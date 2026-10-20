@@ -308,6 +308,14 @@ try {
   }
   console.log(`Rewrote route_trip_codes: ${codes.size} routes.`);
 
+  // Same source as ROUTE_GATES in app.js; the database needs it too, to
+  // enforce gate-wide booking transfers (migration 0050).
+  await client.query("delete from public.route_gates");
+  for (const [route, gate] of gateByDest) {
+    await client.query("insert into public.route_gates (route, gate) values ($1,$2)", [route, gate]);
+  }
+  console.log(`Rewrote route_gates: ${gateByDest.size} routes.`);
+
   await client.query("commit");
   console.log("Done.");
 } catch (err) {

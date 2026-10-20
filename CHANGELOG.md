@@ -4096,6 +4096,49 @@ shown" table; Show all returns the full 1,832.
 
 ---
 
+### 111. Booking transfers by gate, not by route (migration 0050, 20 Oct)
+
+A transfer was limited to operators with an approved vehicle on the booking's
+exact route (0032). The terminal assigns bays by gate, so the receiving operator
+and the plate they pick now only need to be registered for **a route on the same
+gate** as the booking's route (the same route still qualifies).
+
+- **`route_gates`** (new table, 88 routes, read-only for signed-in users): the
+  route -> gate map, which until now existed only in the browser (`ROUTE_GATES`
+  in app.js). Seeded from that list; `scripts/import-vehicle-masterlist.mjs`
+  now rewrites it next to `route_trip_codes`. A route with no gate falls back to
+  exact-route matching.
+- **`vehicle_fits_transfer(vehicle_route, booking_route)`**: the one rule behind
+  the lists and the enforcement.
+- **`list_operator_accounts` / `list_operator_vehicles`** widened to the gate;
+  the vehicle list also returns each vehicle's route, and the dialog shows it
+  ("NBB5496 · SAN JOSE CITY, NUEVA ECIJA") when it isn't the booking's own.
+- **`request_booking_transfer`** re-validates with the same rule (the real gate;
+  the dropdowns are UX). Error text now says "route or gate".
+- **`request_booking_change`**: a plate that arrived via a gate-wide transfer
+  stays valid while the booking's route is unchanged. Without this the new
+  owner could not even change the booking's time afterwards, because the
+  existing check demanded an exact-route vehicle. Picking a *different* plate
+  still has to match the route exactly - the booking form is unchanged.
+- Dialog copy: the context line shows the booking's gate, the intro says any
+  operator on that gate can receive it, empty states say "on this route's gate".
+
+**Applied to the live database by hand**, only 0050, in one transaction with a
+`_schema_migrations` row. Migrations 0048 and 0049 (security advisor fixes, not
+mine) are still **unapplied**, so a plain `run-migration.mjs` run would apply
+them too.
+
+Verified against the live database as `genesis.ops` (rolled-back scratch
+booking, JWT claims set in SQL): a Clark Airport (Gate 5) booking now offers 7
+receiving operators versus 0 under the old exact-route rule; a Baliwag Transit
+bus registered to San Jose City, Nueva Ecija was accepted; a Bicol Isarog
+(Gate 4) operator is absent from the list and its plate is refused by the server
+with the new "route or gate" message. Nothing left behind. The operator
+dialog's new copy loads in the browser; I could not open the dialog itself
+because every demo booking is now in the past (today is 20 Oct).
+
+---
+
 ## What the app does now
 
 

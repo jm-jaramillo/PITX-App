@@ -248,8 +248,9 @@
         <p class="subtle" id="transfer-context"></p>
         <p class="subtle">
           Use this when you have an internal agreement with another
-          operator to cover this slot. PITX staff still need to approve the
-          handoff before it takes effect.
+          operator to cover this slot. Any operator with an approved vehicle on
+          the same gate as this route can receive it. PITX staff still need to
+          approve the handoff before it takes effect.
         </p>
 
         <div class="dialog-grid">
@@ -1784,7 +1785,7 @@
 
       function operatorOptionsHtml() {
         if (operatorAccounts.length === 0) {
-          return `<option value="" disabled selected>No other operator has an approved vehicle for this route</option>`;
+          return `<option value="" disabled selected>No other operator has an approved vehicle on this route's gate</option>`;
         }
         return (
           `<option value="" disabled selected>Select an operator</option>` +
@@ -1824,13 +1825,17 @@
 
         plateSelect.innerHTML =
           vehicles.length === 0
-            ? `<option value="" disabled selected>No approved vehicles for this operator registered for this route</option>`
+            ? `<option value="" disabled selected>No approved vehicles for this operator on this route's gate</option>`
             : `<option value="" disabled selected>Select a vehicle</option>` +
               vehicles
                 .map(
                   (v) =>
                     `<option value="${escapeHtml(v.plate_no)}">${escapeHtml(v.plate_no)}${
                       v.body_number ? ` — Body No. ${escapeHtml(v.body_number)}` : ""
+                    }${
+                      // A vehicle from another route on the same gate says where it
+                      // normally runs, so the sender knows it isn't a same-route bus.
+                      v.route && v.route !== booking?.route ? ` · ${escapeHtml(v.route)}` : ""
                     }</option>`
                 )
                 .join("");
@@ -1850,7 +1855,7 @@
         document.getElementById("transfer_plate_no").disabled = true;
         document.getElementById("transfer_reason").value = "";
         document.getElementById("transfer-context").textContent =
-          `${booking.booking_date}, ${formatSlotStart(booking.slot)} — ${booking.route}`;
+          `${booking.booking_date}, ${formatSlotStart(booking.slot)} — ${booking.route}${gateForRoute(booking.route) ? ` (${gateForRoute(booking.route)})` : ""}`;
         document.getElementById("transfer-error").className = "inline-error hidden";
         transferDialog.showModal();
 
