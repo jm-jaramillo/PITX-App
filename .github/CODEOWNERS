@@ -1,0 +1,5 @@
+# Each module has one owner; shared platform and database changes need both.
+/docs/modules/trip-scheduling/            @jm-jaramillo
+/docs/modules/terminal-operating-system/  @jllanto
+/docs/shared/                             @jm-jaramillo @jllanto
+/supabase/migrations/                     @jm-jaramillo @jllanto
