@@ -114,7 +114,7 @@ export function renderNav(profile, { brand = "PITX", links = [] } = {}) {
 
   host.innerHTML = `
     <div class="sidebar-brand">
-      <img src="${LOGO_URL}" alt="PITX" />
+      <a href="${new URL("portal.html", ROOT_URL).href}" class="brand-link" aria-label="PITX modules"><img src="${LOGO_URL}" alt="PITX" /></a>
       <span class="unit">${brand}</span>
     </div>
     <nav class="sidebar-links">
