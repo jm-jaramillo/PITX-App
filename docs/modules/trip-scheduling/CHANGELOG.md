@@ -1,7 +1,7 @@
 # Project log
 
 Build history for the PITX Trip Scheduling app (formerly "PITX Bus Bay
-Booking" - renamed in #78).
+Booking" - renamed in #78), now the Trip Scheduling module of PITX App (#112).
 Repo: <https://github.com/jm-jaramillo/PITX-App>
 Live: <https://jm-jaramillo.github.io/PITX-App/>
 
@@ -4136,6 +4136,56 @@ bus registered to San Jose City, Nueva Ecija was accepted; a Bicol Isarog
 with the new "route or gate" message. Nothing left behind. The operator
 dialog's new copy loads in the browser; I could not open the dialog itself
 because every demo booking is now in the past (today is 20 Oct).
+
+### 112. PITX App: the site becomes modules; this app is the Trip Scheduling module (28 Oct)
+
+The site is now **PITX App**, a set of modules behind one login and one Supabase
+project. Trip Scheduling is the first; Terminal Operating System (owner
+Jcbllanto16, issue #1) and Ticketing and Booking are next. No database change -
+no migration, nothing applied to the live database.
+
+- **Layout.** The site moved from a flat `docs/` to:
+  - `docs/shared/` - `config.js`, `styles.css`, the logo, `platform.js` and
+    `modules.js`.
+  - `docs/modules/trip-scheduling/` - every existing page.
+  - Root `index.html`, `login.html`, `404.html`.
+- **`app.js` split.** `shared/platform.js` takes the module-agnostic half: the
+  Supabase client, `getProfile` / `guardPage` / `signOut`, the sidebar + topbar
+  shell (`renderNav(profile, { brand, links })`), notifications, `escapeHtml`,
+  `fetchAllRows`, CSV export. `modules/trip-scheduling/assets/app.js` keeps the
+  trip-only parts (`ROUTES`, `ROUTE_GATES`, slots and dates, booking and vehicle
+  rendering, the three sidebar link sets) and re-exports the platform, so no
+  page's imports changed - only asset paths did.
+- **`shared/modules.js`** is the registry: id, name, folder, and which
+  `profiles.role` values may enter, each with a landing page. It only decides
+  what UI to show; RLS is still the access control.
+- **Homepage = module portal.** `index.html` lists the modules the signed-in role
+  can open (signed out goes to `login.html`). Everyone lands there after sign-in;
+  the sidebar logo goes back to it. `portal.html` remains as a redirect. Terminal
+  Operating System shows as a disabled "Coming soon" card for staff (it is not
+  counted as a real module, so the sidebar "All modules" link stays hidden until
+  a second one ships).
+- **Old URLs.** `404.html` forwards root-level page URLs (bookmarks, links already
+  stored in notification rows) to `modules/trip-scheduling/`. `serve-docs.mjs`
+  serves `404.html` for a missing path, like Pages does.
+- **Repo renamed** PITX-Trip-Scheduling -> **PITX-App**; the live site is now
+  <https://jm-jaramillo.github.io/PITX-App/>. The old Pages address returns 404
+  and cannot forward. Package name `pitx-app`.
+- **Docs and scripts.** This file and the README moved into the module folder
+  (links rewritten); the root README now describes PITX App.
+  `import-vehicle-masterlist`, `seed-demo-week` and the operator one-offs moved to
+  `scripts/trip-scheduling/` (`npm run import-vehicles` updated). `CONTRIBUTING.md`
+  covers module rules, one Postgres schema per module, `YYYYMMDDHHMM_<module>_<what>.sql`
+  migration names for new work, and committing straight to `main`.
+  `.github/CODEOWNERS` records module owners (advisory without branch protection).
+
+Verified in the browser against a local server: the sign-in page loads styled,
+signed-out visits to `/` and `portal.html` go to `login.html`, an old URL
+(`my-schedule.html?x=1`) forwards into the module, and - with a faked session in a
+throwaway copy - the sidebar logo opens the portal and the Coming-soon card
+renders. **Not tested signed in on the live site** (no test credentials); sign in
+as an operator and as staff and click through before relying on it. Migration
+`0049` is still untracked and unapplied.
 
 ---
 
