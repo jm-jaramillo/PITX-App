@@ -26,10 +26,9 @@ export const MODULES = [
   {
     id: "terminal-operating-system",
     name: "Terminal Operating System",
-    description: "Terminal-wide operations.",
+    description: "Check every bus at the gates against its approved trip, and run the bays and departure board.",
     path: "modules/terminal-operating-system/",
-    comingSoon: true, // shown on the portal as a disabled card until the module ships
-    roles: { staff: "index.html" },
+    roles: { staff: "gates.html" },
   },
 ];
 
