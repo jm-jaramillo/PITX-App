@@ -6,7 +6,7 @@ login, one Supabase project, made of modules:
 | Module | Folder | Owner | Status |
 |---|---|---|---|
 | Trip Scheduling | [`docs/modules/trip-scheduling/`](docs/modules/trip-scheduling/) | @jm-jaramillo | Live |
-| Terminal Operating System | `docs/modules/terminal-operating-system/` | @Jcbllanto16 | Not started ([#1](https://github.com/jm-jaramillo/PITX-App/issues/1)) |
+| Terminal Operating System | [`docs/modules/terminal-operating-system/`](docs/modules/terminal-operating-system/) | @Jcbllanto16 | Live, gate hardware not connected yet ([#1](https://github.com/jm-jaramillo/PITX-App/issues/1)) |
 | Ticketing and Booking | `docs/modules/ticketing/` | TBD | Not started |
 
 Live: <https://jm-jaramillo.github.io/PITX-App/>
@@ -15,6 +15,8 @@ Live: <https://jm-jaramillo.github.io/PITX-App/>
 - **Trip Scheduling docs** (setup, how it works, project log):
   [README](docs/modules/trip-scheduling/README.md) ·
   [CHANGELOG](docs/modules/trip-scheduling/CHANGELOG.md)
+- **Terminal Operating System docs:**
+  [README](docs/modules/terminal-operating-system/README.md)
 
 ## Layout
 
