@@ -20,8 +20,8 @@ Live: <https://jm-jaramillo.github.io/PITX-App/>
 
 ```
 docs/                        the site, served as-is by GitHub Pages (no build step)
-  index.html                 sign in
-  portal.html                module picker
+  index.html                 home: module portal (sends signed-out users to login.html)
+  login.html                 sign in
   404.html                   forwards old root-level page URLs
   shared/                    platform used by every module (auth, nav, notifications, styles, config)
   modules/<module>/          one folder per module

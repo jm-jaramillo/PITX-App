@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Sign in · PITX Trip Scheduling</title>
+    <title>PITX App</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -11,170 +11,52 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="shared/styles.css" />
+    <style>
+      .portal { max-width: 880px; margin: 0 auto; padding: 48px 16px; }
+      .portal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 32px; }
+      .portal-head img { height: 40px; }
+      .portal-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+      .portal-card { display: block; padding: 20px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); text-decoration: none; color: inherit; }
+      .portal-card:hover { border-color: var(--blue); }
+      .portal-soon { opacity: 0.6; cursor: default; }
+      .portal-soon:hover { border-color: var(--border); }
+      .soon-tag { font-size: 11px; font-weight: 700; color: var(--label); background: var(--border); border-radius: 999px; padding: 2px 8px; vertical-align: middle; }
+      .portal-card h2 { margin: 0 0 6px; font-size: 18px; color: var(--title); }
+      .portal-card p { margin: 0; font-size: 14px; color: var(--label); }
+    </style>
   </head>
   <body>
-    <main class="login-page">
-      <div class="login-card">
-        <div class="login-head">
-          <img src="shared/pitx-logo.webp" alt="PITX" />
-          <p class="eyebrow">Terminal Ops</p>
-          <h1>Trip Scheduling</h1>
-          <p class="subtle">
-            Sign in to request or manage provincial bus trip schedules.
-          </p>
-        </div>
-
-        <form class="login-form" id="login-form">
-          <div class="field">
-            <label for="username">Username</label>
-            <input id="username" name="username" autocomplete="username" required />
-          </div>
-
-          <div class="field">
-            <label for="password">Password</label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autocomplete="current-password"
-              required
-            />
-          </div>
-
-          <p class="inline-error hidden" id="login-error"></p>
-
-          <button type="submit" class="btn-primary" id="submit">Sign in</button>
-
-          <p class="fineprint">
-            <button type="button" class="btn-link" id="forgot-toggle">Forgot password?</button>
-          </p>
-          <p class="fineprint">
-            Don&rsquo;t have an account? PITX staff creates operator and staff
-            accounts &mdash; ask your PITX terminal contact.
-          </p>
-        </form>
-
-        <form class="login-form hidden" id="forgot-form">
-          <p class="subtle">
-            There's no self-service email reset - accounts here log in
-            with a username, not an email inbox. Enter it below and PITX
-            staff will be notified to reset your password for you.
-          </p>
-          <div class="field">
-            <label for="forgot-username">Username</label>
-            <input id="forgot-username" autocomplete="username" required />
-          </div>
-          <p class="inline-error hidden" id="forgot-error"></p>
-          <p class="inline-ok hidden" id="forgot-ok"></p>
-          <button type="submit" class="btn-primary" id="forgot-submit">Notify staff</button>
-          <p class="fineprint">
-            <button type="button" class="btn-link" id="forgot-cancel">Back to sign in</button>
-          </p>
-        </form>
+    <main class="portal">
+      <div class="portal-head">
+        <img src="shared/pitx-logo.webp" alt="PITX" />
+        <button type="button" class="btn-outline" id="sign-out">Sign out</button>
       </div>
+      <h1>Terminal Ops</h1>
+      <p class="subtle">Choose a module.</p>
+      <div class="portal-grid" id="modules"></div>
     </main>
 
     <script type="module">
-      import { supabase, usernameToEmail, getProfile, landingFor } from "./shared/platform.js";
-      import { SUPABASE_URL } from "./shared/config.js";
+      import { getProfile, signOut, escapeHtml } from "./shared/platform.js";
+      import { modulesFor, moduleHome } from "./shared/modules.js";
 
-      const form = document.getElementById("login-form");
-      const errorEl = document.getElementById("login-error");
-      const submitBtn = document.getElementById("submit");
+      document.getElementById("sign-out").addEventListener("click", signOut);
 
-      const forgotForm = document.getElementById("forgot-form");
-      const forgotError = document.getElementById("forgot-error");
-      const forgotOk = document.getElementById("forgot-ok");
-      const forgotSubmit = document.getElementById("forgot-submit");
-
-      document.getElementById("forgot-toggle").addEventListener("click", () => {
-        form.classList.add("hidden");
-        forgotForm.classList.remove("hidden");
-      });
-      document.getElementById("forgot-cancel").addEventListener("click", () => {
-        forgotForm.classList.add("hidden");
-        form.classList.remove("hidden");
-        forgotError.className = "inline-error hidden";
-        forgotOk.className = "inline-ok hidden";
-      });
-
-      forgotForm.addEventListener("submit", async (event) => {
-        event.preventDefault();
-        forgotError.className = "inline-error hidden";
-        forgotOk.className = "inline-ok hidden";
-        forgotSubmit.disabled = true;
-        forgotSubmit.textContent = "Sending…";
-
-        // Unauthenticated by design - this is the one action in the app
-        // meant to be reachable while signed out, since forgetting your
-        // password is exactly the situation where you can't sign in to
-        // ask any other way. Raises a staff-broadcast notification
-        // rather than emailing a reset link - these accounts log in
-        // with a username, not a real inbox (see usernameToEmail()).
-        let result;
-        try {
-          const response = await fetch(
-            `${SUPABASE_URL}/functions/v1/request-password-reset`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                username: document.getElementById("forgot-username").value,
-              }),
-            }
-          );
-          result = await response.json();
-        } catch {
-          result = {
-            error:
-              "Could not reach the password-reset request service. Is the " +
-              "`request-password-reset` Edge Function deployed?",
-          };
-        }
-
-        forgotSubmit.disabled = false;
-        forgotSubmit.textContent = "Notify staff";
-
-        if (result?.error) {
-          forgotError.textContent = result.error;
-          forgotError.className = "inline-error";
-          return;
-        }
-
-        forgotOk.textContent = result.message;
-        forgotOk.className = "inline-ok";
-        document.getElementById("forgot-username").value = "";
-      });
-
-      // Already signed in? Go straight to the right home page.
-      getProfile().then((profile) => {
-        if (profile) {
-          location.replace(landingFor(profile));
-        }
-      });
-
-      form.addEventListener("submit", async (event) => {
-        event.preventDefault();
-        errorEl.className = "inline-error hidden";
-        submitBtn.disabled = true;
-        submitBtn.textContent = "Signing in…";
-
-        const { error } = await supabase.auth.signInWithPassword({
-          email: usernameToEmail(document.getElementById("username").value),
-          password: document.getElementById("password").value,
-        });
-
-        if (error) {
-          errorEl.textContent = "Incorrect username or password.";
-          errorEl.className = "inline-error";
-          submitBtn.disabled = false;
-          submitBtn.textContent = "Sign in";
-          return;
-        }
-
-        const profile = await getProfile();
-        location.replace(landingFor(profile));
-      });
+      const profile = await getProfile();
+      if (!profile) {
+        location.replace("login.html");
+      } else {
+        const mods = modulesFor(profile.role, { includeComingSoon: true });
+        document.getElementById("modules").innerHTML = mods
+          .map((m) =>
+            m.comingSoon
+              ? `<div class="portal-card portal-soon" aria-disabled="true">
+                  <h2>${escapeHtml(m.name)} <span class="soon-tag">Coming soon</span></h2><p>${escapeHtml(m.description)}</p></div>`
+              : `<a class="portal-card" href="${m.path}${moduleHome(m, profile.role)}">
+                  <h2>${escapeHtml(m.name)}</h2><p>${escapeHtml(m.description)}</p></a>`
+          )
+          .join("") || '<p class="subtle">No modules are available for your account.</p>';
+      }
     </script>
   </body>
 </html>

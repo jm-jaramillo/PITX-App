@@ -8,7 +8,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.112.3";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
-import { modulesFor, moduleHome } from "./modules.js";
+import { modulesFor } from "./modules.js";
 
 // docs/ root and the shared logo, resolved from this file so they work from
 // any module depth.
@@ -39,16 +39,9 @@ export async function getProfile() {
   return profile ?? null;
 }
 
-/**
- * Where a signed-in user goes after login / when sent away from a page:
- * straight into their module's home when they only have one, otherwise
- * the module portal.
- */
+/** Everyone lands on the module portal (the site home, index.html); signed out goes to login. */
 export function landingFor(profile) {
-  const mods = modulesFor(profile?.role);
-  if (mods.length === 1) return new URL(moduleHome(mods[0], profile.role), new URL(mods[0].path, ROOT_URL)).href;
-  if (mods.length > 1) return new URL("portal.html", ROOT_URL).href;
-  return new URL("index.html", ROOT_URL).href;
+  return new URL(profile ? "index.html" : "login.html", ROOT_URL).href;
 }
 
 /**
@@ -60,7 +53,7 @@ export async function guardPage(requiredRole) {
   const profile = await getProfile();
 
   if (!profile) {
-    location.replace(new URL("index.html", ROOT_URL).href);
+    location.replace(new URL("login.html", ROOT_URL).href);
     return null;
   }
   if (profile.role !== requiredRole) {
@@ -72,7 +65,7 @@ export async function guardPage(requiredRole) {
 
 export async function signOut() {
   await supabase.auth.signOut();
-  location.replace(new URL("index.html", ROOT_URL).href);
+  location.replace(new URL("login.html", ROOT_URL).href);
 }
 
 /* -------------------------------------------------------------------- nav */
@@ -108,13 +101,13 @@ export function renderNav(profile, { brand = "PITX", links = [] } = {}) {
   const mods = modulesFor(profile.role);
   const allModules =
     mods.length > 1
-      ? `<a href="${new URL("portal.html", ROOT_URL).href}"><span class="icon">${ICONS.overview}</span>All modules</a>`
+      ? `<a href="${new URL("index.html", ROOT_URL).href}"><span class="icon">${ICONS.overview}</span>All modules</a>`
       : "";
   const displayName = profile.operator_name || profile.username;
 
   host.innerHTML = `
     <div class="sidebar-brand">
-      <a href="${new URL("portal.html", ROOT_URL).href}" class="brand-link" aria-label="PITX modules"><img src="${LOGO_URL}" alt="PITX" /></a>
+      <a href="${new URL("index.html", ROOT_URL).href}" class="brand-link" aria-label="PITX modules"><img src="${LOGO_URL}" alt="PITX" /></a>
       <span class="unit">${brand}</span>
     </div>
     <nav class="sidebar-links">

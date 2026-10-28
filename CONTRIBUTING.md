@@ -6,7 +6,7 @@ project and one login.
 
 ```
 docs/
-  index.html, portal.html, 404.html   login, module picker, old-URL forwarding
+  index.html, login.html, 404.html    home (module portal), sign in, old-URL forwarding
   shared/                             platform - used by every module
     platform.js                       Supabase client, auth guard, nav shell, notifications, helpers
     modules.js                        module registry
