@@ -23,10 +23,19 @@ export const MODULES = [
       ticketing: "ticketing.html",
     },
   },
+  {
+    id: "terminal-operating-system",
+    name: "Terminal Operating System",
+    description: "Terminal-wide operations.",
+    path: "modules/terminal-operating-system/",
+    comingSoon: true, // shown on the portal as a disabled card until the module ships
+    roles: { staff: "index.html" },
+  },
 ];
 
-export function modulesFor(role) {
-  return MODULES.filter((m) => role in m.roles);
+/** Modules this role can open. Pass { includeComingSoon: true } to list placeholders too. */
+export function modulesFor(role, { includeComingSoon = false } = {}) {
+  return MODULES.filter((m) => role in m.roles && (includeComingSoon || !m.comingSoon));
 }
 
 export function moduleHome(module, role) {

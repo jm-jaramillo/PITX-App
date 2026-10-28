@@ -18,6 +18,9 @@
       .portal-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
       .portal-card { display: block; padding: 20px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); text-decoration: none; color: inherit; }
       .portal-card:hover { border-color: var(--blue); }
+      .portal-soon { opacity: 0.6; cursor: default; }
+      .portal-soon:hover { border-color: var(--border); }
+      .soon-tag { font-size: 11px; font-weight: 700; color: var(--label); background: var(--border); border-radius: 999px; padding: 2px 8px; vertical-align: middle; }
       .portal-card h2 { margin: 0 0 6px; font-size: 18px; color: var(--title); }
       .portal-card p { margin: 0; font-size: 14px; color: var(--label); }
     </style>
@@ -43,11 +46,14 @@
       if (!profile) {
         location.replace("index.html");
       } else {
-        const mods = modulesFor(profile.role);
+        const mods = modulesFor(profile.role, { includeComingSoon: true });
         document.getElementById("modules").innerHTML = mods
-          .map(
-            (m) => `<a class="portal-card" href="${m.path}${moduleHome(m, profile.role)}">
-              <h2>${escapeHtml(m.name)}</h2><p>${escapeHtml(m.description)}</p></a>`
+          .map((m) =>
+            m.comingSoon
+              ? `<div class="portal-card portal-soon" aria-disabled="true">
+                  <h2>${escapeHtml(m.name)} <span class="soon-tag">Coming soon</span></h2><p>${escapeHtml(m.description)}</p></div>`
+              : `<a class="portal-card" href="${m.path}${moduleHome(m, profile.role)}">
+                  <h2>${escapeHtml(m.name)}</h2><p>${escapeHtml(m.description)}</p></a>`
           )
           .join("");
       }
