@@ -400,6 +400,13 @@ export async function getProfile() {
  * page. Redirects to login (or to the other role's home) when not, and
  * resolves with the profile when the page may proceed.
  */
+/** Where each role lands after login / when sent away from a page. */
+export function homeFor(role) {
+  if (role === "staff") return "overview.html";
+  if (role === "ticketing") return "ticketing.html";
+  return "operator-overview.html";
+}
+
 export async function guardPage(requiredRole) {
   const profile = await getProfile();
 
@@ -408,7 +415,7 @@ export async function guardPage(requiredRole) {
     return null;
   }
   if (profile.role !== requiredRole) {
-    location.replace(profile.role === "staff" ? "overview.html" : "operator-overview.html");
+    location.replace(homeFor(profile.role));
     return null;
   }
   return profile;
@@ -464,6 +471,12 @@ const STAFF_LINKS = [
   { href: "accounts.html", label: "Accounts", icon: ICONS.user },
 ];
 
+// The Ticketing Admin only handles passenger seat requests: it sees no
+// bookings, vehicles or approvals (RLS enforces that, not just this list).
+const TICKETING_LINKS = [
+  { href: "ticketing.html", label: "Seat requests", icon: ICONS.check },
+];
+
 export function initials(name) {
   const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
   if (!parts.length) return "?";
@@ -474,7 +487,12 @@ export function renderNav(profile) {
   const host = document.getElementById("nav");
   if (!host) return;
 
-  const links = profile.role === "staff" ? STAFF_LINKS : OPERATOR_LINKS;
+  const links =
+    profile.role === "staff"
+      ? STAFF_LINKS
+      : profile.role === "ticketing"
+        ? TICKETING_LINKS
+        : OPERATOR_LINKS;
   const here = location.pathname.split("/").pop() || "index.html";
   const displayName = profile.operator_name || profile.username;
 
@@ -593,8 +611,8 @@ async function initNotifications(profile) {
     .order("created_at", { ascending: false })
     .limit(NOTIF_LIMIT);
   query =
-    profile.role === "staff"
-      ? query.eq("recipient_role", "staff").or(`recipient_id.is.null,recipient_id.eq.${profile.id}`)
+    profile.role === "staff" || profile.role === "ticketing"
+      ? query.eq("recipient_role", profile.role).or(`recipient_id.is.null,recipient_id.eq.${profile.id}`)
       : query.eq("recipient_role", "operator").eq("recipient_id", profile.id);
 
   const { data } = await query;

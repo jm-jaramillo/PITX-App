@@ -2999,3 +2999,143 @@ td.row-actions-cell {
 .app-content > .wrap {
   width: 100%;
 }
+
+/* ------------------------------------------------------------ seat map */
+/* Shared by the passenger seat picker (seats.html) and the Ticketing
+   Admin queue (ticketing.html) - see assets/seat-map.js. */
+.seatmap {
+  --seat: 44px;
+  --aisle: 28px;
+  --gap: 6px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 14px 16px 12px;
+  background: var(--inset);
+  border: 1px solid var(--border);
+  border-radius: 28px 28px 14px 14px;
+  max-width: 100%;
+}
+.seatmap-front,
+.seatmap-back {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.seatmap-front { padding: 0 2px 8px; border-bottom: 2px solid var(--border); }
+.seatmap-back { justify-content: center; padding-top: 8px; border-top: 2px solid var(--border); }
+.seatmap-wheel { display: inline-flex; color: var(--label); }
+.seatmap-grid {
+  display: grid;
+  gap: var(--gap);
+  justify-content: center;
+}
+.seat-aisle { width: var(--aisle); }
+.seat {
+  width: var(--seat);
+  height: var(--seat);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: 600 13px/1 Inter, system-ui, sans-serif;
+  color: var(--text-2);
+  background: var(--surface);
+  border: 1.5px solid var(--blue-dot);
+  border-radius: 9px 9px 6px 6px;
+  cursor: pointer;
+  transition: transform 0.08s ease, background 0.12s ease;
+}
+.seat:active:not(:disabled) { transform: scale(0.94); }
+.seat:focus-visible { outline: 3px solid var(--blue-ring); outline-offset: 1px; }
+.seat-none { border: 0; background: none; cursor: default; }
+.seat-available:hover { background: var(--blue-wash); }
+.seat-selected {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+}
+.seat-held {
+  background: var(--amber-wash);
+  border-color: var(--amber-br);
+  color: var(--amber-ink);
+  cursor: not-allowed;
+}
+.seat-blocked {
+  background: var(--ground-alt);
+  border-color: var(--border);
+  color: var(--faint);
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+.seat:disabled { cursor: not-allowed; }
+
+.seat-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--label);
+}
+.seat-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.seat-legend .seat { width: 18px; height: 18px; border-radius: 5px; cursor: default; font-size: 0; }
+
+/* Seat picker layout: trip list / map + booking form side by side on a
+   wide screen, stacked on a phone. */
+.seat-picker { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 900px) {
+  .seat-picker { grid-template-columns: auto minmax(280px, 1fr); align-items: start; }
+}
+.seat-picker-map { display: flex; justify-content: center; overflow-x: auto; }
+.seat-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 30px;
+  margin: 0 0 12px;
+}
+.seat-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--blue-wash);
+  color: var(--blue-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+.trip-list { display: flex; flex-direction: column; gap: 10px; }
+.trip-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--border-card);
+  border-radius: var(--r-card-sm, 14px);
+  cursor: pointer;
+}
+.trip-option:hover:not(:disabled) { border-color: var(--blue-dot); }
+.trip-option:disabled { opacity: 0.55; cursor: not-allowed; }
+.trip-option strong { display: block; font-size: 15px; color: var(--title); }
+.trip-option small { color: var(--label); }
+.trip-option .trip-seats { text-align: right; white-space: nowrap; font-weight: 700; color: var(--title); }
+.trip-option .trip-seats small { display: block; font-weight: 500; }
+.public-wrap { max-width: 960px; margin: 0 auto; padding: 20px 16px 48px; }
+.public-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+.public-brand img { height: 30px; width: auto; max-width: 100%; }
+.public-brand span { font-weight: 800; color: var(--title); }

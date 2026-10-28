@@ -99,8 +99,8 @@ Deno.serve(async (req) => {
   if (password.length < 8) {
     return json({ error: "Password must be at least 8 characters." }, 400);
   }
-  if (role !== "operator" && role !== "staff") {
-    return json({ error: "Role must be 'operator' or 'staff'." }, 400);
+  if (role !== "operator" && role !== "staff" && role !== "ticketing") {
+    return json({ error: "Role must be 'operator', 'staff' or 'ticketing'." }, 400);
   }
 
   // --- 3. Create the account with the privileged client -------------------

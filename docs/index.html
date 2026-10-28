@@ -75,7 +75,7 @@
     </main>
 
     <script type="module">
-      import { supabase, usernameToEmail, getProfile } from "./assets/app.js";
+      import { supabase, usernameToEmail, getProfile, homeFor } from "./assets/app.js";
       import { SUPABASE_URL } from "./assets/config.js";
 
       const form = document.getElementById("login-form");
@@ -149,9 +149,7 @@
       // Already signed in? Go straight to the right home page.
       getProfile().then((profile) => {
         if (profile) {
-          location.replace(
-            profile.role === "staff" ? "overview.html" : "operator-overview.html"
-          );
+          location.replace(homeFor(profile.role));
         }
       });
 
@@ -175,9 +173,7 @@
         }
 
         const profile = await getProfile();
-        location.replace(
-          profile?.role === "staff" ? "overview.html" : "operator-overview.html"
-        );
+        location.replace(homeFor(profile?.role));
       });
     </script>
   </body>

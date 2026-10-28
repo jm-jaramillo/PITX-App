@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Seat requests · PITX Trip Scheduling</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="assets/styles.css" />
+    <style>
+      .req-grid { display: flex; flex-direction: column; gap: 14px; }
+      .req-card { display: grid; gap: 14px; }
+      .req-head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: flex-start; }
+      .req-head h3 { margin: 0 0 2px; font-size: 16px; color: var(--title); }
+      .req-meta { display: grid; gap: 4px 24px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); font-size: 13px; color: var(--label); }
+      .req-meta b { color: var(--title); font-weight: 600; }
+      .req-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+      .req-bus { overflow-x: auto; }
+      .tabs-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+      .tabs-row button { padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); font: 600 13px Inter, sans-serif; color: var(--label); cursor: pointer; }
+      .tabs-row button[aria-pressed="true"] { background: var(--blue); border-color: var(--blue); color: #fff; }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" id="nav"></aside>
+      <div class="app-content">
+        <main class="wrap wrap-narrow">
+          <div class="page-head">
+            <div>
+              <p class="eyebrow">Ticketing &middot; Passenger Seats</p>
+              <h1>Seat requests</h1>
+              <p class="subtle">
+                Passengers pick their seats online. Block the same seats in the
+                ticketing system, then mark the request as blocked here.
+              </p>
+            </div>
+          </div>
+
+          <div class="hidden" id="message"></div>
+
+          <div class="tabs-row" id="tabs" role="group" aria-label="Filter requests"></div>
+          <div class="req-grid" id="list"></div>
+        </main>
+      </div>
+    </div>
+
+    <script type="module">
+      import {
+        supabase,
+        guardPage,
+        renderNav,
+        showMessage,
+        escapeHtml,
+        formatSlotStart,
+        formatDateTime,
+      } from "./assets/app.js";
+      import { renderSeatMap } from "./assets/seat-map.js";
+
+      const profile = await guardPage("ticketing");
+      if (!profile) throw new Error("unauthorised");
+      renderNav(profile);
+
+      const TABS = [
+        { key: "requested", label: "To block" },
+        { key: "blocked", label: "Blocked" },
+        { key: "released", label: "Released" },
+      ];
+      let tab = "requested";
+      let requests = [];
+      const openBus = new Set(); // request refs whose whole-bus map is expanded
+      const busCache = new Map(); // booking_id -> holders
+
+      async function load() {
+        const { data, error } = await supabase.rpc("list_seat_requests");
+        if (error) return showMessage("message", "Could not load seat requests: " + error.message);
+        requests = data ?? [];
+        render();
+      }
+
+      function render() {
+        document.getElementById("tabs").innerHTML = TABS.map((t) => {
+          const n = requests.filter((r) => r.status === t.key).length;
+          return `<button type="button" data-tab="${t.key}" aria-pressed="${t.key === tab}">${t.label} (${n})</button>`;
+        }).join("");
+
+        const rows = requests
+          .filter((r) => r.status === tab)
+          // Soonest departure first for the queue that needs action.
+          .sort((a, b) =>
+            tab === "requested"
+              ? `${a.booking_date}${String(a.slot).padStart(3, "0")}`.localeCompare(`${b.booking_date}${String(b.slot).padStart(3, "0")}`)
+              : 0
+          );
+
+        document.getElementById("list").innerHTML = rows.length
+          ? rows.map(card).join("")
+          : `<div class="card"><p class="subtle" style="margin:0">${
+              tab === "requested" ? "Nothing waiting - you're all caught up." : "Nothing here yet."
+            }</p></div>`;
+
+        for (const r of rows) {
+          if (openBus.has(r.request_ref)) drawBus(r);
+        }
+      }
+
+      function card(r) {
+        const seats = r.seats.map((s) => `<span class="seat-chip">Seat ${s}</span>`).join("");
+        return `
+          <article class="card req-card" data-ref="${escapeHtml(r.request_ref)}">
+            <div class="req-head">
+              <div>
+                <h3>${escapeHtml(r.route)} &middot; ${escapeHtml(formatSlotStart(r.slot))}, ${escapeHtml(r.booking_date)}</h3>
+                <span class="fineprint">${escapeHtml(r.request_ref)} &middot; requested ${escapeHtml(formatDateTime(r.created_at))}</span>
+              </div>
+              <div class="seat-summary" style="margin:0">${seats}</div>
+            </div>
+            <div class="req-meta">
+              <span>Passenger<br /><b>${escapeHtml(r.passenger_name)}</b></span>
+              <span>Mobile<br /><b><a href="tel:${escapeHtml(r.contact_no)}">${escapeHtml(r.contact_no)}</a></b></span>
+              <span>Operator<br /><b>${escapeHtml(r.operator_name)}</b></span>
+              <span>Plate<br /><b>${escapeHtml(r.plate_no ?? "—")}</b></span>
+              ${r.trip_number ? `<span>Trip no.<br /><b>${escapeHtml(r.trip_number)}</b></span>` : ""}
+              ${r.release_note ? `<span>Note<br /><b>${escapeHtml(r.release_note)}</b></span>` : ""}
+            </div>
+            <div class="req-actions">
+              ${r.status === "requested" ? `<button type="button" class="btn-approve" data-act="block">Mark as blocked</button>` : ""}
+              ${r.status !== "released" ? `<button type="button" class="btn-danger-outline" data-act="release">Release</button>` : ""}
+              <button type="button" class="btn-outline" data-act="bus">${openBus.has(r.request_ref) ? "Hide" : "View"} bus</button>
+            </div>
+            <div class="req-bus ${openBus.has(r.request_ref) ? "" : "hidden"}" id="bus-${escapeHtml(r.request_ref)}"></div>
+          </article>`;
+      }
+
+      async function drawBus(r) {
+        const host = document.getElementById(`bus-${r.request_ref}`);
+        if (!host) return;
+        let holders = busCache.get(r.booking_id);
+        if (!holders) {
+          const { data } = await supabase.rpc("list_trip_seat_holders", { p_booking_id: r.booking_id });
+          holders = data ?? [];
+          busCache.set(r.booking_id, holders);
+        }
+        const states = new Map();
+        for (const h of holders) {
+          const mine = h.request_ref === r.request_ref;
+          states.set(h.seat_no, {
+            // This request's own seats are highlighted; others show as taken.
+            state: mine ? "selected" : h.status === "requested" ? "held" : "blocked",
+            title: `${h.passenger_name} (${h.status})`,
+          });
+        }
+        renderSeatMap(host, r.capacity, { states, interactive: false });
+      }
+
+      document.getElementById("tabs").addEventListener("click", (e) => {
+        const b = e.target.closest("button[data-tab]");
+        if (b) {
+          tab = b.dataset.tab;
+          render();
+        }
+      });
+
+      document.getElementById("list").addEventListener("click", async (e) => {
+        const btn = e.target.closest("button[data-act]");
+        if (!btn) return;
+        const ref = btn.closest("[data-ref]").dataset.ref;
+        const r = requests.find((x) => x.request_ref === ref);
+
+        if (btn.dataset.act === "bus") {
+          openBus.has(ref) ? openBus.delete(ref) : openBus.add(ref);
+          busCache.delete(r.booking_id);
+          return render();
+        }
+
+        btn.disabled = true;
+        let error;
+        if (btn.dataset.act === "block") {
+          ({ error } = await supabase.rpc("block_seat_request", { p_ref: ref }));
+        } else {
+          const note = prompt("Reason (optional, shown to the passenger):", "");
+          if (note === null) {
+            btn.disabled = false;
+            return;
+          }
+          ({ error } = await supabase.rpc("release_seat_request", { p_ref: ref, p_note: note }));
+        }
+        if (error) {
+          btn.disabled = false;
+          return showMessage("message", error.message);
+        }
+        busCache.clear();
+        await load();
+      });
+
+      await load();
+      // New requests arrive while this page is open; the bell badge only
+      // refreshes on page load, so keep the queue itself current.
+      setInterval(load, 30000);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Choose your seat · PITX</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="assets/styles.css" />
+  </head>
+  <body>
+    <!-- Public page: passengers have no account, so this deliberately does
+         not call guardPage(). Everything goes through the anon-callable
+         functions in migration 0051 (list_seat_trips, get_trip_seats,
+         request_seats, get_seat_request, cancel_seat_request). -->
+    <main class="public-wrap">
+      <div class="public-brand">
+        <img src="assets/pitx-logo.webp" alt="PITX" />
+      </div>
+
+      <div class="hidden" id="message"></div>
+
+      <!-- Step 1: pick a departure -->
+      <section id="step-trips">
+        <h1 style="margin: 0 0 4px">Choose your seat</h1>
+        <p class="subtle">Pick your departure, tap the seats you want, and the PITX ticketing office will block them for you.</p>
+        <div class="card">
+          <div class="grid grid-2">
+            <div class="field">
+              <label for="trip-date">Travel date</label>
+              <input id="trip-date" type="date" />
+            </div>
+            <div class="field">
+              <label for="trip-dest">Destination</label>
+              <input id="trip-dest" type="search" placeholder="e.g. Legazpi" autocomplete="off" />
+            </div>
+          </div>
+        </div>
+        <p class="subtle" id="trip-note"></p>
+        <div class="trip-list" id="trip-list"></div>
+
+        <div class="card" style="margin-top: 24px">
+          <form id="find-form" style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap">
+            <div class="field" style="flex: 1; min-width: 200px">
+              <label for="find-ref">Already requested seats? Enter your reference</label>
+              <input id="find-ref" placeholder="S-1A2B3C4D" autocomplete="off" />
+            </div>
+            <button type="submit" class="btn-outline">Check status</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- Step 2: pick seats -->
+      <section id="step-seats" class="hidden">
+        <button type="button" class="btn-link" id="back-to-trips">&larr; Other departures</button>
+        <h1 id="trip-title" style="margin: 8px 0 2px"></h1>
+        <p class="subtle" id="trip-sub"></p>
+
+        <div class="seat-picker">
+          <div>
+            <ul class="seat-legend">
+              <li><span class="seat seat-available"></span>Available</li>
+              <li><span class="seat seat-selected"></span>Yours</li>
+              <li><span class="seat seat-held"></span>Reserved</li>
+              <li><span class="seat seat-blocked"></span>Taken</li>
+            </ul>
+            <div class="seat-picker-map" id="seatmap"></div>
+          </div>
+
+          <form class="card" id="seat-form" novalidate>
+            <p class="card-label">Your seats</p>
+            <div class="seat-summary" id="seat-summary"></div>
+            <div class="field">
+              <label for="p-name">Passenger name</label>
+              <input id="p-name" autocomplete="name" maxlength="80" required />
+            </div>
+            <div class="field">
+              <label for="p-contact">Mobile number</label>
+              <input id="p-contact" type="tel" inputmode="tel" autocomplete="tel" placeholder="09XX XXX XXXX" maxlength="20" required />
+            </div>
+            <p class="fineprint">
+              Up to 6 seats per request. The PITX ticketing office is
+              notified and will block your seats; you will still pay and
+              get your ticket at the counter.
+            </p>
+            <button type="submit" class="btn-primary" id="submit-btn" disabled>Request seats</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- Step 3: confirmation / status -->
+      <section id="step-done" class="hidden">
+        <div class="card" id="done-card"></div>
+        <p style="margin-top: 16px"><button type="button" class="btn-outline" id="done-back">Book more seats</button></p>
+      </section>
+    </main>
+
+    <script type="module">
+      import { supabase, escapeHtml, formatSlotStart, todayISO, addDays } from "./assets/app.js";
+      import { renderSeatMap, hasSeatLayout } from "./assets/seat-map.js";
+
+      const MAX_SEATS = 6;
+      const $ = (id) => document.getElementById(id);
+
+      let trips = [];
+      let trip = null; // the departure whose seat map is open
+      let taken = new Map(); // seat -> "held" | "blocked"
+      let selected = new Set();
+      let pollTimer = null;
+
+      const dateInput = $("trip-date");
+      dateInput.min = todayISO();
+      dateInput.max = addDays(todayISO(), 60);
+      dateInput.value = todayISO();
+      dateInput.addEventListener("change", loadTrips);
+      $("trip-dest").addEventListener("input", renderTrips);
+
+      function show(step) {
+        for (const id of ["step-trips", "step-seats", "step-done"]) {
+          $(id).classList.toggle("hidden", id !== step);
+        }
+        if (step !== "step-seats") stopPolling();
+        window.scrollTo({ top: 0 });
+      }
+      function flash(text, kind = "error") {
+        const el = $("message");
+        el.textContent = text;
+        el.className = kind === "error" ? "inline-error" : "inline-ok";
+        el.scrollIntoView({ block: "nearest" });
+      }
+      function clearFlash() {
+        $("message").className = "hidden";
+      }
+
+      /* -------------------------------------------------- step 1: trips */
+      async function loadTrips() {
+        clearFlash();
+        $("trip-list").innerHTML = "";
+        $("trip-note").textContent = "Loading departures…";
+        const { data, error } = await supabase.rpc("list_seat_trips", { p_date: dateInput.value });
+        if (error) {
+          $("trip-note").textContent = "";
+          flash("Could not load departures. Please try again.");
+          return;
+        }
+        trips = data ?? [];
+        renderTrips();
+      }
+
+      function renderTrips() {
+        const q = $("trip-dest").value.trim().toLowerCase();
+        const list = trips.filter((t) => !q || t.route.toLowerCase().includes(q));
+        $("trip-note").textContent = list.length
+          ? `${list.length} departure${list.length === 1 ? "" : "s"} open for seat selection`
+          : trips.length
+            ? "No departures match that destination."
+            : "No departures are open for seat selection on this date yet.";
+        $("trip-list").innerHTML = list
+          .map((t) => {
+            const left = t.capacity - t.seats_taken;
+            return `
+              <button type="button" class="trip-option" data-id="${t.booking_id}" ${left <= 0 || !hasSeatLayout(t.capacity) ? "disabled" : ""}>
+                <span>
+                  <strong>${escapeHtml(formatSlotStart(t.slot))} &middot; ${escapeHtml(t.route)}</strong>
+                  <small>${escapeHtml(t.trade_name || t.operator_name)} &middot; ${t.capacity}-seater (${escapeHtml(t.config)})</small>
+                </span>
+                <span class="trip-seats">${left <= 0 ? "Full" : left}<small>${left <= 0 ? "" : "seats left"}</small></span>
+              </button>`;
+          })
+          .join("");
+      }
+      $("trip-list").addEventListener("click", (e) => {
+        const btn = e.target.closest(".trip-option");
+        if (btn && !btn.disabled) openTrip(trips.find((t) => t.booking_id === btn.dataset.id));
+      });
+
+      /* -------------------------------------------------- step 2: seats */
+      async function openTrip(t) {
+        clearFlash();
+        trip = t;
+        selected = new Set();
+        $("trip-title").textContent = `${formatSlotStart(t.slot)} · ${t.route}`;
+        $("trip-sub").textContent =
+          `${new Date(t.booking_date + "T00:00:00").toLocaleDateString("en-PH", { weekday: "long", month: "long", day: "numeric" })}` +
+          ` · ${t.trade_name || t.operator_name} · ${t.capacity}-seater`;
+        show("step-seats");
+        await refreshSeats();
+        pollTimer = setInterval(refreshSeats, 15000);
+      }
+
+      function stopPolling() {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+
+      async function refreshSeats() {
+        if (!trip) return;
+        const { data } = await supabase.rpc("get_trip_seats", { p_booking_id: trip.booking_id });
+        taken = new Map((data ?? []).map((r) => [r.seat_no, r.state]));
+        // Someone else grabbed a seat this passenger had ticked.
+        const lost = [...selected].filter((s) => taken.has(s));
+        lost.forEach((s) => selected.delete(s));
+        if (lost.length) flash(`Seat ${lost.join(", ")} was just taken by someone else.`);
+        draw();
+      }
+
+      function draw() {
+        const states = new Map();
+        for (const [seat, state] of taken) states.set(seat, { state });
+        for (const seat of selected) states.set(seat, { state: "selected" });
+        renderSeatMap($("seatmap"), trip.capacity, { states, onToggle: toggle });
+
+        const list = [...selected].sort((a, b) => a - b);
+        $("seat-summary").innerHTML = list.length
+          ? list.map((s) => `<span class="seat-chip">Seat ${s}</span>`).join("")
+          : `<span class="fineprint">Tap a seat on the map to choose it.</span>`;
+        $("submit-btn").disabled = list.length === 0;
+        $("submit-btn").textContent = list.length
+          ? `Request ${list.length} seat${list.length === 1 ? "" : "s"}`
+          : "Request seats";
+      }
+
+      function toggle(seat) {
+        clearFlash();
+        if (selected.has(seat)) selected.delete(seat);
+        else if (selected.size >= MAX_SEATS) return flash(`You can request up to ${MAX_SEATS} seats at a time.`);
+        else selected.add(seat);
+        draw();
+      }
+
+      $("back-to-trips").addEventListener("click", () => {
+        trip = null;
+        loadTrips();
+        show("step-trips");
+      });
+
+      $("seat-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        clearFlash();
+        const name = $("p-name").value.trim();
+        const contact = $("p-contact").value.trim();
+        if (name.length < 2) return flash("Enter the passenger's name.");
+        if (!/^[0-9+()\- ]{7,20}$/.test(contact)) return flash("Enter a valid mobile number.");
+
+        const btn = $("submit-btn");
+        btn.disabled = true;
+        btn.textContent = "Sending…";
+        const { data: ref, error } = await supabase.rpc("request_seats", {
+          p_booking_id: trip.booking_id,
+          p_seats: [...selected],
+          p_name: name,
+          p_contact: contact,
+        });
+        if (error) {
+          flash(error.message.replace(/^seat_taken:\s*/, ""));
+          await refreshSeats();
+          return;
+        }
+        await showRequest(ref);
+      });
+
+      /* ----------------------------------------- step 3: status of a ref */
+      async function showRequest(ref) {
+        const { data, error } = await supabase.rpc("get_seat_request", { p_ref: ref });
+        if (error || !data?.length) {
+          show("step-trips");
+          return flash("We couldn't find a request with that reference.");
+        }
+        const rows = data;
+        const first = rows[0];
+        const live = rows.filter((r) => r.status === "requested" || r.status === "blocked");
+        const allBlocked = rows.every((r) => r.status === "blocked");
+        const allReleased = rows.every((r) => r.status === "released");
+        const waiting = rows.some((r) => r.status === "requested");
+
+        const headline = allReleased
+          ? "This request was released"
+          : allBlocked
+            ? "Your seats are blocked"
+            : "Seat request sent";
+        const detail = allReleased
+          ? escapeHtml(first.release_note || "The seats are available to others again.")
+          : allBlocked
+            ? "The ticketing office has blocked your seats. Please proceed to the counter to pay and get your ticket."
+            : "The ticketing office has been notified and will block your seats shortly. Keep your reference.";
+
+        $("done-card").innerHTML = `
+          <p class="card-label">${allBlocked ? "Confirmed" : allReleased ? "Released" : "Pending"}</p>
+          <h2 style="margin: 0 0 6px">${headline}</h2>
+          <p class="subtle">${detail}</p>
+          <p style="margin: 16px 0 4px"><span class="fineprint">Reference</span><br /><strong style="font-size: 22px; letter-spacing: 0.04em">${escapeHtml(first.request_ref)}</strong></p>
+          <p style="margin: 12px 0 4px">${escapeHtml(first.route)} &middot; ${escapeHtml(formatSlotStart(first.slot))} &middot; ${escapeHtml(first.booking_date)}</p>
+          <div class="seat-summary">${rows
+            .map((r) => `<span class="seat-chip" style="${r.status === "released" ? "opacity:.45;text-decoration:line-through" : ""}">Seat ${r.seat_no}</span>`)
+            .join("")}</div>
+          ${waiting && live.length
+            ? `<button type="button" class="btn-danger-outline" id="cancel-req">Cancel this request</button>`
+            : ""}`;
+        $("cancel-req")?.addEventListener("click", async () => {
+          if (!confirm("Give these seats back?")) return;
+          await supabase.rpc("cancel_seat_request", { p_ref: ref });
+          await showRequest(ref);
+        });
+        show("step-done");
+      }
+
+      $("done-back").addEventListener("click", () => {
+        trip = null;
+        loadTrips();
+        show("step-trips");
+      });
+      $("find-form").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const ref = $("find-ref").value.trim();
+        if (ref) showRequest(ref);
+      });
+
+      loadTrips();
+    </script>
+  </body>
+</html>
