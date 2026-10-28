@@ -157,7 +157,7 @@ const OVERRIDES = [
 
 /* ------------------------------------------------------------ database */
 
-const src = readFileSync(path.resolve(import.meta.dirname, "../docs/modules/trip-scheduling/assets/app.js"), "utf8");
+const src = readFileSync(path.resolve(import.meta.dirname, "../../docs/modules/trip-scheduling/assets/app.js"), "utf8");
 const gateBlock = src.match(/export const ROUTE_GATES = \{([\s\S]*?)\n\};/)[1];
 const ROUTE_GATES = Object.fromEntries(
   [...gateBlock.matchAll(/"((?:[^"\\]|\\.)*)":\s*"(Gate \d)"/g)].map((m) => [m[1], m[2]])

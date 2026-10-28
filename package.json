@@ -1,15 +1,15 @@
 {
-  "name": "pitx-bay-booking",
+  "name": "pitx-app",
   "version": "1.0.0",
   "private": true,
-  "description": "PITX bus bay hourly booking - static site in docs/ backed by Supabase. This package.json exists only for the setup/helper scripts; the site itself has no build step.",
+  "description": "PITX App - static site in docs/ backed by Supabase. This package.json exists only for the setup/helper scripts; the site itself has no build step.",
   "scripts": {
     "serve": "node scripts/serve-docs.mjs 3100",
     "create-staff": "node scripts/create-staff.mjs",
     "create-operator": "node scripts/create-operator.mjs",
     "delete-account": "node scripts/delete-account.mjs",
     "migrate": "node scripts/run-migration.mjs",
-    "import-vehicles": "node scripts/import-vehicle-masterlist.mjs"
+    "import-vehicles": "node scripts/trip-scheduling/import-vehicle-masterlist.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.3"

@@ -2,8 +2,8 @@
 
 Build history for the PITX Trip Scheduling app (formerly "PITX Bus Bay
 Booking" - renamed in #78).
-Repo: <https://github.com/jm-jaramillo/PITX-Trip-Scheduling>
-Live: <https://jm-jaramillo.github.io/PITX-Trip-Scheduling/>
+Repo: <https://github.com/jm-jaramillo/PITX-App>
+Live: <https://jm-jaramillo.github.io/PITX-App/>
 
 ---
 
@@ -1049,7 +1049,7 @@ fine as a safety net, but an operator has no way to know their preferred
 gate is already full until after they've submitted and waited on staff.
 
 Added a live check on the booking form
-([`docs/dashboard.html`](docs/dashboard.html)): once route, date, and
+([`docs/dashboard.html`](../../dashboard.html)): once route, date, and
 slot are all picked, if every active bay in that route's gate is
 already assigned to an *approved* booking for that slot, an amber hint
 appears under the time slot field naming up to 3 nearby times (nearest
@@ -4237,7 +4237,7 @@ error rather than failing silently.
 ## Outstanding — needs your account access
 
 1. ~~Point GitHub Pages at `/docs`.~~ **Done** — live at
-   <https://jm-jaramillo.github.io/PITX-Trip-Scheduling/>.
+   <https://jm-jaramillo.github.io/PITX-App/>.
 
 2. **Deploy the four Edge Functions** so staff can create, delete, and
    reset passwords for accounts in-app, and so operators can request a
