@@ -44,9 +44,6 @@
         location.replace("index.html");
       } else {
         const mods = modulesFor(profile.role);
-        if (mods.length === 1) {
-          location.replace(mods[0].path + moduleHome(mods[0], profile.role));
-        }
         document.getElementById("modules").innerHTML = mods
           .map(
             (m) => `<a class="portal-card" href="${m.path}${moduleHome(m, profile.role)}">
