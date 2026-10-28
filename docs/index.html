@@ -10,13 +10,13 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="assets/styles.css" />
+    <link rel="stylesheet" href="shared/styles.css" />
   </head>
   <body>
     <main class="login-page">
       <div class="login-card">
         <div class="login-head">
-          <img src="assets/pitx-logo.webp" alt="PITX" />
+          <img src="shared/pitx-logo.webp" alt="PITX" />
           <p class="eyebrow">Terminal Ops</p>
           <h1>Trip Scheduling</h1>
           <p class="subtle">
@@ -75,8 +75,8 @@
     </main>
 
     <script type="module">
-      import { supabase, usernameToEmail, getProfile, homeFor } from "./assets/app.js";
-      import { SUPABASE_URL } from "./assets/config.js";
+      import { supabase, usernameToEmail, getProfile, landingFor } from "./shared/platform.js";
+      import { SUPABASE_URL } from "./shared/config.js";
 
       const form = document.getElementById("login-form");
       const errorEl = document.getElementById("login-error");
@@ -149,7 +149,7 @@
       // Already signed in? Go straight to the right home page.
       getProfile().then((profile) => {
         if (profile) {
-          location.replace(homeFor(profile.role));
+          location.replace(landingFor(profile));
         }
       });
 
@@ -173,7 +173,7 @@
         }
 
         const profile = await getProfile();
-        location.replace(homeFor(profile?.role));
+        location.replace(landingFor(profile));
       });
     </script>
   </body>

@@ -33,11 +33,18 @@ createServer(async (req, res) => {
       return;
     }
 
+    let status = 200;
     const info = await stat(filePath).catch(() => null);
+    // Like GitHub Pages: a missing path serves 404.html (which forwards
+    // legacy page URLs to their module).
+    if (!info) {
+      filePath = path.join(root, "404.html");
+      status = 404;
+    }
     if (info?.isDirectory()) filePath = path.join(filePath, "index.html");
 
     const body = await readFile(filePath);
-    res.writeHead(200, {
+    res.writeHead(status, {
       "Content-Type": MIME[path.extname(filePath)] ?? "application/octet-stream",
       "Cache-Control": "no-store",
     });

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Page not found · PITX</title>
+    <script>
+      // Pages used to live at the site root; they now live under
+      // modules/trip-scheduling/. GitHub Pages serves this file for any
+      // missing path, so old bookmarks and stored notification links
+      // (e.g. .../my-schedule.html?x=1) are forwarded to the new location.
+      (function () {
+        var legacy = [
+          "accounts", "approvals", "bays", "dashboard", "my-schedule",
+          "operator-overview", "operator-profile", "operator-profiles",
+          "overview", "request-history", "schedule", "seats", "staff",
+          "ticketing", "transfer-approvals", "utilization",
+          "vehicle-approvals", "vehicles-database", "vehicles",
+        ];
+        var path = location.pathname;
+        var page = path.split("/").pop().replace(/\.html$/, "");
+        if (legacy.indexOf(page) !== -1 && path.indexOf("/modules/") === -1) {
+          var base = path.slice(0, path.lastIndexOf("/") + 1);
+          location.replace(base + "modules/trip-scheduling/" + page + ".html" + location.search + location.hash);
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <p>Page not found. <a href="index.html">Back to sign in</a></p>
+  </body>
+</html>

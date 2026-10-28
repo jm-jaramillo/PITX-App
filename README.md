@@ -37,7 +37,7 @@ directly from the browser. There is **no build step and no server** - GitHub
 Pages serves the folder as-is.
 
 Security model: the Supabase **anon key is public by
-design** (it's in [`docs/assets/config.js`](docs/assets/config.js)) and only
+design** (it's in [`docs/shared/config.js`](docs/shared/config.js)) and only
 grants what **Row Level Security** allows - see
 [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql). RLS
 is the real access-control boundary; the client-side role checks only decide
@@ -146,7 +146,7 @@ already been migrated partway.
 
 ### 3. Point the static site at your project
 
-Edit [`docs/assets/config.js`](docs/assets/config.js) with your Project URL
+Edit [`docs/shared/config.js`](docs/shared/config.js) with your Project URL
 and anon key.
 
 ### 4. Create the first staff account
@@ -263,7 +263,7 @@ ignored.
 
 | Workbook column | Where it lands |
 |---|---|
-| `Destination` | `vehicles.destination` **and** `vehicles.route`, and the `ROUTES` list in [`docs/assets/app.js`](docs/assets/app.js) |
+| `Destination` | `vehicles.destination` **and** `vehicles.route`, and the `ROUTES` list in [`docs/modules/trip-scheduling/assets/app.js`](docs/modules/trip-scheduling/assets/app.js) |
 | `Gate Assignment` | `ROUTE_GATES` - the gate staff are offered first when approving |
 | `Operator Name` / `Trade Name` | matched to an existing operator account (see below); `Trade Name` is also stored on the vehicle |
 | `Plate No.`, `Chassis No.`, `Body No.`, `Sticker No.`, `Case No.`, `Franchise` | the matching `vehicles` columns |
@@ -539,7 +539,7 @@ relabeled "Operator" on the form (the column itself stays
 ### Route dropdown
 
 A booking's **Route** is picked from `ROUTES` in
-[`docs/assets/app.js`](docs/assets/app.js) rather than typed freehand, so
+[`docs/modules/trip-scheduling/assets/app.js`](docs/modules/trip-scheduling/assets/app.js) rather than typed freehand, so
 it can't drift into near-duplicate variants of the same route
 (`"PITX - Batangas"` vs `"Batangas"` vs `"pitx batangas"`). This list went
 through three sources over time: originally the operator database
@@ -788,7 +788,7 @@ out to be wrong. The #86 test pass found the staff approvals page
 fetching *every* approved booking with no date filter, so once the table
 passed 1000 rows its bay-conflict check silently saw only the oldest
 1000 and offered bays that were already taken. #87 swept the rest and
-added a shared `fetchAllRows()` helper (in `docs/assets/app.js`) that
+added a shared `fetchAllRows()` helper (in `docs/modules/trip-scheduling/assets/app.js`) that
 pages with `.range()` until a short page comes back. Any list that grows
 with usage should go through it rather than assume one round trip is the
 whole answer.
@@ -890,7 +890,7 @@ has one, unchanged.
 
 Slots were 30 minutes (48/day) before migration
 `0038_fifteen_minute_slots.sql` (applied - see CHANGELOG #80). Deployed
-together with the matching `docs/assets/app.js` change, never one
+together with the matching `docs/modules/trip-scheduling/assets/app.js` change, never one
 without the other - the client and server's slot-to-clock-time math
 must always agree, or existing bookings display at the wrong time
 (hit live once, see #80's own note on what that looked like and how
@@ -907,7 +907,7 @@ Bays are grouped into gates, matching the terminal's actual layout
 | Gate 4 | 18-23 | Bicol, Visayas, Mindanao (Regions V-XIII) |
 | Gate 5 | 33-36 | North (CAR, Regions I-III) |
 
-`ROUTE_GATES` in [`docs/assets/app.js`](docs/assets/app.js) maps each of
+`ROUTE_GATES` in [`docs/modules/trip-scheduling/assets/app.js`](docs/modules/trip-scheduling/assets/app.js) maps each of
 the 91 entries in `ROUTES` to its gate, derived from each route's own
 province rather than hand-picked per destination (one exception:
 "Muntinlupa City, Metro Manila" has no gate entry, since it's NCR rather
@@ -931,7 +931,7 @@ Adding these gates' bays (21-23, 33-36 didn't exist before) raised active
 bay count from 20 to 27, which directly raises the per-slot approval cap
 described above.
 
-On the operator's own booking form ([`docs/dashboard.html`](docs/dashboard.html)),
+On the operator's own booking form ([`dashboard.html`](docs/modules/trip-scheduling/dashboard.html)),
 if the chosen route/date/time combination has no bay left (every relevant
 bay is already assigned to an *approved* booking for that slot), an amber
 hint appears under the time slot field naming the nearest open times that
@@ -991,7 +991,7 @@ Once a route is picked in that dialog, the Plate No. dropdown **only**
 offers vehicles whose own `route` matches it - not a suggestion, a hard
 requirement. With none, the dropdown disables with an explanatory note.
 Matching is **plain equality** (`vehicleMatchesRoute()` in
-`docs/dashboard.html`): `vehicles.route` is set by the one-time
+`docs/modules/trip-scheduling/dashboard.html`): `vehicles.route` is set by the one-time
 masterlist data-linking pass to the exact canonical string from `ROUTES`
 (see "Real operator data import" below), so a vehicle matches a route
 only when its own `route` is that exact string.
@@ -1045,7 +1045,7 @@ to actually fulfill it. Never locks an operator out entirely, though -
 with no vehicles yet, or with vehicles whose route doesn't exactly match
 any canonical route at all, this falls back to the full list rather
 than showing nothing (`routesWithRegisteredVehicle()` in
-`docs/dashboard.html`). Same narrowing applies to the **Change**
+`docs/modules/trip-scheduling/dashboard.html`). Same narrowing applies to the **Change**
 dialog's route field, while still preserving a booking's current route
 as a selectable option even if it's since fallen outside that operator's
 matched set (e.g. a vehicle's registered route changed after the
@@ -1057,7 +1057,7 @@ reasoning as the plate fallback.
 Both schedule pages - `schedule.html` (staff) and `my-schedule.html`
 (operators) - have a **Day / Week** toggle plus Prev/Next navigation that
 steps by a day or a week depending on which mode is active. Both share
-`startOfWeek()`/`weekDates()` (`docs/assets/app.js`) so the two pages
+`startOfWeek()`/`weekDates()` (`docs/modules/trip-scheduling/assets/app.js`) so the two pages
 agree on where a week starts (Monday) without each re-deriving it.
 
 - **Day** is unchanged from before: staff get the full per-slot capacity
@@ -1233,29 +1233,40 @@ RPC - staff already have unrestricted UPDATE rights on `bookings`
 
 ```
 docs/                        THE SITE ITSELF (served by GitHub Pages)
-  index.html                 Sign in (+ "Forgot password?" request-to-staff flow)
-  operator-overview.html     Operator: shift-start dashboard - counts, lockout alerts, quick links
-  dashboard.html             Operator: request form + own requests, today and future only (CSV export)
-  request-history.html       Operator: own past requests, one month at a time (CSV export)
-  my-schedule.html           Operator: airport-style PIDS board - own confirmed trips or every operator's, one day at a time (CSV export)
-  vehicles.html              Operator: register/edit vehicles (scan or manual, Region/Province/City route picker, search, column toggle, CSV export)
-  operator-profile.html     Operator: one-time company details (no approval)
-  overview.html              Staff: shift-start dashboard - queue counts, lockout alerts, quick links
-  staff.html                 Staff: pending booking queue (search, bulk actions, decided log)
-  vehicle-approvals.html     Staff: pending vehicle queue (search, bulk actions, columns, CSV, decided log)
-  vehicles-database.html     Staff: every registered vehicle, any status, searchable, Operator/Trade/Destination filters, column toggle, CSV export
-  transfer-approvals.html    Staff: pending booking-transfer queue (search, bulk actions, decided log)
-  schedule.html              Staff: airport-style departures board, one day at a time (CSV export)
-  utilization.html           Staff: gate occupancy + busiest hours over a date range, plus vehicles blocked by an unlinked route (CSV export)
-  bays.html                  Staff: manage the bay list (add, rename, activate/deactivate)
-  operator-profiles.html     Staff: read-only view of every operator's company profile (sortable, CSV export)
-  accounts.html              Staff: create/delete/reset-password logins (via Edge Functions)
-  assets/
+  index.html                 Sign in (+ "Forgot password?" request-to-staff flow); redirects to the module (or portal)
+  portal.html                Module picker, shown when a role can open more than one module
+  404.html                   Forwards old root-level page URLs to modules/trip-scheduling/
+  shared/                    Platform used by every module - see CONTRIBUTING.md
     config.js                Supabase URL + public anon key
-    app.js                   Shared client, auth guard, nav, helpers
-    orcr-parser.js           Client-side OCR + OR/CR field-extraction heuristics
-    pitx-logo.webp           PITX mark
+    platform.js              Supabase client, auth guard, nav shell, notifications, UI helpers
+    modules.js               Module registry (name, folder, roles -> landing page)
     styles.css               Styles (light-theme only, explicit colors)
+    pitx-logo.webp           PITX mark
+  modules/
+    trip-scheduling/         THE TRIP SCHEDULING MODULE
+      operator-overview.html     Operator: shift-start dashboard - counts, lockout alerts, quick links
+      dashboard.html             Operator: request form + own requests, today and future only (CSV export)
+      request-history.html       Operator: own past requests, one month at a time (CSV export)
+      my-schedule.html           Operator: airport-style PIDS board - own confirmed trips or every operator's, one day at a time (CSV export)
+      vehicles.html              Operator: register/edit vehicles (scan or manual, Region/Province/City route picker, search, column toggle, CSV export)
+      operator-profile.html     Operator: one-time company details (no approval)
+      overview.html              Staff: shift-start dashboard - queue counts, lockout alerts, quick links
+      staff.html                 Staff: pending booking queue (search, bulk actions, decided log)
+      vehicle-approvals.html     Staff: pending vehicle queue (search, bulk actions, columns, CSV, decided log)
+      vehicles-database.html     Staff: every registered vehicle, any status, searchable, Operator/Trade/Destination filters, column toggle, CSV export
+      transfer-approvals.html    Staff: pending booking-transfer queue (search, bulk actions, decided log)
+      schedule.html              Staff: airport-style departures board, one day at a time (CSV export)
+      utilization.html           Staff: gate occupancy + busiest hours over a date range, plus vehicles blocked by an unlinked route (CSV export)
+      bays.html                  Staff: manage the bay list (add, rename, activate/deactivate)
+      operator-profiles.html     Staff: read-only view of every operator's company profile (sortable, CSV export)
+      accounts.html              Staff: create/delete/reset-password logins (via Edge Functions)
+      assets/
+        app.js               Module helpers (routes, slots, vehicle/booking rendering, sidebar); re-exports platform.js
+        orcr-parser.js       Client-side OCR + OR/CR field-extraction heuristics
+        week-view.js         Week view used by the schedule pages
+        seat-map.js          Seat map for passenger seat requests
+
+CONTRIBUTING.md              How modules are structured and how to add one
 
 supabase/
   migrations/                Schema, RLS policies, booking-change function
