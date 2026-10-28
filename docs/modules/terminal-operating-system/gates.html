@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gate monitor · PITX Terminal Operations</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../../shared/styles.css" />
+    <link rel="stylesheet" href="assets/tos.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" id="nav"></aside>
+      <div class="app-content">
+        <main class="wrap">
+          <div class="page-head">
+            <div>
+              <p class="eyebrow">Terminal Operations &middot; Gates</p>
+              <h1>Gate monitor</h1>
+              <p class="subtle">
+                Every bus read at the gates is checked against its approved trip in Trip Scheduling
+                and the vehicle masterfile. TOS opens the barrier, sends the bus to staging, or holds
+                it for a staff decision.
+              </p>
+            </div>
+            <div class="tos-head-right" id="head-right"></div>
+          </div>
+
+          <div class="hidden" id="message"></div>
+          <div id="view"></div>
+        </main>
+      </div>
+    </div>
+
+    <script type="module">
+      import {
+        guardPage,
+        renderNav,
+        escapeHtml,
+        showMessage,
+        startLive,
+        liveText,
+        act,
+        fmt,
+        decisionPill,
+        decisionLabel,
+        plateChip,
+      } from "./assets/tos.js";
+
+      const profile = await guardPage("staff");
+      if (!profile) throw new Error("unauthorised");
+      renderNav(profile);
+
+      const SCENARIOS = [
+        ["ontime", "On-time bus", "Booked, docs valid"],
+        ["late", "Late bus", "Past grace period"],
+        ["early", "Early bus", "Before entry window"],
+        ["unreg", "Unregistered", "Not in masterfile"],
+        ["expired", "Expired OR/CR", "Registered, docs lapsed"],
+        ["unclear", "Unclear read", "Low camera match"],
+        ["exit", "Bus leaves", "Exit gate read"],
+      ];
+      const FILTERS = [["all", "All"], ["ALLOW", "Allowed"], ["DENY", "Denied"], ["HOLD", "Staging"], ["EXIT", "Exits"]];
+
+      let M = null;
+      let updatedAt = null;
+      let loadError = null;
+      let filter = "all";
+      let busy = false;
+
+      const live = startLive({
+        onData: (model, at) => {
+          M = model;
+          updatedAt = at;
+          loadError = null;
+          showMessage("message", "");
+          render();
+        },
+        onError: (error) => {
+          loadError = error;
+          if (!M) showMessage("message", `Could not load gate data: ${error.message}`);
+          renderHead();
+        },
+      });
+
+      function renderHead() {
+        document.getElementById("head-right").innerHTML =
+          liveText(updatedAt, loadError) +
+          `<button type="button" class="btn-outline" data-act="refresh">Refresh</button>`;
+      }
+
+      function render() {
+        renderHead();
+        if (!M) return;
+        const gateIds = Object.keys(M.gates);
+        document.getElementById("view").innerHTML = `
+          ${M.trips.length ? "" : `<p class="tos-note">No approved trips in Trip Scheduling for today. Until there are, every registered bus is read as "No booking".</p>`}
+          <div class="tos-gates">${gateIds.map(gateTile).join("")}</div>
+          <div class="tos-split">
+            <section class="table-wrap">
+              <div class="tos-panel-head">
+                <h3>Gate events</h3>
+                <div class="tos-seg" role="group" aria-label="Filter events">${FILTERS.map(
+                  ([k, l]) => `<button type="button" data-act="filter" data-v="${k}" aria-pressed="${k === filter}">${l}</button>`
+                ).join("")}</div>
+              </div>
+              ${feedHtml()}
+            </section>
+            <div class="tos-side">
+              <section class="table-wrap">${queueHtml()}</section>
+              <section class="card">
+                <p class="card-label">Test a vehicle at the gate</p>
+                <p class="subtle" style="margin: -6px 0 12px">
+                  Sends one plate read now, picked from today's real trips, as an LPR camera will once
+                  the hardware is connected. Test reads are marked and can be cleared on Devices &amp; rules.
+                </p>
+                <div class="tos-scen">${SCENARIOS.map(
+                  ([k, l, s], i) =>
+                    `<button type="button" class="btn-outline${i === SCENARIOS.length - 1 ? " is-wide" : ""}" data-act="sim" data-v="${k}"${busy ? " disabled" : ""}>${l}<small>${s}</small></button>`
+                ).join("")}</div>
+              </section>
+            </div>
+          </div>`;
+      }
+
+      function gateTile(id) {
+        const g = M.gates[id];
+        const now = M.now();
+        const evs = M.events.filter((e) => e.gate === id);
+        const last = evs[0];
+        const holding = M.pending().some((e) => e.gate === id);
+        const open = !holding && last && last.opened && now - (last.resolvedAt ?? last.at) < 1.2;
+        const [cls, label] = holding ? ["is-hold", "Holding · awaiting staff"] : open ? ["is-open", "Barrier open"] : ["", "Barrier closed"];
+        const exit = g.direction === "exit";
+        const passed = evs.filter((e) => e.opened).length;
+        const refused = evs.filter((e) => e.decision === "DENY" || e.resolution === "DENIED").length;
+        return `
+          <div class="tos-gate">
+            <div><b>${escapeHtml(g.name)}</b><small>${escapeHtml(g.description ?? "")}</small></div>
+            <div class="tos-barrier ${cls}"><i></i>${label}</div>
+            <div class="tos-last">${last ? `Last read ${fmt(last.at)} ${plateChip(M, last.plate)} ${decisionPill(last)}` : "No reads yet today"}</div>
+            <div class="tos-stats"><span><b>${passed}</b>${exit ? "exited" : "let in"}</span>${exit ? "" : `<span><b>${refused}</b>turned away</span>`}</div>
+            <div class="tos-devs">${g.devices.map((d) => `<span class="tos-dev">${escapeHtml(d.kind)} · ${escapeHtml(d.status)}</span>`).join("")}</div>
+          </div>`;
+      }
+
+      function tripLine(e) {
+        const t = e.bid && M.byId[e.bid];
+        if (t) return `<span class="cell-strong">${escapeHtml(t.route)}</span><span class="cell-sub">${escapeHtml(t.trip ?? "")} · ETD ${fmt(t.dep)} · ${escapeHtml(t.bay)}</span>`;
+        if (e.route) return `<span class="cell-strong">${escapeHtml(e.route)}</span><span class="cell-sub">${escapeHtml(e.trip ?? "")}</span>`;
+        return `<span class="muted">No matching trip</span>`;
+      }
+
+      function feedHtml() {
+        const rows = M.events
+          .filter((e) =>
+            filter === "all" ||
+            (filter === "ALLOW" ? e.decision === "ALLOW" || e.resolution === "ALLOWED"
+              : filter === "DENY" ? e.decision === "DENY" || e.resolution === "DENIED"
+              : e.decision === filter)
+          )
+          .slice(0, 50);
+        if (!rows.length) return `<p class="tos-none">No gate reads in this filter today.</p>`;
+        return `<div style="overflow-x:auto"><table>
+          <thead><tr><th>Time</th><th>Gate</th><th>Plate</th><th>Trip</th><th>Decision</th></tr></thead>
+          <tbody>${rows
+            .map(
+              (e) => `<tr${e.bid ? ` class="row-clickable" data-act="trip" data-id="${escapeHtml(e.bid)}"` : ""}>
+                <td class="tos-num">${fmt(e.at)}</td>
+                <td class="muted">${escapeHtml(M.gates[e.gate]?.name ?? e.gate)}</td>
+                <td>${plateChip(M, e.plate)}<span class="tos-conf${e.conf * 100 < M.rules.conf ? " is-low" : ""}">${Math.round(e.conf * 100)}% read</span></td>
+                <td>${tripLine(e)}</td>
+                <td>${decisionPill(e)}<div class="tos-reason">${escapeHtml(e.reason)}</div></td>
+              </tr>`
+            )
+            .join("")}</tbody></table></div>`;
+      }
+
+      function queueHtml() {
+        const items = M.pending();
+        const head = `<div class="tos-panel-head"><h3>Waiting for staff<span class="tos-count${items.length ? "" : " is-zero"}">${items.length}</span></h3></div>`;
+        if (!items.length) return head + `<p class="tos-none">No vehicles waiting. Late arrivals and unclear plate reads land here.</p>`;
+        return head + `<ul class="tos-queue">${items
+          .map((e) => {
+            const v = M.vehicles[e.plate];
+            const t = e.bid && M.byId[e.bid];
+            return `<li><span class="stripe"></span><div>
+              <div class="t">${plateChip(M, e.plate)} at ${escapeHtml(M.gates[e.gate]?.name ?? e.gate)}${e.isTest ? ' <span class="tos-pill s-muted">Test</span>' : ""}</div>
+              <div style="margin-top:4px">${escapeHtml(e.reason)}</div>
+              <div class="d">${v ? `${escapeHtml(v.operator_name ?? "")}${v.body_number ? " · body " + escapeHtml(v.body_number) : ""}` : "Not in the masterfile"}${t ? ` · ${escapeHtml(t.route)} ${fmt(t.dep)}` : ""} · read ${fmt(e.at)}</div>
+              <div class="a">
+                <button type="button" class="btn-primary" data-act="allow" data-id="${e.id}" data-plate="${escapeHtml(e.plate)}"${busy ? " disabled" : ""}>Open barrier</button>
+                <button type="button" class="btn-danger-outline" data-act="deny" data-id="${e.id}" data-plate="${escapeHtml(e.plate)}"${busy ? " disabled" : ""}>Keep closed</button>
+              </div></div></li>`;
+          })
+          .join("")}</ul>`;
+      }
+
+      async function run(fn, args, ok) {
+        busy = true;
+        render();
+        await act(fn, args, ok);
+        busy = false;
+        await live.refresh();
+        render();
+      }
+
+      document.addEventListener("click", (event) => {
+        const el = event.target.closest("[data-act]");
+        if (!el || el.disabled) return;
+        const { act: a, v, id, plate } = el.dataset;
+        if (a === "refresh") live.refresh();
+        else if (a === "filter") { filter = v; render(); }
+        else if (a === "trip") location.href = `bays.html?trip=${encodeURIComponent(id)}`;
+        else if (a === "allow" || a === "deny")
+          run("tos_resolve_review", { p_event: Number(id), p_allow: a === "allow" }, `${plate}: ${a === "allow" ? "barrier opened" : "kept out"}`);
+        else if (a === "sim")
+          run("tos_simulate", { p_kind: v }, (r) => {
+            if (!r?.ok) return r?.msg ?? "No suitable vehicle for that test right now.";
+            const e = r.event;
+            return `${e.plate} at ${M.gates[e.gate_id]?.name ?? e.gate_id}: ${decisionLabel({ decision: e.decision, cat: e.category })}`;
+          });
+      });
+
+      setInterval(() => M && !busy && render(), 15000);
+      renderHead();
+    </script>
+  </body>
+</html>

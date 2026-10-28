@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Passenger board · PITX Terminal Operations</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../../shared/styles.css" />
+    <link rel="stylesheet" href="assets/tos.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" id="nav"></aside>
+      <div class="app-content">
+        <main class="wrap">
+          <div class="page-head">
+            <div>
+              <p class="eyebrow">Terminal Operations &middot; Concourse</p>
+              <h1>Passenger board</h1>
+              <p class="subtle">
+                What the concourse departure screens show. "Bus at bay" appears the moment the entry
+                gate lets the bus in, and the row clears when the exit gate reads it leaving.
+              </p>
+            </div>
+            <div class="tos-head-right"><span id="live"></span></div>
+          </div>
+
+          <div class="hidden" id="message"></div>
+          <div class="tos-board">
+            <div class="tos-board-top">
+              <div class="tos-board-ttl">Departures<small>Pag-alis · Parañaque Integrated Terminal Exchange</small></div>
+              <div class="tos-board-clock" id="clock">--:--</div>
+            </div>
+            <div class="tos-board-scroll" id="rows"></div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script type="module">
+      import { guardPage, renderNav, escapeHtml, showMessage, startLive, liveText, tripStatus, fmt } from "./assets/tos.js";
+
+      const profile = await guardPage("staff");
+      if (!profile) throw new Error("unauthorised");
+      renderNav(profile);
+
+      let M = null;
+      let updatedAt = null;
+      let loadError = null;
+
+      startLive({
+        onData: (model, at) => {
+          M = model;
+          updatedAt = at;
+          loadError = null;
+          showMessage("message", "");
+          render();
+        },
+        onError: (error) => {
+          loadError = error;
+          showMessage("message", `Could not load departures: ${error.message}`);
+          render();
+        },
+      });
+
+      function remark(t, now) {
+        const s = tripStatus(M, t, now);
+        if (s === "Departed") return [`DEPARTED ${fmt(t.departedAt)}`, "", true];
+        if (s === "Denied entry" || s === "No-show") return ["CANCELLED · SEE COUNTER", "r-bad"];
+        if (s === "Boarding") return now >= t.dep - 5 ? ["FINAL CALL", "r-final"] : ["BOARDING", "r-board"];
+        if (s === "At bay" || s === "Entered gate") return ["BUS AT BAY", "r-board"];
+        if (s === "In staging" || s === "At gate · review") return ["BUS ARRIVED", ""];
+        if (s === "Overdue") return [now > t.dep ? "DELAYED" : "BUS NOT YET ARRIVED", "r-bad"];
+        return ["ON TIME", ""];
+      }
+
+      function render() {
+        document.getElementById("live").innerHTML = liveText(updatedAt, loadError);
+        if (!M) return;
+        const now = M.now();
+        document.getElementById("clock").textContent = fmt(now);
+        const rows = M.trips
+          .filter((t) => (t.departedAt != null ? t.departedAt >= now - 5 : t.dep >= now - 40) && t.dep <= now + 150)
+          .sort((a, b) => a.dep - b.dep)
+          .slice(0, 15);
+        document.getElementById("rows").innerHTML = rows.length
+          ? `<table><thead><tr><th>ETD</th><th>Destination</th><th>Operator</th><th>Bay</th><th>Remarks</th></tr></thead><tbody>${rows
+              .map((t) => {
+                const [text, cls, gone] = remark(t, now);
+                return `<tr class="${gone ? "gone" : ""}"><td>${fmt(t.dep)}</td><td class="dest">${escapeHtml(t.route)}</td><td>${escapeHtml(t.trade || t.operator || "")}</td><td><span class="bay-chip">${escapeHtml(t.bay)}</span></td><td class="${cls}">${text}</td></tr>`;
+              })
+              .join("")}</tbody></table>`
+          : `<p class="tos-board-empty">No departures in the next two and a half hours.</p>`;
+      }
+
+      setInterval(render, 1000);
+    </script>
+  </body>
+</html>

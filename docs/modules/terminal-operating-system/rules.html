@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Devices &amp; rules · PITX Terminal Operations</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../../shared/styles.css" />
+    <link rel="stylesheet" href="assets/tos.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" id="nav"></aside>
+      <div class="app-content">
+        <main class="wrap">
+          <div class="page-head">
+            <div>
+              <p class="eyebrow">Terminal Operations &middot; Setup</p>
+              <h1>Devices &amp; rules</h1>
+              <p class="subtle">
+                The gate rules TOS applies to every plate read, and the hardware it talks to. Hardware is
+                still being chosen, so each device connects through an adapter and the rules stay the
+                same whichever vendor is picked.
+              </p>
+            </div>
+          </div>
+
+          <div class="hidden" id="message"></div>
+
+          <section class="card" style="margin-top: 0">
+            <p class="card-label">How TOS connects</p>
+            <div class="tos-flow">
+              <div class="tos-fbox"><b>Trip Scheduling</b><span>Approved trips and bays</span><span>Approved vehicle masterfile</span></div>
+              <div class="tos-farrow" aria-hidden="true">→</div>
+              <div class="tos-fbox is-core"><b>TOS gate rules</b><span>Match plate to trip and masterfile, check bay-window timing and documents, then open, stage, ask staff, or deny</span></div>
+              <div class="tos-farrow" aria-hidden="true">⇄</div>
+              <div class="tos-fstack">
+                <div class="tos-fbox"><b>Device adapter</b><span>LPR cameras, RFID, boom barriers</span></div>
+                <div class="tos-fbox"><b>Outputs</b><span>Concourse and bay displays, staff alerts</span></div>
+              </div>
+            </div>
+          </section>
+
+          <div class="tos-split" style="margin-top: 18px; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr)">
+            <section class="table-wrap">
+              <div class="tos-panel-head"><h3>Gate rules</h3><span class="subtle" id="rules-note"></span></div>
+              <div id="rules"><p class="tos-none">Loading…</p></div>
+            </section>
+            <div class="tos-side">
+              <section class="table-wrap">
+                <div class="tos-panel-head"><h3>Devices</h3></div>
+                <div id="devices"></div>
+              </section>
+              <section class="card">
+                <p class="card-label">Test reads</p>
+                <p class="subtle" style="margin-top: -6px">
+                  Reads sent with "Test a vehicle" on Gate monitor are marked as tests. Clearing removes
+                  them and any trip arrival they recorded. Real gate reads are kept.
+                </p>
+                <div class="tos-actions" id="tests"></div>
+              </section>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script type="module">
+      import { guardPage, renderNav, escapeHtml, showMessage, supabase, buildModel, act, pill, fmt, formatDateTime } from "./assets/tos.js";
+
+      const profile = await guardPage("staff");
+      if (!profile) throw new Error("unauthorised");
+      renderNav(profile);
+
+      const ACTIONS = [["DENY", "Keep barrier closed"], ["REVIEW", "Ask staff"]];
+      const RULES = [
+        ["early_min", "Early entry window", "Buses earlier than this before their bay window wait in staging.", "min", 0, 240, 5],
+        ["grace_min", "Late grace period", "Minutes after the bay window opens that a bus still enters automatically.", "min", 0, 120, 5],
+        ["on_late", "Late beyond grace", "What happens when a bus misses its bay window."],
+        ["on_expired", "Expired CPC or OR/CR", "Checked against the vehicle masterfile on every read."],
+        ["on_no_booking", "No trip today", "Registered bus with no approved trip for its plate."],
+        ["on_unregistered", "Unregistered plate", "Plate not in the approved vehicle masterfile."],
+        ["min_confidence", "Minimum plate read confidence", "Below this, staff confirm on camera.", "%", 50, 99, 1],
+      ];
+
+      let snap = null;
+      let model = null;
+      let clearArmed = false;
+      let busy = false;
+
+      async function load() {
+        const { data, error } = await supabase.rpc("tos_snapshot", { p_date: null });
+        if (error) return showMessage("message", `Could not load gate rules: ${error.message}`);
+        snap = data;
+        model = buildModel(data);
+        render();
+      }
+
+      function render() {
+        const r = snap.rules;
+        document.getElementById("rules-note").textContent = `Last changed ${formatDateTime(r.updated_at)} · applies from the next read`;
+        document.getElementById("rules").innerHTML = RULES.map(([key, title, help, unit, min, max, step]) => {
+          const control = unit
+            ? `<div class="tos-inline"><input type="number" id="r-${key}" data-key="${key}" min="${min}" max="${max}" step="${step}" value="${r[key]}"${busy ? " disabled" : ""} /><span>${unit}</span></div>`
+            : `<select id="r-${key}" data-key="${key}"${busy ? " disabled" : ""}>${ACTIONS.map(([v, l]) => `<option value="${v}"${v === r[key] ? " selected" : ""}>${l}</option>`).join("")}</select>`;
+          return `<div class="tos-rule"><div><b>${title}</b><span>${help}</span></div>${control}</div>`;
+        }).join("");
+
+        document.getElementById("devices").innerHTML = `<table><thead><tr><th>Location</th><th>Device</th><th>Status</th></tr></thead><tbody>${model.devices
+          .map(
+            (d) => `<tr><td>${escapeHtml(d.location)}</td><td><span class="cell-strong">${escapeHtml(d.kind)}</span><span class="cell-sub">${escapeHtml(d.role ?? "")}</span></td>
+              <td>${d.status === "online" ? pill("Online", "s-ok") + (d.hb != null ? `<span class="cell-sub">heartbeat ${fmt(d.hb)}</span>` : "") : pill(d.status.replace(/^./, (c) => c.toUpperCase()), d.status === "planned" ? "s-sched" : "s-done")}</td></tr>`
+          )
+          .join("")}</tbody></table>`;
+
+        const tests = model.events.filter((e) => e.isTest).length;
+        document.getElementById("tests").innerHTML = clearArmed
+          ? `<button type="button" class="btn-danger-outline" data-act="clear"${busy ? " disabled" : ""}>Delete all test reads</button><button type="button" class="btn-outline" data-act="cancel">Cancel</button>`
+          : `<button type="button" class="btn-outline" data-act="arm"${busy ? " disabled" : ""}>Clear test reads</button><span class="subtle" style="align-self:center">${tests} test read${tests === 1 ? "" : "s"} today</span>`;
+      }
+
+      document.getElementById("rules").addEventListener("change", async (e) => {
+        const el = e.target.closest("[data-key]");
+        if (!el) return;
+        const key = el.dataset.key;
+        let value = el.value;
+        if (el.type === "number") {
+          value = Number.parseInt(value, 10);
+          if (Number.isNaN(value) || value < Number(el.min) || value > Number(el.max)) {
+            showMessage("message", `Enter a value from ${el.min} to ${el.max}.`);
+            el.value = snap.rules[key];
+            return;
+          }
+        }
+        showMessage("message", "");
+        busy = true;
+        render();
+        const saved = await act("tos_set_rules", { p: { [key]: value } }, "Rule saved. Applies from the next plate read.");
+        busy = false;
+        if (saved) snap.rules = saved;
+        render();
+      });
+
+      document.addEventListener("click", async (e) => {
+        const el = e.target.closest("[data-act]");
+        if (!el || el.disabled) return;
+        if (el.dataset.act === "arm") clearArmed = true;
+        else if (el.dataset.act === "cancel") clearArmed = false;
+        else if (el.dataset.act === "clear") {
+          clearArmed = false;
+          busy = true;
+          render();
+          await act("tos_clear_tests", {}, (n) => `Removed ${n} test read${n === 1 ? "" : "s"}.`);
+          busy = false;
+          await load();
+          return;
+        }
+        render();
+      });
+
+      await load();
+    </script>
+  </body>
+</html>

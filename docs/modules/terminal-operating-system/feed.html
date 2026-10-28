@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Trip feed · PITX Terminal Operations</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../../shared/styles.css" />
+    <link rel="stylesheet" href="assets/tos.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" id="nav"></aside>
+      <div class="app-content">
+        <main class="wrap">
+          <div class="page-head">
+            <div>
+              <p class="eyebrow">Terminal Operations &middot; From Trip Scheduling</p>
+              <h1>Trip feed</h1>
+              <p class="subtle">
+                What TOS receives from Trip Scheduling: the day's approved trips and the approved vehicle
+                masterfile. TOS reads these and never changes them; edits are made in Trip Scheduling.
+              </p>
+            </div>
+            <div class="tos-head-right">
+              <input type="date" id="date" aria-label="Terminal day" />
+            </div>
+          </div>
+
+          <div class="hidden" id="message"></div>
+          <div class="toolbar" style="margin-bottom: 4px">
+            <input id="q" type="search" placeholder="Plate, operator, body no., destination, trip no." style="min-width: 0; flex: 0 1 340px" />
+            <div class="tos-seg" role="group" aria-label="Dataset" id="tabs"></div>
+          </div>
+          <div class="table-wrap" id="table"><p class="tos-none">Loading…</p></div>
+        </main>
+      </div>
+    </div>
+
+    <script type="module">
+      import {
+        guardPage,
+        renderNav,
+        escapeHtml,
+        showMessage,
+        supabase,
+        fetchAllRows,
+        buildModel,
+        tripPill,
+        plateChip,
+        docsExpired,
+        manilaToday,
+        fmt,
+      } from "./assets/tos.js";
+
+      const profile = await guardPage("staff");
+      if (!profile) throw new Error("unauthorised");
+      renderNav(profile);
+
+      const TABS = [["trips", "Approved trips"], ["vehicles", "Vehicle masterfile"], ["expired", "Expired documents"]];
+      const params = new URLSearchParams(location.search);
+      const dateInput = document.getElementById("date");
+      dateInput.value = params.get("date") || manilaToday();
+      let tab = TABS.some(([k]) => k === params.get("tab")) ? params.get("tab") : "trips";
+      let M = null;
+      let masterfile = null;
+      let query = "";
+
+      document.getElementById("q").addEventListener("input", (e) => {
+        query = e.target.value.trim().toLowerCase();
+        render();
+      });
+      dateInput.addEventListener("change", loadTrips);
+      document.getElementById("tabs").addEventListener("click", (e) => {
+        const b = e.target.closest("button[data-v]");
+        if (!b) return;
+        tab = b.dataset.v;
+        const url = new URL(location.href);
+        url.searchParams.set("tab", tab);
+        history.replaceState(null, "", url);
+        if (tab !== "trips" && !masterfile) loadMasterfile();
+        render();
+      });
+
+      async function loadTrips() {
+        const { data, error } = await supabase.rpc("tos_snapshot", { p_date: dateInput.value || null });
+        if (error) return showMessage("message", `Could not load trips: ${error.message}`);
+        showMessage("message", "");
+        M = buildModel(data);
+        render();
+      }
+
+      async function loadMasterfile() {
+        const { data, error } = await fetchAllRows((from, to) => supabase.rpc("tos_vehicle_masterfile").range(from, to));
+        if (error) return showMessage("message", `Could not load the vehicle masterfile: ${error.message}`);
+        masterfile = data;
+        render();
+      }
+
+      const matches = (...xs) => !query || xs.join(" ").toLowerCase().includes(query);
+
+      function render() {
+        document.getElementById("tabs").innerHTML = TABS.map(
+          ([k, l]) => `<button type="button" data-v="${k}" aria-pressed="${k === tab}">${l}</button>`
+        ).join("");
+        dateInput.closest(".tos-head-right").classList.toggle("hidden", tab !== "trips");
+        const host = document.getElementById("table");
+
+        if (tab === "trips") {
+          if (!M) return;
+          const rows = M.trips.filter((t) => matches(t.trip, t.route, t.plate, t.operator, t.trade, t.bay));
+          host.innerHTML = rows.length
+            ? `<table><thead><tr><th>Trip</th><th>ETD</th><th>Destination</th><th>Operator</th><th>Plate</th><th>Bay window</th><th>TOS status</th></tr></thead><tbody>${rows
+                .map(
+                  (t) => `<tr class="row-clickable" data-trip="${escapeHtml(t.id)}">
+                    <td><span class="trip-tag">${escapeHtml(t.trip ?? "—")}</span></td>
+                    <td class="tos-num">${fmt(t.dep)}</td>
+                    <td class="cell-strong">${escapeHtml(t.route)}</td>
+                    <td>${escapeHtml(t.operator ?? "")}${t.trade ? `<span class="cell-sub">${escapeHtml(t.trade)}</span>` : ""}</td>
+                    <td>${plateChip(M, t.plate)}${docsExpired(M.vehicles[t.plate], M.date) ? '<span class="cell-sub tos-exp">Documents expired</span>' : ""}</td>
+                    <td class="tos-num">${t.bayId ? `<span class="bay-tag">${escapeHtml(t.bay)}</span> ${fmt(t.slot)}` : '<span class="muted">No bay</span>'}</td>
+                    <td>${tripPill(M, t)}</td></tr>`
+                )
+                .join("")}</tbody></table>`
+            : `<p class="tos-none">${M.trips.length ? "No trips match that search." : `No approved trips on ${escapeHtml(M.dayLabel)}.`}</p>`;
+          return;
+        }
+
+        if (!masterfile) {
+          host.innerHTML = `<p class="tos-none">Loading the vehicle masterfile…</p>`;
+          return;
+        }
+        const today = manilaToday();
+        const exp = (d) => (d && d < today ? " tos-exp" : "");
+        const rows = masterfile
+          .filter((v) => (tab !== "expired" || docsExpired(v, today)) && matches(v.plate_no, v.body_number, v.operator_name, v.trade_name, v.route))
+          .slice(0, 300);
+        const total = masterfile.filter((v) => tab !== "expired" || docsExpired(v, today)).length;
+        host.innerHTML = rows.length
+          ? `<div class="tos-panel-head"><h3>${tab === "expired" ? "Expired documents" : "Vehicle masterfile"}</h3><span class="subtle">${total} vehicle${total === 1 ? "" : "s"}${rows.length < total ? ` · showing ${rows.length}, search to narrow` : ""}</span></div>
+             <table><thead><tr><th>Plate</th><th>Body no.</th><th>Operator</th><th>Destination</th><th>Bus type</th><th>CPC validity</th><th>OR/CR validity</th></tr></thead><tbody>${rows
+               .map(
+                 (v) => `<tr><td><span class="tos-plate">${escapeHtml(v.plate_no)}</span></td><td class="tos-num">${escapeHtml(v.body_number ?? "—")}</td>
+                   <td>${escapeHtml(v.operator_name ?? "")}${v.trade_name ? `<span class="cell-sub">${escapeHtml(v.trade_name)}</span>` : ""}</td>
+                   <td>${escapeHtml(v.route ?? "—")}</td><td class="muted">${escapeHtml(v.bus_type ?? "—")}</td>
+                   <td class="tos-num${exp(v.cpc_validity)}">${escapeHtml(v.cpc_validity ?? "—")}</td><td class="tos-num${exp(v.orcr_validity)}">${escapeHtml(v.orcr_validity ?? "—")}</td></tr>`
+               )
+               .join("")}</tbody></table>`
+          : `<p class="tos-none">No vehicles match that search.</p>`;
+      }
+
+      document.getElementById("table").addEventListener("click", (e) => {
+        const row = e.target.closest("[data-trip]");
+        if (row) location.href = `bays.html?date=${encodeURIComponent(M.date)}&trip=${encodeURIComponent(row.dataset.trip)}`;
+      });
+
+      render();
+      await loadTrips();
+      if (tab !== "trips") loadMasterfile();
+    </script>
+  </body>
+</html>

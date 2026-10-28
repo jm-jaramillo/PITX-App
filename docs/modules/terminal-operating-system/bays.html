@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bay timeline · PITX Terminal Operations</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../../shared/styles.css" />
+    <link rel="stylesheet" href="assets/tos.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" id="nav"></aside>
+      <div class="app-content">
+        <main class="wrap">
+          <div class="page-head">
+            <div>
+              <p class="eyebrow">Terminal Operations &middot; Bays</p>
+              <h1>Bay timeline</h1>
+              <p class="subtle">
+                Approved trips from Trip Scheduling on their assigned bays, coloured by what the gates
+                have seen. Each bar starts when the bay window opens (30 minutes before ETD) and ends at
+                ETD, or when the exit gate reads the bus.
+              </p>
+            </div>
+            <div class="tos-head-right">
+              <input type="date" id="date" aria-label="Terminal day" />
+              <span id="live"></span>
+              <button type="button" class="btn-outline" data-act="refresh">Refresh</button>
+            </div>
+          </div>
+
+          <div class="hidden" id="message"></div>
+          <div class="tos-legend" id="legend"></div>
+          <div class="tos-split" style="margin-top: 14px">
+            <section class="table-wrap">
+              <div class="tos-panel-head"><h3 id="day-label">Loading</h3><span class="subtle" id="trip-count"></span></div>
+              <div class="tos-gantt-scroll" id="scroll"><div class="tos-gantt" id="gantt"></div></div>
+            </section>
+            <section class="card tos-detail" id="detail" style="margin-top: 0"></section>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script type="module">
+      import {
+        guardPage,
+        renderNav,
+        escapeHtml,
+        showMessage,
+        startLive,
+        liveText,
+        act,
+        fmt,
+        pill,
+        tripPill,
+        tripStatus,
+        STATUS_CLASS,
+        decisionLabel,
+        plateChip,
+        docsExpired,
+        manilaToday,
+      } from "./assets/tos.js";
+
+      const profile = await guardPage("staff");
+      if (!profile) throw new Error("unauthorised");
+      renderNav(profile);
+
+      const PX = 3; // pixels per minute
+      const DAY_FROM = 4 * 60;
+      const DAY_TO = 24 * 60;
+      const params = new URLSearchParams(location.search);
+      const dateInput = document.getElementById("date");
+      dateInput.value = params.get("date") || manilaToday();
+
+      let M = null;
+      let updatedAt = null;
+      let loadError = null;
+      let selected = params.get("trip");
+      let scrolled = false;
+      let busy = false;
+
+      document.getElementById("legend").innerHTML = ["Booked", "No plate", "Overdue", "At bay", "Boarding", "Departed", "No-show"]
+        .map((s) => pill(s, STATUS_CLASS[s]))
+        .join("");
+
+      const live = startLive({
+        getDate: () => dateInput.value || null,
+        onData: (model, at) => {
+          M = model;
+          updatedAt = at;
+          loadError = null;
+          showMessage("message", "");
+          render();
+        },
+        onError: (error) => {
+          loadError = error;
+          showMessage("message", `Could not load trips: ${error.message}`);
+          renderLive();
+        },
+      });
+
+      dateInput.addEventListener("change", () => {
+        scrolled = false;
+        const url = new URL(location.href);
+        url.searchParams.set("date", dateInput.value);
+        url.searchParams.delete("trip");
+        selected = null;
+        history.replaceState(null, "", url);
+        live.refresh();
+      });
+
+      function renderLive() {
+        document.getElementById("live").innerHTML = liveText(updatedAt, loadError);
+      }
+
+      function render() {
+        renderLive();
+        if (!M) return;
+        document.getElementById("day-label").textContent = M.dayLabel;
+        const unassigned = M.trips.filter((t) => !t.bayId).length;
+        document.getElementById("trip-count").textContent =
+          `${M.trips.length} approved trip${M.trips.length === 1 ? "" : "s"}` + (unassigned ? ` · ${unassigned} without a bay` : "");
+        document.getElementById("gantt").innerHTML = ganttHtml();
+        document.getElementById("detail").innerHTML = detailHtml();
+        const scroll = document.getElementById("scroll");
+        if (!scrolled) {
+          const focus = selected && M.byId[selected] ? M.byId[selected].slot : M.isToday ? M.now() : M.trips[0]?.slot ?? 6 * 60;
+          scroll.scrollLeft = Math.max(0, (focus - 60 - DAY_FROM) * PX);
+          scrolled = true;
+        }
+      }
+
+      function ganttHtml() {
+        const x = (m) => (Math.min(Math.max(m, DAY_FROM), DAY_TO) - DAY_FROM) * PX;
+        const width = (DAY_TO - DAY_FROM) * PX;
+        let h = `<div class="tos-g-axis"><div class="tos-g-label"></div><div class="tos-g-track" style="width:${width}px">`;
+        for (let m = DAY_FROM; m < DAY_TO; m += 30) h += `<span class="tos-tick${m === DAY_FROM ? " is-first" : ""}" style="left:${x(m)}px">${fmt(m)}</span>`;
+        h += `</div></div>`;
+
+        const groups = {};
+        M.bays.forEach((b) => (groups[b.gate || "No gate"] ??= []).push(b));
+        for (const [gate, bays] of Object.entries(groups)) {
+          h += `<div class="tos-g-group">${escapeHtml(gate)}</div>`;
+          for (const bay of bays) {
+            h += `<div class="tos-g-row"><div class="tos-g-label">${escapeHtml(bay.name)}</div><div class="tos-g-track" style="width:${width}px">`;
+            for (const t of M.trips.filter((t) => t.bayId === bay.id)) {
+              const end = t.departedAt != null ? Math.max(t.departedAt, t.slot + 5) : t.dep;
+              const s = tripStatus(M, t);
+              const bad = s === "No-show" || s === "Denied entry";
+              h += `<button type="button" class="tos-blk ${STATUS_CLASS[s]}${bad ? " is-bad" : ""}${selected === t.id ? " is-sel" : ""}"
+                data-act="select" data-id="${escapeHtml(t.id)}" style="left:${x(t.slot)}px;width:${Math.max(x(end) - x(t.slot), 6)}px"
+                title="${escapeHtml(`${t.trip ?? ""} · ${t.route} · ${s}`)}">${fmt(t.dep)} ${escapeHtml(t.route)}</button>`;
+            }
+            h += `</div></div>`;
+          }
+        }
+        if (M.isToday) h += `<div class="tos-now" style="left:${88 + x(M.now())}px"></div>`;
+        return h;
+      }
+
+      function detailHtml() {
+        const t = selected && M.byId[selected];
+        if (!t) {
+          return `<p class="card-label">Trip detail</p><p class="subtle" style="margin:0">Select a trip on the timeline, or a row on Gate monitor, to see the bus, its documents and everything the gates recorded.</p>`;
+        }
+        const v = t.plate ? M.vehicles[t.plate] : null;
+        const evs = M.events.filter((e) => e.bid === t.id).slice().reverse();
+        const pending = evs.find((e) => e.pending);
+        const cls = (e) => (e.resolution === "DENIED" || e.decision === "DENY" ? "bad" : e.decision === "HOLD" || e.pending ? "mid" : "ok");
+        const exp = (d) => (d && d < M.date ? "tos-exp" : "");
+        return `
+          <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap">
+            <span class="trip-tag">${escapeHtml(t.trip ?? "No trip number")}</span>${tripPill(M, t)}
+          </div>
+          <p class="subtle" style="margin:10px 0 0">${escapeHtml(t.operator ?? "")}${t.trade ? " · " + escapeHtml(t.trade) : ""}</p>
+          <h4>${escapeHtml(t.route)}</h4>
+          <dl class="tos-kv">
+            <dt>ETD</dt><dd>${fmt(t.dep)}</dd>
+            <dt>Bay window</dt><dd>${escapeHtml(t.bay)} · ${fmt(t.slot)}–${fmt(t.dep)}</dd>
+            <dt>Bus</dt><dd>${plateChip(M, t.plate)}${v?.body_number ? " body " + escapeHtml(v.body_number) : ""}</dd>
+            ${v ? `<dt>Type</dt><dd>${escapeHtml(v.bus_type ?? "—")}</dd>
+            <dt>CPC validity</dt><dd class="${exp(v.cpc_validity)}">${escapeHtml(v.cpc_validity ?? "Not recorded")}</dd>
+            <dt>OR/CR validity</dt><dd class="${exp(v.orcr_validity)}">${escapeHtml(v.orcr_validity ?? "Not recorded")}</dd>` : ""}
+          </dl>
+          ${!t.plate ? `<p class="tos-warnbox">No plate assigned in Trip Scheduling. The gate camera cannot match this trip until the operator or staff assigns one.</p>` : ""}
+          ${t.plate && !v ? `<p class="tos-warnbox">This plate is not in the approved vehicle masterfile.</p>` : ""}
+          ${docsExpired(v, M.date) ? `<p class="tos-warnbox">Documents expired. The gate applies the "Expired CPC or OR/CR" rule.</p>` : ""}
+          ${pending ? `<p class="tos-warnbox">${escapeHtml(pending.reason)}</p>
+            <div class="tos-actions" style="margin-bottom:14px">
+              <button type="button" class="btn-primary" data-act="allow" data-id="${pending.id}"${busy ? " disabled" : ""}>Open barrier</button>
+              <button type="button" class="btn-danger-outline" data-act="deny" data-id="${pending.id}"${busy ? " disabled" : ""}>Keep closed</button>
+            </div>` : ""}
+          <p class="card-label" style="margin-top:8px">Gate history</p>
+          ${evs.length
+            ? `<ul class="tos-hist">${evs
+                .map((e) => `<li class="${cls(e)}"><span class="ht">${fmt(e.at)}</span> ${escapeHtml(M.gates[e.gate]?.name ?? e.gate)} · ${escapeHtml(decisionLabel(e))}${e.resolvedAt != null ? " at " + fmt(e.resolvedAt) : ""}${e.isTest ? " (test)" : ""}<div class="subtle">${escapeHtml(e.reason)}</div></li>`)
+                .join("")}</ul>`
+            : `<p class="subtle" style="margin:0">No gate reads for this trip.</p>`}
+          <p class="subtle" style="margin-top:12px">Trip changes are made in Trip Scheduling. TOS only records what happens at the gate.</p>`;
+      }
+
+      document.addEventListener("click", async (event) => {
+        const el = event.target.closest("[data-act]");
+        if (!el || el.disabled) return;
+        const { act: a, id } = el.dataset;
+        if (a === "refresh") live.refresh();
+        else if (a === "select") {
+          selected = id;
+          const url = new URL(location.href);
+          url.searchParams.set("trip", id);
+          history.replaceState(null, "", url);
+          render();
+        } else if (a === "allow" || a === "deny") {
+          busy = true;
+          render();
+          await act("tos_resolve_review", { p_event: Number(id), p_allow: a === "allow" }, a === "allow" ? "Barrier opened" : "Kept out");
+          busy = false;
+          await live.refresh();
+        }
+      });
+
+      setInterval(() => M?.isToday && !busy && render(), 15000);
+      renderLive();
+    </script>
+  </body>
+</html>

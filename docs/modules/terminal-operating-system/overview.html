@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Overview · PITX Terminal Operations</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../../shared/styles.css" />
+    <link rel="stylesheet" href="assets/tos.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" id="nav"></aside>
+      <div class="app-content">
+        <main class="wrap">
+          <div class="page-head">
+            <div>
+              <p class="eyebrow">Terminal Operations &middot; Today</p>
+              <h1>Overview</h1>
+              <p class="subtle">Gate activity for today, from the first bus in to now.</p>
+            </div>
+            <div class="tos-head-right">
+              <span id="live"></span>
+              <button type="button" class="btn-outline" data-act="refresh">Refresh</button>
+            </div>
+          </div>
+
+          <div class="hidden" id="message"></div>
+          <div class="kpis" id="kpis"></div>
+          <div class="tos-split" style="grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr)">
+            <section class="table-wrap">
+              <div class="tos-panel-head">
+                <h3>Gate entries per hour</h3>
+                <div class="tos-leg"><span style="--c: var(--blue)">Let in</span><span style="--c: var(--red-ink)">Turned away</span></div>
+              </div>
+              <div class="tos-chart" id="chart" style="padding: 14px 16px"></div>
+            </section>
+            <section class="table-wrap">
+              <div class="tos-panel-head"><h3>Why buses were stopped</h3></div>
+              <div id="reasons"></div>
+            </section>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script type="module">
+      import { guardPage, renderNav, escapeHtml, showMessage, startLive, liveText, tripStatus } from "./assets/tos.js";
+
+      const profile = await guardPage("staff");
+      if (!profile) throw new Error("unauthorised");
+      renderNav(profile);
+
+      let M = null;
+      let updatedAt = null;
+      let loadError = null;
+
+      const live = startLive({
+        onData: (model, at) => {
+          M = model;
+          updatedAt = at;
+          loadError = null;
+          showMessage("message", "");
+          render();
+        },
+        onError: (error) => {
+          loadError = error;
+          showMessage("message", `Could not load gate data: ${error.message}`);
+          render();
+        },
+      });
+
+      function render() {
+        document.getElementById("live").innerHTML = liveText(updatedAt, loadError);
+        if (!M) return;
+        const now = M.now();
+        const entry = M.events.filter((e) => M.gates[e.gate]?.direction === "entry");
+        const letIn = entry.filter((e) => e.opened);
+        const refused = entry.filter((e) => e.decision === "DENY" || e.resolution === "DENIED");
+        const arrived = M.trips.filter((t) => t.arrivedAt != null);
+        const onTime = arrived.filter((t) => t.arrivedAt - t.slot <= M.rules.grace).length;
+        const noPlate = M.trips.filter((t) => !t.plate).length;
+        const noShows = M.trips.filter((t) => tripStatus(M, t, now) === "No-show").length;
+
+        const kpi = (label, value, sub) =>
+          `<div class="kpi"><div class="kpi-label">${label}</div><div class="kpi-value"><strong style="font-size:26px">${value}</strong></div><div class="subtle">${sub}</div></div>`;
+        document.getElementById("kpis").innerHTML = [
+          kpi("Buses let in", letIn.length, `of ${M.trips.filter((t) => t.slot <= now).length} trips due so far`),
+          kpi("On-time arrivals", arrived.length ? `${Math.round((onTime / arrived.length) * 100)}%` : "—", `within ${M.rules.grace}-min grace`),
+          kpi("Turned away", refused.length, `${entry.filter((e) => e.cat === "Unregistered vehicle").length} unregistered plates`),
+          kpi("No-shows", noShows, "bay window passed, bus never read"),
+          kpi("Trips without a plate", noPlate, `of ${M.trips.length} approved today`),
+          kpi("Waiting for staff", M.pending().length, "at the gate now"),
+        ].join("");
+
+        // Per-hour bars, drawn to one scale.
+        const W = 720, H = 230, pl = 34, pb = 26, pt = 10;
+        const hours = Array.from({ length: 19 }, (_, i) => i + 4);
+        const hourOf = (e) => Math.floor((e.resolvedAt ?? e.at) / 60);
+        const data = hours.map((h) => ({ h, a: letIn.filter((e) => hourOf(e) === h).length, d: refused.filter((e) => hourOf(e) === h).length }));
+        const ymax = Math.max(5, Math.ceil(Math.max(...data.map((d) => Math.max(d.a, d.d))) / 5) * 5);
+        const bw = (W - pl - 6) / hours.length;
+        const y = (v) => pt + (H - pt - pb) * (1 - v / ymax);
+        const cur = Math.floor(now / 60);
+        let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Gate entries per hour">`;
+        [0, ymax / 2, ymax].forEach((v) => {
+          svg += `<line x1="${pl}" x2="${W - 4}" y1="${y(v)}" y2="${y(v)}" stroke="var(--divider)"/><text x="${pl - 6}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--label)">${v}</text>`;
+        });
+        data.forEach((d, i) => {
+          const x = pl + i * bw + bw * 0.14, w = bw * 0.34;
+          if (d.a) svg += `<rect x="${x}" y="${y(d.a)}" width="${w}" height="${y(0) - y(d.a)}" rx="2" fill="var(--blue)"/>`;
+          if (d.d) svg += `<rect x="${x + w + 2}" y="${y(d.d)}" width="${w}" height="${y(0) - y(d.d)}" rx="2" fill="var(--red-ink)"/>`;
+          if (i % 2 === 0 || d.h === cur)
+            svg += `<text x="${pl + i * bw + bw / 2}" y="${H - 8}" text-anchor="middle" font-size="11" fill="${d.h === cur ? "var(--text)" : "var(--label)"}" font-weight="${d.h === cur ? 700 : 500}">${String(d.h).padStart(2, "0")}</text>`;
+        });
+        document.getElementById("chart").innerHTML = svg + "</svg>";
+
+        const groups = {};
+        entry
+          .filter((e) => !(e.decision === "ALLOW" && !e.resolution))
+          .forEach((e) => {
+            const g = (groups[e.cat || "Other"] ??= { n: 0, a: 0, d: 0 });
+            g.n++;
+            if (e.resolution === "ALLOWED" || (e.decision === "HOLD" && M.byId[e.bid]?.arrivedAt != null)) g.a++;
+            else if (e.decision === "DENY" || e.resolution === "DENIED") g.d++;
+          });
+        const rows = Object.entries(groups).sort((a, b) => b[1].n - a[1].n);
+        document.getElementById("reasons").innerHTML = rows.length
+          ? `<table><thead><tr><th>Reason</th><th>Stops</th><th>Let in after</th><th>Denied</th></tr></thead><tbody>${rows
+              .map(([k, v]) => `<tr><td>${escapeHtml(k)}</td><td class="tos-num">${v.n}</td><td class="tos-num">${v.a}</td><td class="tos-num">${v.d}</td></tr>`)
+              .join("")}</tbody></table>`
+          : `<p class="tos-none">No buses stopped yet today.</p>`;
+      }
+
+      document.addEventListener("click", (e) => {
+        if (e.target.closest('[data-act="refresh"]')) live.refresh();
+      });
+      render();
+    </script>
+  </body>
+</html>
