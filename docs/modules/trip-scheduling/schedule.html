@@ -360,6 +360,19 @@
           : { key: "arriving", label: "Arriving" };
       }
 
+      // Approved trips link to the Terminal Operating System's Bay timeline,
+      // which opens on that day with the trip selected (it reads ?date= and
+      // ?trip=<booking id>). TOS only knows approved trips, so cancelled rows
+      // keep the plain trip number.
+      function tosTripLink(b) {
+        const text = escapeHtml(b.trip_number ?? "—");
+        if (b.status !== "approved") return text;
+        const href = `../terminal-operating-system/bays.html?date=${encodeURIComponent(
+          b.booking_date ?? currentDate
+        )}&trip=${encodeURIComponent(b.id)}`;
+        return `<a href="${href}" title="Open in Terminal Operating System">${text}</a>`;
+      }
+
       await load();
 
       async function load() {
@@ -485,7 +498,7 @@
                               <span class="pids-company-name">${bookingOperatorHtml(b)}</span>
                             </div>
                           </td>
-                          <td class="pids-trip-no">${escapeHtml(b.trip_number ?? "—")}</td>
+                          <td class="pids-trip-no">${tosTripLink(b)}</td>
                           <td>${
                             b.plate_no
                               ? escapeHtml(b.plate_no)
