@@ -50,9 +50,15 @@ supabase/
 
 ## Git
 
-- Branch per change, open a PR, squash-merge to `main`. `main` deploys to GitHub Pages.
-- Add a `.github/CODEOWNERS` with each owner's GitHub username for their module folder
-  (and both for `docs/shared/` and `supabase/migrations/`).
+- Everyone commits straight to `main`; there is no dev branch. `main` deploys to
+  GitHub Pages within a minute, so only push what works.
+- Before pushing: `git pull --rebase origin main`. Push small, frequent commits.
+- Stay in your module folder so pushes rarely touch the same files. A change to
+  `docs/shared/` or `supabase/migrations/` affects every module: tell the other owner
+  first.
+- `.github/CODEOWNERS` records who owns what. Without branch protection it is
+  advisory only (it is not enforced on direct pushes).
+- Test against the dev Supabase project, never production.
 
 ## Adding a module
 
