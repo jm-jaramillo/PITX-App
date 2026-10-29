@@ -4487,3 +4487,28 @@ The staff Schedule board is unchanged. Checked as genesis.ops: 6 columns, no bad
 
 ---
 
+### 119. Staff Schedule: no status; assign a plate or swap the operator (migration 202610291400, 29 Oct)
+
+- **Status column removed** from the staff Schedule day view and its CSV export,
+  like My schedule (#118): arrival/departure is the Terminal Operating System's
+  job. Cancelled trips stay struck through.
+- **New "Plate / operator" action** on every trip that is not cancelled and has not
+  departed. It opens a dialog:
+  - *Plate only* - pick one of the current operator's eligible vehicles (or "No
+    plate yet" to clear it); uses the existing `staff_set_booking_plate`.
+  - *Swap operator* - pick another operator, then one of that operator's vehicles;
+    the trip (date, slot, **bay**) moves to them. New `staff_reassign_booking()`.
+- Rules, enforced in the database: staff only; trip must be pending/approved; the
+  new operator and plate must be registered for the booking's **gate** (same rule as
+  transfers, 0050) with a valid CPC/LTFRB; a plate is required for a swap; same
+  back-to-back-slot rule as every other plate path. The old operator is kept in
+  `previous_operator_name` (so it shows like a transfer), the trade name follows
+  the new plate, and **both operators get a notification** (`trip_reassigned`).
+- Helper RPCs for the dialog (staff only): `staff_list_reassign_operators`,
+  `staff_list_booking_vehicles`.
+- Applied to the live database by hand with a `_schema_migrations` row.
+- Verified as staff on a 2 Nov trip: assigned a plate, then swapped Genesis ->
+  Baliwag Transit with one of its plates (bay unchanged); then restored the demo row.
+
+---
+

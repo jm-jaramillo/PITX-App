@@ -185,6 +185,27 @@
 
       <div class="hidden" id="message"></div>
       <div id="grid"></div>
+
+      <dialog id="trip-dialog" class="card" style="max-width: 440px; width: calc(100% - 32px)">
+        <form id="trip-form" method="dialog">
+          <h2 style="margin-top: 0">Plate &amp; operator</h2>
+          <p class="subtle" id="trip-context"></p>
+          <div class="field">
+            <label for="trip-operator">Operator</label>
+            <select id="trip-operator"></select>
+          </div>
+          <div class="field">
+            <label for="trip-plate">Plate number</label>
+            <select id="trip-plate"></select>
+          </div>
+          <p class="subtle" id="trip-hint"></p>
+          <div class="hidden" id="trip-message"></div>
+          <div style="display: flex; gap: 8px; justify-content: flex-end">
+            <button type="button" class="btn-outline" id="trip-cancel">Cancel</button>
+            <button type="submit" class="btn-primary" id="trip-save">Save</button>
+          </div>
+        </form>
+      </dialog>
     </main>
       </div>
     </div>
@@ -263,7 +284,6 @@
         "Destination",
         "Gate",
         "Bay",
-        "Status",
       ];
 
       const csvHeaders = () => (rangeMode === "week" ? ["Date", ...BASE_CSV_HEADERS] : BASE_CSV_HEADERS);
@@ -279,7 +299,6 @@
           b.route ?? "",
           bareGate(b.route),
           bareBay(b.bays?.name),
-          pidsStatus(b).label,
         ];
       }
 
@@ -345,20 +364,13 @@
         return ((words[0]?.[0] ?? "") + (words[1]?.[0] ?? "")).toUpperCase() || "?";
       }
 
-      // Status shown on the board is derived entirely from data this app
-      // actually has - no fabricated real-time tracking. A cancelled
-      // booking (that had a real assigned slot at some point) shows as
-      // CANCELLED; an approved one flips from ARRIVING to DEPARTED once
-      // its 15-minute window has passed, since that's the one thing we
-      // can honestly infer without live GPS/dispatch data.
-      function pidsStatus(b) {
-        if (b.status === "cancelled") return { key: "cancelled", label: "Cancelled" };
-        const hasDeparted =
-          slotStartMillis(b.booking_date ?? currentDate, b.slot) + 15 * 60 * 1000 <= Date.now();
-        return hasDeparted
-          ? { key: "departed", label: "Departed" }
-          : { key: "arriving", label: "Arriving" };
-      }
+      // The board no longer shows a status (arrival/departure is the Terminal
+      // Operating System's job). All that is left is whether a trip is
+      // cancelled (struck through) and whether its slot has passed - staff can
+      // only change the bay, plate or operator of a trip that hasn't departed.
+      const isCancelled = (b) => b.status === "cancelled";
+      const hasDeparted = (b) =>
+        slotStartMillis(b.booking_date ?? currentDate, b.slot) + 15 * 60 * 1000 <= Date.now();
 
       // Approved trips link to the Terminal Operating System's Bay timeline,
       // which opens on that day with the trip selected (it reads ?date= and
@@ -476,7 +488,7 @@
                     <th>Destination</th>
                     <th class="pids-num">Gate</th>
                     <th class="pids-num">Bay</th>
-                    <th>Status</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -486,10 +498,9 @@
                       const timeLabel = formatSlotStart(slot);
                       const rowsHtml = rows
                         .map((b) => {
-                          const status = pidsStatus(b);
                           const label = b.operator_name || "Operator";
                           return `
-                        <tr class="pids-row${status.key === "cancelled" ? " is-cancelled" : ""}">
+                        <tr class="pids-row${isCancelled(b) ? " is-cancelled" : ""}">
                           <td>
                             <div class="pids-company">
                               <span class="pids-avatar" style="background:${avatarColor(label)}">${escapeHtml(
@@ -507,11 +518,15 @@
                           <td>${escapeHtml((b.route ?? "—").toUpperCase())}</td>
                           <td class="pids-num">${escapeHtml(bareGate(b.route))}</td>
                           <td class="pids-num" data-bay-cell="${escapeHtml(b.id)}">${
-                            status.key === "arriving"
+                            !isCancelled(b) && !hasDeparted(b)
                               ? bayReassignHtml(b)
                               : escapeHtml(bareBay(b.bays?.name))
                           }</td>
-                          <td><span class="pids-status status-${status.key}">${escapeHtml(status.label)}</span></td>
+                          <td class="pids-num">${
+                            !isCancelled(b) && !hasDeparted(b)
+                              ? `<button type="button" class="btn-link" data-edit-trip="${escapeHtml(b.id)}">Plate / operator</button>`
+                              : ""
+                          }</td>
                         </tr>`;
                         })
                         .join("");
@@ -528,6 +543,9 @@
           </div>
         `;
 
+        document.querySelectorAll("[data-edit-trip]").forEach((btn) => {
+          btn.addEventListener("click", () => openTripEditor(btn.dataset.editTrip));
+        });
         document.querySelectorAll("[data-reassign-bay]").forEach((form) => {
           form.addEventListener("submit", (e) => {
             e.preventDefault();
@@ -599,6 +617,96 @@
           </form>
         `;
       }
+
+      // Staff-side plate entry and operator swap. Changing only the plate goes
+      // through staff_set_booking_plate; picking a different operator goes
+      // through staff_reassign_booking, which needs that operator's vehicle and
+      // keeps the bay and slot. Both enforce eligibility in the database -
+      // these lists are just the choices that will be accepted.
+      let editingId = null;
+      let editingOperatorName = "";
+      const tripDialog = document.getElementById("trip-dialog");
+      const tripOperator = document.getElementById("trip-operator");
+      const tripPlate = document.getElementById("trip-plate");
+
+      async function loadPlateChoices(username, currentPlate) {
+        tripPlate.disabled = true;
+        tripPlate.innerHTML = `<option value="" disabled selected>Loading…</option>`;
+        const { data, error } = await supabase.rpc("staff_list_booking_vehicles", {
+          p_booking_id: editingId,
+          p_username: username,
+        });
+        const vehicles = error ? [] : data ?? [];
+        const norm = (v) => String(v ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+        tripPlate.innerHTML =
+          (username ? "" : `<option value="">No plate yet</option>`) +
+          (vehicles.length === 0
+            ? `<option value="" disabled ${username ? "selected" : ""}>No eligible vehicles</option>`
+            : username
+            ? `<option value="" disabled selected>Select a vehicle</option>`
+            : "") +
+          vehicles
+            .map(
+              (v) =>
+                `<option value="${escapeHtml(v.plate_no)}"${
+                  !username && norm(v.plate_no) === norm(currentPlate) ? " selected" : ""
+                }>${escapeHtml(v.plate_no)}${v.body_number ? " · " + escapeHtml(v.body_number) : ""}</option>`
+            )
+            .join("");
+        tripPlate.disabled = false;
+      }
+
+      async function openTripEditor(bookingId) {
+        const b = lastDayBookings.find((x) => x.id === bookingId);
+        if (!b) return;
+        editingId = bookingId;
+        editingOperatorName = b.operator_name ?? "this operator";
+        showMessage("trip-message", "");
+        document.getElementById("trip-context").textContent =
+          `${formatSlotStart(b.slot)} · ${b.route} · ${b.booking_date ?? currentDate}`;
+        tripOperator.innerHTML = `<option value="">${escapeHtml(editingOperatorName)} (current)</option>`;
+        document.getElementById("trip-hint").textContent =
+          "Change the plate for the current operator, or pick another operator to move the trip to them (their vehicle is required). The bay stays the same.";
+        tripDialog.showModal();
+        loadPlateChoices(null, b.plate_no);
+        const { data } = await supabase.rpc("staff_list_reassign_operators", { p_booking_id: bookingId });
+        tripOperator.innerHTML =
+          `<option value="">${escapeHtml(editingOperatorName)} (current)</option>` +
+          (data ?? [])
+            .map((o) => `<option value="${escapeHtml(o.username)}">${escapeHtml(o.operator_name ?? o.username)}</option>`)
+            .join("");
+      }
+
+      tripOperator.addEventListener("change", () => {
+        const b = lastDayBookings.find((x) => x.id === editingId);
+        loadPlateChoices(tripOperator.value || null, b?.plate_no);
+      });
+      document.getElementById("trip-cancel").addEventListener("click", () => tripDialog.close());
+      document.getElementById("trip-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        showMessage("trip-message", "");
+        const username = tripOperator.value || null;
+        const plate = tripPlate.value;
+        if (username && !plate) return showMessage("trip-message", "Pick the receiving operator's vehicle.");
+        const { error } = username
+          ? await supabase.rpc("staff_reassign_booking", {
+              p_booking_id: editingId,
+              p_to_username: username,
+              p_plate_no: plate,
+            })
+          : await supabase.rpc("staff_set_booking_plate", {
+              p_booking_id: editingId,
+              p_plate_no: plate,
+            });
+        if (error) return showMessage("trip-message", error.message);
+        tripDialog.close();
+        showMessage(
+          "message",
+          username ? "Trip moved to the new operator." : plate ? `Plate set to ${plate}.` : "Plate cleared.",
+          "ok"
+        );
+        await load();
+      });
 
       async function reassignBay(bookingId, bayIdRaw) {
         showMessage("message", "");
