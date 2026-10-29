@@ -23,9 +23,15 @@ before its bus arrives: no plate assigned, plate not in the masterfile, or
 expired documents means the gate camera cannot let it in, so staff can fix
 it in Trip Scheduling first.
 | `bays.html` | Bay timeline for any day, with trip detail, documents and gate history |
-| `board.html` | Concourse departures board |
+| `board.html` | Concourse departures board in PITX blue and red, with All / Provincial / Commuter tabs |
 | `feed.html` | What TOS receives from Trip Scheduling: approved trips for a day, the vehicle masterfile, and vehicles with expired documents |
-| `rules.html` | Gate rules (saved to the database), devices, and clearing test reads |
+| `rules.html` | Gate rules (saved to the database), devices, clearing test reads, and which destinations are commuter or provincial |
+
+**Commuter or provincial:** Trip Scheduling stores no service type, so TOS
+keeps its own destination list (`tos.route_service`), which staff edit on
+Devices & rules. Any destination not marked commuter counts as provincial.
+The first commuter list was ALABANG, PACITA COMPLEX, BIÑAN, LAGUNA and
+STA. ROSA, LAGUNA.
 
 `assets/tos.js` holds the module's helpers (snapshot model, trip status,
 live refresh, sidebar) and re-exports `../../shared/platform.js`.
@@ -69,6 +75,7 @@ Migrations:
 | `tos_resolve_review(event, allow)` | Open barrier / Keep closed |
 | `tos_set_rules(jsonb)` | Devices & rules |
 | `tos_simulate(kind)` / `tos_clear_tests()` | test reads until the hardware is connected |
+| `tos_route_services()` / `tos_set_route_service(route, service)` | the commuter / provincial list (added in `202610291100_terminal-operating-system_route_service.sql`) |
 
 Every function checks `public.is_staff()`. The `tos` schema is not exposed
 through the REST API, so pages can only reach it through these functions.

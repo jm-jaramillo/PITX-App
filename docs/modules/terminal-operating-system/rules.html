@@ -66,6 +66,18 @@
               </section>
             </div>
           </div>
+
+          <section class="table-wrap" style="margin-top: 18px">
+            <div class="tos-panel-head">
+              <h3>Commuter and provincial routes</h3>
+              <span class="subtle" id="routes-note"></span>
+            </div>
+            <div class="toolbar" style="padding: 12px 16px; border-bottom: 1px solid var(--divider)">
+              <input id="route-q" type="search" placeholder="Search destinations" style="min-width: 0; flex: 0 1 300px" />
+              <div class="tos-seg" role="group" aria-label="Show" id="route-filter"></div>
+            </div>
+            <div id="routes"><p class="tos-none">Loading…</p></div>
+          </section>
         </main>
       </div>
     </div>
@@ -163,7 +175,73 @@
         render();
       });
 
+      /* ---- commuter / provincial route list (drives the passenger board tabs) */
+      let routes = [];
+      let routeQuery = "";
+      let routeFilter = "all";
+      const ROUTE_FILTERS = [["all", "All"], ["commuter", "Commuter"], ["provincial", "Provincial"]];
+
+      async function loadRoutes() {
+        const { data, error } = await supabase.rpc("tos_route_services");
+        if (error) {
+          document.getElementById("routes").innerHTML = `<p class="tos-none">Could not load destinations: ${escapeHtml(error.message)}</p>`;
+          return;
+        }
+        routes = data;
+        renderRoutes();
+      }
+
+      function renderRoutes() {
+        const commuter = routes.filter((r) => r.service === "commuter").length;
+        document.getElementById("routes-note").textContent =
+          `${commuter} commuter · ${routes.length - commuter} provincial · destinations not marked count as provincial`;
+        document.getElementById("route-filter").innerHTML = ROUTE_FILTERS.map(
+          ([k, l]) => `<button type="button" data-route-filter="${k}" aria-pressed="${k === routeFilter}">${l}</button>`
+        ).join("");
+        const rows = routes.filter(
+          (r) => (routeFilter === "all" || r.service === routeFilter) && (!routeQuery || r.route.toLowerCase().includes(routeQuery))
+        );
+        document.getElementById("routes").innerHTML = rows.length
+          ? `<div style="max-height: 420px; overflow-y: auto"><table><thead><tr><th>Destination</th><th style="width: 220px">Service</th></tr></thead><tbody>${rows
+              .map(
+                (r) => `<tr><td class="cell-strong">${escapeHtml(r.route)}</td><td>
+                  <select data-route="${escapeHtml(r.route)}" aria-label="Service for ${escapeHtml(r.route)}">
+                    <option value="provincial"${r.service === "provincial" ? " selected" : ""}>Provincial</option>
+                    <option value="commuter"${r.service === "commuter" ? " selected" : ""}>Commuter</option>
+                  </select></td></tr>`
+              )
+              .join("")}</tbody></table></div>`
+          : `<p class="tos-none">No destinations match.</p>`;
+      }
+
+      document.getElementById("route-q").addEventListener("input", (e) => {
+        routeQuery = e.target.value.trim().toLowerCase();
+        renderRoutes();
+      });
+      document.getElementById("route-filter").addEventListener("click", (e) => {
+        const b = e.target.closest("[data-route-filter]");
+        if (!b) return;
+        routeFilter = b.dataset.routeFilter;
+        renderRoutes();
+      });
+      document.getElementById("routes").addEventListener("change", async (e) => {
+        const sel = e.target.closest("select[data-route]");
+        if (!sel) return;
+        const route = sel.dataset.route;
+        const before = routes.find((r) => r.route === route)?.service;
+        sel.disabled = true;
+        const saved = await act(
+          "tos_set_route_service",
+          { p_route: route, p_service: sel.value },
+          `${route} is now ${sel.value === "commuter" ? "Commuter" : "Provincial"} on the passenger board.`
+        );
+        const row = routes.find((r) => r.route === route);
+        if (row) row.service = saved ? saved.service : before;
+        renderRoutes();
+      });
+
       await load();
+      await loadRoutes();
     </script>
   </body>
 </html>
