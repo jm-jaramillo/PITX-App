@@ -11,7 +11,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="../../shared/styles.css" />
-    <link rel="stylesheet" href="assets/tos.css" />
+    <link rel="stylesheet" href="assets/tos.css?v=20261029-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -65,7 +65,7 @@
         expectedTrips,
         gateReadiness,
         expectedHtml,
-      } from "./assets/tos.js";
+      } from "./assets/tos.js?v=20261029-1";
 
       const profile = await guardPage("staff");
       if (!profile) throw new Error("unauthorised");

@@ -36,6 +36,13 @@ STA. ROSA, LAGUNA.
 `assets/tos.js` holds the module's helpers (snapshot model, trip status,
 live refresh, sidebar) and re-exports `../../shared/platform.js`.
 
+**When you change `assets/tos.js` or `assets/tos.css`, bump the `?v=`
+version on every page's import and stylesheet link** (all pages use the same
+value, e.g. `./assets/tos.js?v=20261029-1`). GitHub Pages lets browsers cache
+files for 10 minutes. Without a new version, a browser can load a new page
+together with an old cached `tos.js`. The page script then fails on a missing
+export and the page stays blank (no sidebar).
+
 ## How a gate read is decided
 
 A trip's ETD is its Trip Scheduling slot start. Its **bay window** opens 30
