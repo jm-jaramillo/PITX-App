@@ -4461,3 +4461,12 @@ request-history) land correctly.
 
 ---
 
+### 116. Demo bookings for the current week (29 Oct)
+
+Same trip list as #114 for **26 Oct - 1 Nov 2026** (the week containing today): 158
+bookings, every one given its bay by the balanced-assignment trigger. Mon-Wed
+(already departed) are all approved; Thu-Sun keep about 1 in 7 pending (18 in the
+Approvals queue). Seeded with SQL; nothing assigned by hand.
+
+---
+
