@@ -209,6 +209,68 @@ export function docsExpired(v, date) {
   return !!v && ((v.cpc_validity && v.cpc_validity < date) || (v.orcr_validity && v.orcr_validity < date));
 }
 
+/* --------------------------------------------------- expected at the gates */
+
+/**
+ * What the gate will make of a booked trip's bus when it arrives, judged
+ * from Trip Scheduling's data before any camera read: [label, class, ready].
+ */
+export function gateReadiness(M, t) {
+  if (!t.plate) return ["No plate assigned", "s-bad", false];
+  const v = M.vehicles[t.plate];
+  if (!v) return ["Plate not in masterfile", "s-bad", false];
+  if (docsExpired(v, M.date)) return ["Documents expired", "s-bad", false];
+  return ["Ready", "s-ok", true];
+}
+
+/**
+ * Approved trips whose bus has not reached the gate yet: overdue ones first
+ * (up to 20 minutes past ETD), then those whose bay window opens within
+ * `horizon` minutes.
+ */
+export function expectedTrips(M, horizon = 120, now = M.now()) {
+  return M.trips
+    .filter((t) => t.arrivedAt == null && t.departedAt == null && !t.denied)
+    .filter((t) => t.dep >= now - 20 && t.slot <= now + horizon)
+    .sort((a, b) => a.slot - b.slot);
+}
+
+/** "Expected at the gates" panel body: a table, or an empty note. */
+export function expectedHtml(M, { horizon = 120, limit = 12 } = {}) {
+  const now = M.now();
+  const rows = expectedTrips(M, horizon, now);
+  if (!rows.length) {
+    const next = M.trips.find((t) => t.arrivedAt == null && !t.denied && t.slot > now + horizon);
+    return `<p class="tos-none">${
+      M.trips.length === 0
+        ? "No approved trips in Trip Scheduling for today."
+        : next
+          ? `No buses due in the next ${horizon / 60} hours. Next bay window opens ${fmt(next.slot)}.`
+          : "No more buses due today."
+    }</p>`;
+  }
+  const notReady = rows.filter((t) => !gateReadiness(M, t)[2]).length;
+  return `
+    ${notReady ? `<p class="tos-note" style="margin:12px 16px 0">${notReady} of ${rows.length} cannot be matched by the gate camera yet. Fix them in Trip Scheduling before the bus arrives.</p>` : ""}
+    <div style="overflow-x:auto"><table>
+      <thead><tr><th>Bay window</th><th>Trip</th><th>Plate</th><th>Bay</th><th>Gate check</th><th>Status</th></tr></thead>
+      <tbody>${rows
+        .slice(0, limit)
+        .map((t) => {
+          const [label, cls] = gateReadiness(M, t);
+          return `<tr class="row-clickable" data-act="trip" data-id="${escapeHtml(t.id)}">
+            <td class="tos-num">${fmt(t.slot)}<span class="cell-sub">ETD ${fmt(t.dep)}</span></td>
+            <td><span class="cell-strong">${escapeHtml(t.route)}</span><span class="cell-sub">${escapeHtml(t.trip ?? "")} · ${escapeHtml(t.trade || t.operator || "")}</span></td>
+            <td>${plateChip(M, t.plate)}</td>
+            <td>${t.bayId ? `<span class="bay-tag">${escapeHtml(t.bay)}</span>${t.bayGate ? `<span class="cell-sub">${escapeHtml(t.bayGate)}</span>` : ""}` : '<span class="muted">No bay</span>'}</td>
+            <td>${pill(label, cls)}</td>
+            <td>${tripPill(M, t)}</td>
+          </tr>`;
+        })
+        .join("")}</tbody></table></div>
+    ${rows.length > limit ? `<p class="tos-none" style="padding-top:8px">and ${rows.length - limit} more. See the Bay timeline.</p>` : ""}`;
+}
+
 /* ------------------------------------------------------------ live data */
 
 /**
