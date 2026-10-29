@@ -4445,3 +4445,19 @@ Bays 18, 19, 20... every day under the old rule.
 
 ---
 
+### 115. Fix: pages blank after the module restructure (29 Oct)
+
+`assets/app.js` calls `escapeHtml` (25 places: booking/vehicle renderers) but after
+the move to modules it only imported `renderNav`/`ICONS` from the shared platform
+- `export *` re-exports a name, it does not bring it into scope. Result: staff
+**Approvals** and **Vehicles** (and anything using those renderers) failed with
+`escapeHtml is not defined` and showed an empty list. Added the import.
+
+Full sweep after the fix, signed in as staff (pitx.admin) and as an operator:
+every Trip Scheduling and Terminal Operating System page loads with no script
+errors; all 38 scripts parse; every link/import/redirect target exists; legacy
+redirects (staff, dashboard, utilization, transfer/vehicle-approvals,
+request-history) land correctly.
+
+---
+

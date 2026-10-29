@@ -3,7 +3,7 @@
 // not specific to trip scheduling lives in ../../../shared/platform.js and is
 // re-exported here so pages keep a single import.
 
-import { renderNav as renderShell, ICONS } from "../../../shared/platform.js";
+import { renderNav as renderShell, ICONS, escapeHtml } from "../../../shared/platform.js";
 export * from "../../../shared/platform.js";
 
 /* ---------------------------------------------------------------- routes */
