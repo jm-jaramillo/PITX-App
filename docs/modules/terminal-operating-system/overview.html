@@ -45,12 +45,27 @@
               <div id="reasons"></div>
             </section>
           </div>
+          <section class="table-wrap" style="margin-top: 18px">
+            <div class="tos-panel-head"><h3>Expected at the gates</h3><span class="subtle">Next 2 hours</span></div>
+            <div id="expected"></div>
+          </section>
         </main>
       </div>
     </div>
 
     <script type="module">
-      import { guardPage, renderNav, escapeHtml, showMessage, startLive, liveText, tripStatus } from "./assets/tos.js";
+      import {
+        guardPage,
+        renderNav,
+        escapeHtml,
+        showMessage,
+        startLive,
+        liveText,
+        tripStatus,
+        expectedTrips,
+        gateReadiness,
+        expectedHtml,
+      } from "./assets/tos.js";
 
       const profile = await guardPage("staff");
       if (!profile) throw new Error("unauthorised");
@@ -86,6 +101,7 @@
         const onTime = arrived.filter((t) => t.arrivedAt - t.slot <= M.rules.grace).length;
         const noPlate = M.trips.filter((t) => !t.plate).length;
         const noShows = M.trips.filter((t) => tripStatus(M, t, now) === "No-show").length;
+        const expected = expectedTrips(M, 120, now);
 
         const kpi = (label, value, sub) =>
           `<div class="kpi"><div class="kpi-label">${label}</div><div class="kpi-value"><strong style="font-size:26px">${value}</strong></div><div class="subtle">${sub}</div></div>`;
@@ -96,7 +112,9 @@
           kpi("No-shows", noShows, "bay window passed, bus never read"),
           kpi("Trips without a plate", noPlate, `of ${M.trips.length} approved today`),
           kpi("Waiting for staff", M.pending().length, "at the gate now"),
+          kpi("Expected next 2 hours", expected.length, expected.length ? `${expected.filter((t) => !gateReadiness(M, t)[2]).length} the camera can't match yet` : "no buses due"),
         ].join("");
+        document.getElementById("expected").innerHTML = expectedHtml(M);
 
         // Per-hour bars, drawn to one scale.
         const W = 720, H = 230, pl = 34, pb = 26, pt = 10;
@@ -139,7 +157,10 @@
 
       document.addEventListener("click", (e) => {
         if (e.target.closest('[data-act="refresh"]')) live.refresh();
+        const trip = e.target.closest('[data-act="trip"]');
+        if (trip) location.href = `bays.html?trip=${encodeURIComponent(trip.dataset.id)}`;
       });
+      setInterval(() => M && render(), 15000);
       render();
     </script>
   </body>

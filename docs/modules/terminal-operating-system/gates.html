@@ -50,6 +50,7 @@
         decisionPill,
         decisionLabel,
         plateChip,
+        expectedHtml,
       } from "./assets/tos.js";
 
       const profile = await guardPage("staff");
@@ -101,6 +102,10 @@
         document.getElementById("view").innerHTML = `
           ${M.trips.length ? "" : `<p class="tos-note">No approved trips in Trip Scheduling for today. Until there are, every registered bus is read as "No booking".</p>`}
           <div class="tos-gates">${gateIds.map(gateTile).join("")}</div>
+          <section class="table-wrap" style="margin: 0 0 18px">
+            <div class="tos-panel-head"><h3>Expected at the gates</h3><span class="subtle">Approved trips whose bay window opens in the next 2 hours</span></div>
+            ${expectedHtml(M)}
+          </section>
           <div class="tos-split">
             <section class="table-wrap">
               <div class="tos-panel-head">

@@ -14,8 +14,14 @@ Staff accounts can open it from the module picker after signing in.
 
 | Page | What it shows |
 | --- | --- |
-| `gates.html` | Gate monitor (landing page): barrier state per gate, every plate read today, vehicles waiting for a staff decision, and test reads |
-| `overview.html` | Today's totals, entries per hour, and why buses were stopped |
+| `gates.html` | Gate monitor (landing page): barrier state per gate, buses expected at the gates in the next 2 hours, every plate read today, vehicles waiting for a staff decision, and test reads |
+| `overview.html` | Today's totals, entries per hour, why buses were stopped, and the buses expected next |
+
+**Expected at the gates** lists approved trips whose bay window opens within
+2 hours, plus overdue ones up to 20 minutes past ETD. Each trip is checked
+before its bus arrives: no plate assigned, plate not in the masterfile, or
+expired documents means the gate camera cannot let it in, so staff can fix
+it in Trip Scheduling first.
 | `bays.html` | Bay timeline for any day, with trip detail, documents and gate history |
 | `board.html` | Concourse departures board |
 | `feed.html` | What TOS receives from Trip Scheduling: approved trips for a day, the vehicle masterfile, and vehicles with expired documents |
