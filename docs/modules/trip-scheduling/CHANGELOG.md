@@ -4189,6 +4189,67 @@ as an operator and as staff and click through before relying on it. Migration
 
 ---
 
+### 113. Automatic, balanced bay assignment (migration 202610291200, 29 Oct)
+
+The bay used to be chosen only at approval, and the default (single approve and
+bulk approve alike) was "the first free bay in the gate" - so Bay 18 got
+everything and the higher-numbered bays sat idle. Every booking now gets its bay
+**the moment it is scheduled**, picked to keep the bays evenly loaded, and staff
+keep full manual control.
+
+**The algorithm - `pick_balanced_bay(route, date, slot)`**, a database function.
+Candidates are active bays free at that date + slot (approved trips *and* other
+requests' proposed bays count as taken, so two requests never get the same bay).
+The first bay by this order wins:
+
+1. **In the route's gate** before any other gate (`route_gates`, 0050); a route
+   with no gate treats all bays alike. Falls back to other gates only when the
+   gate is full at that time.
+2. **No trip in that bay within +/-2 slots (30 min)** - a bus that arrived just
+   before may still be standing there.
+3. **Fewest trips that day** in the bay - the main balancing term.
+4. **Fewest trips over +/-14 days** - keeps the spread fair across the fortnight,
+   so days with only a trip or two still rotate through every bay.
+5. **Stable pseudo-random tie-break** (md5 of bay + date + slot) - deliberately
+   *not* the lowest bay number, which with everything else equal is exactly the
+   old "always Bay 18" behaviour. Same inputs always give the same answer.
+
+Each new trip lands on the emptiest eligible bay, so loads stay within one trip
+of each other.
+
+**When it runs** (triggers on `bookings`): on insert, and on any update that
+leaves a pending/approved booking without a bay - which is what happens when an
+operator changes a trip's route/date/time (`request_booking_change` clears the
+bay). Operators still cannot pick a bay: a bay supplied on insert by a non-staff
+user is discarded. A bay staff set explicitly is never touched. If staff approve
+a booking into a bay another *pending* request had been proposed (an override),
+that request is re-picked automatically. Existing upcoming pending requests were
+given bays by the migration (36, none left without one).
+
+**Staff still decide.**
+- *Approvals:* the bay dropdown is preselected with the booking's bay (marked
+  "(auto)") and any vacant bay, in any gate, can be chosen instead; bulk
+  "Approve selected" now confirms each booking's own proposed bay instead of
+  piling onto the lowest-numbered one. The old first-free rule is only a
+  fallback if a proposed bay has since been taken.
+- *Overstay:* unchanged and still there - on the Schedule board an approved trip
+  that hasn't departed has a bay selector listing only vacant bays for that slot,
+  so a trip whose bus overstayed can be moved to a vacant bay by hand.
+
+**Verified against the live database in rolled-back transactions:** five trips in
+one slot -> Bays 33, 34, 35, 36 then a non-gate bay; eight spaced trips ->
+2 each across the four Gate 5 bays; adjacent slots -> different bays; an operator
+asking for Bay 36 is overridden; staff approving B into A's bay re-picks A;
+a cleared bay is reassigned; no double bookings. Long-run: 30 single-trip days on
+the six Gate 4 bays -> 4/5/5/5/5/6 (earlier tie-break would have been Bay 18 every
+time); 24 trips in one day -> exactly 4 on each. Same-slot clusters no longer
+always start at the lowest bay (35,34,36,33 | 34,33,36,35 | ...).
+
+Applied to the live database by hand (one transaction, with a
+`_schema_migrations` row), as with 0050.
+
+---
+
 ## What the app does now
 
 

@@ -311,7 +311,7 @@
             supabase
               .from("bookings")
               .select(
-                "id, operator_name, trade_name, route, plate_no, booking_date, slot, status, revision_count, previously_approved, last_edited_at"
+                "id, operator_name, trade_name, route, plate_no, booking_date, slot, status, revision_count, previously_approved, last_edited_at, assigned_bay_id"
               )
               .eq("status", "pending")
               .is("cancellation_requested_at", null)
@@ -469,6 +469,13 @@
         await Promise.all([loadCancellations(), load()]);
       }
 
+      // Every booking now arrives with a bay already chosen by the database's
+      // balanced assignment (pick_balanced_bay, migration 202610291200), so the
+      // dropdown is preselected with THAT bay and Approve confirms it; staff
+      // can still pick any other vacant bay from the list. The old first-free
+      // rule (always the lowest-numbered bay) is only a fallback now, for a
+      // booking whose proposed bay has since been taken.
+      //
       // Given a route, works out which bay the single-approve dropdown
       // would auto-pick and preselect - the bulk "Approve selected" button
       // reuses this exact same rule so a selected item never gets a bay
@@ -480,8 +487,9 @@
         const gate = gateForRoute(booking.route);
         const suggested = gate ? available.filter((bay) => bay.gate === gate) : [];
         const other = gate ? available.filter((bay) => bay.gate !== gate) : available;
-        const autoPick = suggested[0] ?? other[0] ?? null;
-        return { gate, available, suggested, other, autoPick };
+        const proposed = available.find((bay) => bay.id === booking.assigned_bay_id) ?? null;
+        const autoPick = proposed ?? suggested[0] ?? other[0] ?? null;
+        return { gate, available, suggested, other, autoPick, proposed };
       }
 
       function renderRequests() {
@@ -516,7 +524,7 @@
 
         host.innerHTML = requests
           .map((b) => {
-            const { gate, suggested, other, autoPick } = bayChoicesFor(b);
+            const { gate, suggested, other, autoPick, proposed } = bayChoicesFor(b);
             const none = suggested.length + other.length === 0;
 
             const optionsHtml = (list) =>
@@ -525,7 +533,7 @@
                   (bay) =>
                     `<option value="${bay.id}"${
                       bay.id === autoPick?.id ? " selected" : ""
-                    }>${escapeHtml(bay.name)}</option>`
+                    }>${escapeHtml(bay.name)}${bay.id === proposed?.id ? " (auto)" : ""}</option>`
                 )
                 .join("");
 
