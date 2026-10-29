@@ -52,6 +52,8 @@
         plateChip,
         expectedHtml,
         reviewActionsHtml,
+        swapFormActive,
+        handleSwapForms,
       } from "./assets/tos.js";
 
       const profile = await guardPage("staff");
@@ -100,6 +102,8 @@
       function render() {
         renderHead();
         if (!M) return;
+        // Staff are typing a plate for a substitute bus: don't redraw under them.
+        if (swapFormActive()) return;
         const gateIds = Object.keys(M.gates);
         document.getElementById("view").innerHTML = `
           ${M.trips.length ? "" : `<p class="tos-note">No approved trips in Trip Scheduling for today. Until there are, every registered bus is read as "No booking".</p>`}
@@ -217,20 +221,31 @@
       document.addEventListener("click", (event) => {
         const el = event.target.closest("[data-act]");
         if (!el || el.disabled) return;
-        const { act: a, v, id, plate, trip, label } = el.dataset;
+        const { act: a, v, id, plate } = el.dataset;
         if (a === "refresh") live.refresh();
         else if (a === "filter") { filter = v; render(); }
         else if (a === "trip") location.href = `bays.html?trip=${encodeURIComponent(id)}`;
         else if (a === "allow" || a === "deny")
           run("tos_resolve_review", { p_event: Number(id), p_allow: a === "allow" }, `${plate}: ${a === "allow" ? "barrier opened" : "kept out"}`);
-        else if (a === "swap")
-          run("tos_swap_plate", { p_event: Number(id), p_booking: trip }, `${plate} swapped onto ${label}; barrier opened`);
         else if (a === "sim")
           run("tos_simulate", { p_kind: v }, (r) => {
             if (!r?.ok) return r?.msg ?? "No suitable vehicle for that test right now.";
             const e = r.event;
             return `${e.plate} at ${M.gates[e.gate_id]?.name ?? e.gate_id}: ${decisionLabel({ decision: e.decision, cat: e.category })}`;
           });
+      });
+
+      // Substitute bus: staff type the plate on the bus, then the swap runs.
+      handleSwapForms({
+        rerender: () => render(),
+        onSwap: async ({ event, trip, plate, label }) => {
+          busy = true;
+          render();
+          const done = await act("tos_swap_plate", { p_event: event, p_booking: trip, p_plate: plate }, `${plate} swapped onto ${label}; barrier opened`);
+          busy = false;
+          await live.refresh();
+          return !!done;
+        },
       });
 
       setInterval(() => M && !busy && render(), 15000);

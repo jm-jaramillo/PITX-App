@@ -61,12 +61,16 @@ not on any trip today is held for staff when its operator has a trip to the
 same destination whose entry window is open (or that is overdue). The review
 card offers **Swap onto <trip>** for each such trip, plus **Keep closed**.
 
-Swapping calls Trip Scheduling's own `staff_set_booking_plate()`, so its
-checks apply: same operator, registered for that destination, valid CPC, and
-not booked in the adjacent slot. If it refuses, its message is shown and the
-barrier stays closed. Otherwise the booking's plate changes in Trip
-Scheduling, the bus is let in on that trip, and the gate event records the
-plate the trip had before (`swapped_from`).
+Choosing a trip opens a form where staff **must type the plate number on the
+bus**. The camera read is shown for reference but is not used, so a misread
+plate can be corrected here. The typed plate must be in the approved vehicle
+masterfile with a valid CPC and OR/CR. Then Trip Scheduling's own
+`staff_set_booking_plate()` applies its checks: same operator, registered for
+that destination, and not booked in the adjacent slot. If any check fails, the
+message is shown and the barrier stays closed. Otherwise the booking's plate
+changes in Trip Scheduling to the typed plate and the bus is let in on that
+trip. The gate event records the camera read (`plate`), the typed plate
+(`swapped_to`) and the plate the trip had before (`swapped_from`).
 
 For test reads, the swap runs those checks and then rolls the change back,
 so a test never changes a real booking.
@@ -93,7 +97,7 @@ Migrations:
 | `tos_snapshot(date)` | every page: rules, gates, devices, bays, the day's trips with their gate state, gate events, and the vehicles involved |
 | `tos_gate_read(gate, plate, confidence, booking, test)` | the device adapter (and test reads) |
 | `tos_resolve_review(event, allow)` | Open barrier / Keep closed |
-| `tos_swap_plate(event, booking)` | Swap a substitute bus onto a trip (added in `202610291400_terminal-operating-system_plate_swap.sql`) |
+| `tos_swap_plate(event, booking, plate)` | Swap a substitute bus onto a trip using the plate staff typed (`202610291400_…_plate_swap.sql`, plate entry added in `202610291600_…_swap_plate_entry.sql`) |
 | `tos_set_rules(jsonb)` | Devices & rules |
 | `tos_simulate(kind)` / `tos_clear_tests()` | test reads until the hardware is connected |
 | `tos_route_services()` / `tos_set_route_service(route, service)` | the commuter / provincial list (added in `202610291100_terminal-operating-system_route_service.sql`) |
