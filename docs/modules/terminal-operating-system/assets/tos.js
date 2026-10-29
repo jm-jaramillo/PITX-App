@@ -94,6 +94,8 @@ export function buildModel(s) {
     held: !!t.held,
     denied: !!t.denied,
     isTest: !!t.is_test,
+    // "commuter" or "provincial", from the TOS route list (Devices & rules).
+    service: t.service === "commuter" ? "commuter" : "provincial",
   }));
   const byId = {};
   trips.forEach((t) => (byId[t.id] = t));

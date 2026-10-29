@@ -220,39 +220,55 @@
 .tos-leg { display: flex; gap: 14px; font-size: 12px; color: var(--label); font-weight: 600; }
 .tos-leg span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; background: var(--c); }
 
-/* passenger board (concourse screen, always dark) */
+/* passenger board: the concourse screen, in the app's PITX blue with red
+   for anything a passenger must act on (final call, delays, cancellations) */
 .tos-board {
-  --board: #0a0d10;
-  --board-ink: #f4c430;
-  --board-dim: #8c7c40;
-  --board-line: #1e252a;
-  --board-white: #e9eef0;
-  --board-red: #ff6b5e;
-  --board-green: #5fd39a;
-  background: var(--board);
-  color: var(--board-ink);
+  background: var(--surface);
+  border: 1px solid var(--border-card);
   border-radius: var(--r-card);
-  padding: 22px clamp(14px, 3vw, 30px) 26px;
+  overflow: hidden;
   min-width: 0;
 }
-.tos-board-top { display: flex; justify-content: space-between; align-items: end; gap: 12px; flex-wrap: wrap; border-bottom: 2px solid var(--board-line); padding-bottom: 14px; }
-.tos-board-ttl { font-weight: 800; font-size: clamp(22px, 3.6vw, 36px); color: var(--board-white); letter-spacing: 0.04em; text-transform: uppercase; line-height: 1; }
-.tos-board-ttl small { display: block; font-size: 0.42em; color: var(--board-dim); letter-spacing: 0.14em; margin-top: 8px; }
-.tos-board-clock { font-size: clamp(28px, 4.6vw, 48px); font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.tos-board-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--blue);
+  color: #fff;
+  border-bottom: 4px solid var(--red-ink);
+  padding: 20px clamp(14px, 3vw, 28px) 16px;
+}
+.tos-board-ttl { font-weight: 800; font-size: clamp(22px, 3.6vw, 36px); letter-spacing: 0.04em; text-transform: uppercase; line-height: 1; }
+.tos-board-ttl small { display: block; font-size: 0.42em; color: oklch(86% 0.05 258); letter-spacing: 0.14em; margin-top: 8px; }
+.tos-board-clock { font-size: clamp(28px, 4.6vw, 48px); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.tos-board-tabs { display: flex; gap: 6px; flex-wrap: wrap; padding: 12px clamp(14px, 3vw, 28px); border-bottom: 1px solid var(--divider); background: var(--inset); }
+.tos-board-tabs button { background: var(--surface); border: 1px solid var(--border); color: var(--text-2); padding: 7px 14px; font-size: 13px; font-weight: 700; border-radius: var(--r-chip); }
+.tos-board-tabs button[aria-pressed="true"] { background: var(--blue); border-color: var(--blue); color: #fff; }
+.tos-board-tabs button span { font-weight: 600; opacity: 0.75; margin-left: 4px; }
 .tos-board-scroll { overflow-x: auto; }
 .tos-board table { min-width: 680px; font-variant-numeric: tabular-nums; }
-.tos-board th { color: var(--board-dim); border-bottom: 1px solid var(--board-line); font-size: 11px; padding: 12px 10px 8px; }
-.tos-board td { border-bottom: 1px solid var(--board-line); padding: 10px; color: var(--board-ink); font-size: clamp(13px, 1.5vw, 17px); font-weight: 600; }
-.tos-board td.dest { color: var(--board-white); font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; }
-.tos-board .r-board { color: var(--board-green); }
-.tos-board .r-final { animation: tos-blink 1s steps(2) infinite; }
-.tos-board .r-bad { color: var(--board-red); }
-.tos-board tr.gone td { color: var(--board-dim); }
-.tos-board .bay-chip { display: inline-block; border: 1px solid currentColor; padding: 0 7px; border-radius: 5px; }
-.tos-board-empty { color: var(--board-dim); padding: 18px 0 0; margin: 0; }
-@keyframes tos-blink { 50% { opacity: 0.25; } }
+.tos-board th { color: var(--blue-ink); background: var(--blue-wash); font-size: 11px; padding: 10px 14px; border-bottom: 1px solid var(--info-br); }
+.tos-board td { padding: 11px 14px; color: var(--text); font-size: clamp(13px, 1.5vw, 17px); font-weight: 600; border-bottom: 1px solid var(--divider); }
+.tos-board tbody tr:nth-child(even) td { background: var(--inset); }
+.tos-board td.etd { color: var(--blue-ink); font-weight: 800; }
+.tos-board td.dest { color: var(--title); font-weight: 800; letter-spacing: 0.02em; text-transform: uppercase; }
+.tos-board td.dest small { display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: var(--label); margin-top: 2px; }
+.tos-board .bay-chip { display: inline-block; border: 1.5px solid var(--blue); color: var(--blue-ink); padding: 0 8px; border-radius: 6px; font-weight: 800; }
+.tos-remark { display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 0.85em; font-weight: 800; letter-spacing: 0.04em; white-space: nowrap; }
+.tos-remark.r-ontime { background: var(--blue-wash); color: var(--blue-ink); }
+.tos-remark.r-arrived { background: var(--surface); color: var(--blue-ink); border: 1.5px solid var(--blue); }
+.tos-remark.r-board { background: var(--blue); color: #fff; }
+.tos-remark.r-final { background: var(--red-ink); color: #fff; animation: tos-blink 1s steps(2) infinite; }
+.tos-remark.r-bad { background: var(--red-wash); color: var(--red-ink); border: 1px solid var(--red-br); }
+.tos-remark.r-gone { background: var(--neutral-wash); color: var(--neutral-ink); }
+.tos-board tr.gone td { color: var(--faint); }
+.tos-board tr.gone td.dest, .tos-board tr.gone td.etd { color: var(--faint); }
+.tos-board-empty { color: var(--label); padding: 22px clamp(14px, 3vw, 28px); margin: 0; }
+@keyframes tos-blink { 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) {
-  .tos-board .r-final { animation: none; text-decoration: underline; }
+  .tos-remark.r-final { animation: none; }
 }
 
 /* rules */
