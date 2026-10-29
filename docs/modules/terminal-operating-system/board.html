@@ -114,11 +114,11 @@
         const rows = upcoming.filter((t) => tab === "all" || t.service === tab).slice(0, 15);
         const label = tab === "all" ? "" : `${tab} `;
         document.getElementById("rows").innerHTML = rows.length
-          ? `<table><thead><tr><th>ETD</th><th>Destination</th><th>Operator</th><th>Bay</th><th>Remarks</th></tr></thead><tbody>${rows
+          ? `<table><thead><tr><th>ETD</th><th>Trip</th><th>Destination</th><th>Operator</th><th>Bay</th><th>Remarks</th></tr></thead><tbody>${rows
               .map((t) => {
                 const [text, cls, gone] = remark(t, now);
                 const service = tab === "all" ? `<small>${t.service === "commuter" ? "Commuter" : "Provincial"}</small>` : "";
-                return `<tr class="${gone ? "gone" : ""}"><td class="etd">${fmt(t.dep)}</td><td class="dest">${escapeHtml(t.route)}${service}</td><td>${escapeHtml(t.trade || t.operator || "")}</td><td><span class="bay-chip">${escapeHtml(t.bay)}</span></td><td><span class="tos-remark ${cls}">${text}</span></td></tr>`;
+                return `<tr class="${gone ? "gone" : ""}"><td class="etd">${fmt(t.dep)}</td><td class="trip">${escapeHtml(t.trip ?? "—")}</td><td class="dest">${escapeHtml(t.route)}${service}</td><td>${escapeHtml(t.trade || t.operator || "")}</td><td><span class="bay-chip">${escapeHtml(t.bay)}</span></td><td><span class="tos-remark ${cls}">${text}</span></td></tr>`;
               })
               .join("")}</tbody></table>`
           : `<p class="tos-board-empty">No ${label}departures in the next two and a half hours.</p>`;
