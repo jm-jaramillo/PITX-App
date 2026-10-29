@@ -123,6 +123,8 @@ export function buildModel(s) {
     swappedFrom: e.swapped_from,
     // Plate staff typed for the bus when swapping (may differ from the camera read).
     swappedTo: e.swapped_to,
+    // Plate staff typed when deciding an unregistered or unclear read.
+    confirmedPlate: e.confirmed_plate,
   }));
 
   const gates = {};
@@ -253,6 +255,21 @@ export function swapFormActive() {
 export function reviewActionsHtml(M, e, busy = false) {
   const off = busy ? " disabled" : "";
   const keep = `<button type="button" class="btn-danger-outline" data-act="deny" data-id="${e.id}" data-plate="${escapeHtml(e.plate)}"${off}>Keep closed</button>`;
+  if (e.cat === "Unregistered vehicle" || e.cat === "Unclear plate read") {
+    // Either way staff decide, they record the plate actually on the bus.
+    const inputId = `confirm-plate-${e.id}`;
+    const value = swapDraft.event === e.id && swapDraft.trip == null ? swapDraft.plate : "";
+    return `<form class="tos-swap" data-swap-form data-mode="confirm" data-id="${e.id}">
+        <label for="${inputId}">Plate number on the bus</label>
+        <div class="tos-swap-row">
+          <input id="${inputId}" name="plate" required autocomplete="off" spellcheck="false" maxlength="12"
+            placeholder="Type the plate, e.g. ${escapeHtml(e.plate)}" value="${escapeHtml(value)}"${off} />
+          <button type="submit" name="decision" value="allow" class="btn-primary"${off}>Let in</button>
+          <button type="submit" name="decision" value="deny" class="btn-danger-outline"${off}>Keep closed</button>
+        </div>
+        <p class="subtle">Camera read <b>${escapeHtml(e.plate)}</b>. Required for the gate record either way. If the plate is a registered bus with a trip today, letting it in records the arrival on that trip.</p>
+      </form>`;
+  }
   if (e.cat !== "Substitute bus") {
     return `<button type="button" class="btn-primary" data-act="allow" data-id="${e.id}" data-plate="${escapeHtml(e.plate)}"${off}>Open barrier</button>${keep}`;
   }
@@ -289,11 +306,13 @@ export function reviewActionsHtml(M, e, busy = false) {
 }
 
 /**
- * Wires the swap form on a page: opening, typing, cancelling and submitting.
- * `onSwap({ event, trip, plate, label })` performs the swap; `rerender()`
- * redraws the page.
+ * Wires the plate forms on a page: the substitute-bus swap form (open, type,
+ * cancel, submit) and the plate confirmation on unregistered / unclear reads.
+ * `onSwap({ event, trip, plate, label })` performs a swap,
+ * `onConfirm({ event, plate, allow })` a confirmation; both resolve truthy on
+ * success. `rerender()` redraws the page.
  */
-export function handleSwapForms({ onSwap, rerender }) {
+export function handleSwapForms({ onSwap, onConfirm, rerender }) {
   let swapping = false;
   document.addEventListener("click", (e) => {
     const open = e.target.closest('[data-act="swap-open"]');
@@ -307,22 +326,28 @@ export function handleSwapForms({ onSwap, rerender }) {
     }
   });
   document.addEventListener("input", (e) => {
-    if (e.target.closest("[data-swap-form]")) swapDraft.plate = e.target.value.toUpperCase();
+    const form = e.target.closest("[data-swap-form]");
+    if (!form) return;
+    if (form.dataset.mode === "confirm") Object.assign(swapDraft, { event: Number(form.dataset.id), trip: null });
+    swapDraft.plate = e.target.value.toUpperCase();
   });
   document.addEventListener("submit", async (e) => {
     const form = e.target.closest("[data-swap-form]");
     if (!form) return;
     e.preventDefault();
     if (swapping) return;
-    const plate = swapDraft.plate.replace(/[^A-Za-z0-9]/g, "");
+    const typed = form.querySelector("input")?.value ?? swapDraft.plate;
+    const plate = typed.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
     if (plate.length < 2) {
       toast("Type the plate number shown on the bus.");
       form.querySelector("input")?.focus();
       return;
     }
-    const args = { event: Number(form.dataset.id), trip: form.dataset.trip, plate, label: form.dataset.label };
     swapping = true;
-    const done = await onSwap(args).finally(() => (swapping = false));
+    const done = await (form.dataset.mode === "confirm"
+      ? onConfirm({ event: Number(form.dataset.id), plate, allow: e.submitter?.value === "allow" })
+      : onSwap({ event: Number(form.dataset.id), trip: form.dataset.trip, plate, label: form.dataset.label })
+    ).finally(() => (swapping = false));
     if (done) Object.assign(swapDraft, { event: null, trip: null, plate: "" });
     rerender();
   });
