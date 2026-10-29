@@ -1,6 +1,6 @@
 # Terminal Operating System (TOS)
 
-Owner: @Jcbllanto16 · Issue #1
+Owner: @Jcbllanto16 · Issue #1 · Build history: [CHANGELOG](CHANGELOG.md)
 
 TOS decides what happens to a bus at the terminal gates. Each plate read is
 checked against the bus's approved trip in Trip Scheduling and the approved
