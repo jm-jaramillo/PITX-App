@@ -269,7 +269,6 @@
         "Destination",
         "Gate",
         "Bay",
-        "Status",
       ];
 
       const csvHeaders = () => (rangeMode === "week" ? ["Date", ...BASE_CSV_HEADERS] : BASE_CSV_HEADERS);
@@ -285,7 +284,6 @@
           b.route ?? "",
           bareGate(b.route),
           bareBay(b.bays?.name),
-          pidsStatus(b).label,
         ];
       }
 
@@ -478,7 +476,6 @@
                     <th>Destination</th>
                     <th class="pids-num">Gate</th>
                     <th class="pids-num">Bay</th>
-                    <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -508,13 +505,12 @@
                           <td>${escapeHtml((b.route ?? "—").toUpperCase())}</td>
                           <td class="pids-num">${escapeHtml(bareGate(b.route))}</td>
                           <td class="pids-num">${escapeHtml(bareBay(b.bays?.name))}</td>
-                          <td><span class="pids-status status-${status.key}">${escapeHtml(status.label)}</span></td>
                         </tr>`;
                         })
                         .join("");
                       return `
                       <tr class="pids-time-row">
-                        <td colspan="7">${escapeHtml(timeLabel)}</td>
+                        <td colspan="6">${escapeHtml(timeLabel)}</td>
                       </tr>
                       ${rowsHtml}`;
                     })

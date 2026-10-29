@@ -4478,3 +4478,12 @@ before. Checked in the browser: 4 groups, 27 bays, 27 action buttons.
 
 ---
 
+### 118. Status removed from the operator daily schedule (29 Oct)
+
+My schedule (day view) no longer has a Status column or its Arriving/Departed
+badge, and the CSV export drops the Status column - arrival/departure tracking is
+the Terminal Operating System's job. Cancelled trips are still struck through.
+The staff Schedule board is unchanged. Checked as genesis.ops: 6 columns, no badges.
+
+---
+
