@@ -44,12 +44,32 @@ minutes before ETD, and the gate rules are measured from that moment:
 1. Plate read below the minimum confidence: ask staff.
 2. Plate not in the approved masterfile: the "Unregistered plate" rule.
 3. CPC or OR/CR expired: the "Expired CPC or OR/CR" rule.
-4. No approved trip today for the plate: the "No trip today" rule.
+4. No approved trip today for the plate: if the operator has a trip to the
+   same destination due now, the "Substitute bus" rule (default: ask staff);
+   otherwise the "No trip today" rule.
 5. Earlier than the early entry window: staging; released automatically when the window opens.
 6. Later than the grace period: the "Late beyond grace" rule.
 7. Otherwise the barrier opens.
 
 The exit gate marks the trip departed.
+
+### Substitute buses (different plate from the booking)
+
+Operators sometimes send a different bus than the one booked. The trip does
+not need to be booked again. A registered bus with valid documents that is
+not on any trip today is held for staff when its operator has a trip to the
+same destination whose entry window is open (or that is overdue). The review
+card offers **Swap onto <trip>** for each such trip, plus **Keep closed**.
+
+Swapping calls Trip Scheduling's own `staff_set_booking_plate()`, so its
+checks apply: same operator, registered for that destination, valid CPC, and
+not booked in the adjacent slot. If it refuses, its message is shown and the
+barrier stays closed. Otherwise the booking's plate changes in Trip
+Scheduling, the bus is let in on that trip, and the gate event records the
+plate the trip had before (`swapped_from`).
+
+For test reads, the swap runs those checks and then rolls the change back,
+so a test never changes a real booking.
 
 Trips with no plate assigned in Trip Scheduling cannot be matched by a camera.
 The bay timeline and trip feed flag them so they can be fixed before the bus
@@ -73,6 +93,7 @@ Migrations:
 | `tos_snapshot(date)` | every page: rules, gates, devices, bays, the day's trips with their gate state, gate events, and the vehicles involved |
 | `tos_gate_read(gate, plate, confidence, booking, test)` | the device adapter (and test reads) |
 | `tos_resolve_review(event, allow)` | Open barrier / Keep closed |
+| `tos_swap_plate(event, booking)` | Swap a substitute bus onto a trip (added in `202610291400_terminal-operating-system_plate_swap.sql`) |
 | `tos_set_rules(jsonb)` | Devices & rules |
 | `tos_simulate(kind)` / `tos_clear_tests()` | test reads until the hardware is connected |
 | `tos_route_services()` / `tos_set_route_service(route, service)` | the commuter / provincial list (added in `202610291100_terminal-operating-system_route_service.sql`) |

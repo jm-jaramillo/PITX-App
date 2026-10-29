@@ -66,6 +66,7 @@
         plateChip,
         docsExpired,
         manilaToday,
+        reviewActionsHtml,
       } from "./assets/tos.js";
 
       const profile = await guardPage("staff");
@@ -193,10 +194,7 @@
           ${t.plate && !v ? `<p class="tos-warnbox">This plate is not in the approved vehicle masterfile.</p>` : ""}
           ${docsExpired(v, M.date) ? `<p class="tos-warnbox">Documents expired. The gate applies the "Expired CPC or OR/CR" rule.</p>` : ""}
           ${pending ? `<p class="tos-warnbox">${escapeHtml(pending.reason)}</p>
-            <div class="tos-actions" style="margin-bottom:14px">
-              <button type="button" class="btn-primary" data-act="allow" data-id="${pending.id}"${busy ? " disabled" : ""}>Open barrier</button>
-              <button type="button" class="btn-danger-outline" data-act="deny" data-id="${pending.id}"${busy ? " disabled" : ""}>Keep closed</button>
-            </div>` : ""}
+            <div class="tos-actions" style="margin-bottom:14px">${reviewActionsHtml(M, pending, busy)}</div>` : ""}
           <p class="card-label" style="margin-top:8px">Gate history</p>
           ${evs.length
             ? `<ul class="tos-hist">${evs
@@ -209,7 +207,7 @@
       document.addEventListener("click", async (event) => {
         const el = event.target.closest("[data-act]");
         if (!el || el.disabled) return;
-        const { act: a, id } = el.dataset;
+        const { act: a, id, trip, plate, label } = el.dataset;
         if (a === "refresh") live.refresh();
         else if (a === "select") {
           selected = id;
@@ -221,6 +219,12 @@
           busy = true;
           render();
           await act("tos_resolve_review", { p_event: Number(id), p_allow: a === "allow" }, a === "allow" ? "Barrier opened" : "Kept out");
+          busy = false;
+          await live.refresh();
+        } else if (a === "swap") {
+          busy = true;
+          render();
+          await act("tos_swap_plate", { p_event: Number(id), p_booking: trip }, `${plate} swapped onto ${label}; barrier opened`);
           busy = false;
           await live.refresh();
         }

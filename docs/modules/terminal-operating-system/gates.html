@@ -51,6 +51,7 @@
         decisionLabel,
         plateChip,
         expectedHtml,
+        reviewActionsHtml,
       } from "./assets/tos.js";
 
       const profile = await guardPage("staff");
@@ -64,6 +65,7 @@
         ["unreg", "Unregistered", "Not in masterfile"],
         ["expired", "Expired OR/CR", "Registered, docs lapsed"],
         ["unclear", "Unclear read", "Low camera match"],
+        ["substitute", "Substitute bus", "Same operator, different plate"],
         ["exit", "Bus leaves", "Exit gate read"],
       ];
       const FILTERS = [["all", "All"], ["ALLOW", "Allowed"], ["DENY", "Denied"], ["HOLD", "Staging"], ["EXIT", "Exits"]];
@@ -126,7 +128,7 @@
                 </p>
                 <div class="tos-scen">${SCENARIOS.map(
                   ([k, l, s], i) =>
-                    `<button type="button" class="btn-outline${i === SCENARIOS.length - 1 ? " is-wide" : ""}" data-act="sim" data-v="${k}"${busy ? " disabled" : ""}>${l}<small>${s}</small></button>`
+                    `<button type="button" class="btn-outline${SCENARIOS.length % 2 && i === SCENARIOS.length - 1 ? " is-wide" : ""}" data-act="sim" data-v="${k}"${busy ? " disabled" : ""}>${l}<small>${s}</small></button>`
                 ).join("")}</div>
               </section>
             </div>
@@ -198,10 +200,7 @@
               <div class="t">${plateChip(M, e.plate)} at ${escapeHtml(M.gates[e.gate]?.name ?? e.gate)}${e.isTest ? ' <span class="tos-pill s-muted">Test</span>' : ""}</div>
               <div style="margin-top:4px">${escapeHtml(e.reason)}</div>
               <div class="d">${v ? `${escapeHtml(v.operator_name ?? "")}${v.body_number ? " · body " + escapeHtml(v.body_number) : ""}` : "Not in the masterfile"}${t ? ` · ${escapeHtml(t.route)} ${fmt(t.dep)}` : ""} · read ${fmt(e.at)}</div>
-              <div class="a">
-                <button type="button" class="btn-primary" data-act="allow" data-id="${e.id}" data-plate="${escapeHtml(e.plate)}"${busy ? " disabled" : ""}>Open barrier</button>
-                <button type="button" class="btn-danger-outline" data-act="deny" data-id="${e.id}" data-plate="${escapeHtml(e.plate)}"${busy ? " disabled" : ""}>Keep closed</button>
-              </div></div></li>`;
+              <div class="a">${reviewActionsHtml(M, e, busy)}</div></div></li>`;
           })
           .join("")}</ul>`;
       }
@@ -218,12 +217,14 @@
       document.addEventListener("click", (event) => {
         const el = event.target.closest("[data-act]");
         if (!el || el.disabled) return;
-        const { act: a, v, id, plate } = el.dataset;
+        const { act: a, v, id, plate, trip, label } = el.dataset;
         if (a === "refresh") live.refresh();
         else if (a === "filter") { filter = v; render(); }
         else if (a === "trip") location.href = `bays.html?trip=${encodeURIComponent(id)}`;
         else if (a === "allow" || a === "deny")
           run("tos_resolve_review", { p_event: Number(id), p_allow: a === "allow" }, `${plate}: ${a === "allow" ? "barrier opened" : "kept out"}`);
+        else if (a === "swap")
+          run("tos_swap_plate", { p_event: Number(id), p_booking: trip }, `${plate} swapped onto ${label}; barrier opened`);
         else if (a === "sim")
           run("tos_simulate", { p_kind: v }, (r) => {
             if (!r?.ok) return r?.msg ?? "No suitable vehicle for that test right now.";
