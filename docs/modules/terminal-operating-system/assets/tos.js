@@ -80,6 +80,7 @@ export function buildModel(s) {
   const trips = (s.trips || []).map((t) => ({
     id: t.booking_id,
     route: t.route,
+    operatorId: t.operator_id,
     operator: t.operator_name,
     trade: t.trade_name,
     trip: t.trip_number,
@@ -118,6 +119,8 @@ export function buildModel(s) {
     by: e.resolved_by_name,
     opened: !!e.barrier_opened,
     isTest: !!e.is_test,
+    // Plate that was on the trip before staff swapped this bus onto it ("none" if it had none).
+    swappedFrom: e.swapped_from,
   }));
 
   const gates = {};
@@ -190,6 +193,7 @@ const DECISION = {
 };
 
 export function decisionLabel(e) {
+  if (e.resolution === "ALLOWED" && e.swappedFrom) return `Plate swapped by ${e.by || "staff"}`;
   if (e.resolution) return `${e.resolution === "ALLOWED" ? "Allowed" : "Denied"} by ${e.by || "staff"}`;
   if (e.decision === "ALLOW" && e.cat === "Early") return "Released";
   return (DECISION[e.decision] || [e.decision])[0];
@@ -209,6 +213,50 @@ export const plateChip = (M, plate) =>
 
 export function docsExpired(v, date) {
   return !!v && ((v.cpc_validity && v.cpc_validity < date) || (v.orcr_validity && v.orcr_validity < date));
+}
+
+/* ------------------------------------------------- substitute buses */
+
+/**
+ * Trips a bus held as "Substitute bus" could be swapped onto: same operator
+ * and destination as the vehicle, not yet in, entry window open or overdue.
+ * Mirrors tos.substitute_trips() in the database, which re-checks on swap.
+ */
+export function substituteTrips(M, e, now = M.now()) {
+  const v = M.vehicles[e.plate];
+  if (!v) return [];
+  return M.trips
+    .filter((t) => t.operatorId === v.operator_id && t.route === v.route && t.plate !== e.plate)
+    .filter((t) => t.arrivedAt == null && !t.denied && t.dep >= now - 60 && t.slot - M.rules.early <= now)
+    .sort((a, b) => Math.abs(a.slot - now) - Math.abs(b.slot - now));
+}
+
+/**
+ * Buttons for a read waiting on staff. A substitute bus gets one "Swap plate"
+ * button per candidate trip (Trip Scheduling's staff_set_booking_plate checks
+ * the swap); anything else gets Open barrier.
+ */
+export function reviewActionsHtml(M, e, busy = false) {
+  const off = busy ? " disabled" : "";
+  const keep = `<button type="button" class="btn-danger-outline" data-act="deny" data-id="${e.id}" data-plate="${escapeHtml(e.plate)}"${off}>Keep closed</button>`;
+  if (e.cat !== "Substitute bus") {
+    return `<button type="button" class="btn-primary" data-act="allow" data-id="${e.id}" data-plate="${escapeHtml(e.plate)}"${off}>Open barrier</button>${keep}`;
+  }
+  const trips = substituteTrips(M, e);
+  if (!trips.length) {
+    return `<span class="subtle" style="align-self:center">No trip of this operator is due any more.</span>${keep}`;
+  }
+  return (
+    trips
+      .map(
+        (t) => `<button type="button" class="btn-primary" data-act="swap" data-id="${e.id}" data-trip="${escapeHtml(t.id)}"
+          data-plate="${escapeHtml(e.plate)}" data-label="${escapeHtml(t.trip || t.route)}"${off}
+          title="Sets ${escapeHtml(e.plate)} on this booking in Trip Scheduling and lets the bus in">Swap onto ${escapeHtml(t.trip || t.route)} · ${fmt(t.dep)}${
+            t.plate ? ` (was ${escapeHtml(t.plate)})` : " (no plate)"
+          }</button>`
+      )
+      .join("") + keep
+  );
 }
 
 /* --------------------------------------------------- expected at the gates */
