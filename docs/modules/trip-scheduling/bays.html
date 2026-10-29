@@ -64,7 +64,7 @@
       async function load() {
         const { data } = await supabase
           .from("bays")
-          .select("id, name, is_active");
+          .select("id, name, gate, is_active");
 
         const bays = (data ?? []).sort((a, b) =>
           compareBayNames(a.name, b.name)
@@ -75,16 +75,12 @@
           `${activeCount} active bay${activeCount === 1 ? "" : "s"} — this is ` +
           `the maximum number of approved bookings allowed per 15-minute slot.`;
 
-        document.getElementById("list").innerHTML = `
-          <div class="table-wrap table-plain">
-            <table>
-              <thead>
-                <tr><th>Bay</th><th>Status</th><th></th></tr>
-              </thead>
-              <tbody>
-                ${bays
-                  .map(
-                    (bay) => `
+        // One table per gate (numeric order), bays with no gate last.
+        const gateKey = (g) => g ?? "";
+        const gates = [...new Set(bays.map((b) => gateKey(b.gate)))].sort((a, b) =>
+          a === "" ? 1 : b === "" ? -1 : a.localeCompare(b, undefined, { numeric: true })
+        );
+        const rowHtml = (bay) => `
                   <tr>
                     <td>${escapeHtml(bay.name)}</td>
                     <td><span class="badge badge-${
@@ -99,13 +95,26 @@
                       bay.is_active ? "Deactivate" : "Activate"
                     }</button>
                     </td>
-                  </tr>`
-                  )
-                  .join("")}
+                  </tr>`;
+
+        document.getElementById("list").innerHTML = gates
+          .map((g) => {
+            const inGate = bays.filter((b) => gateKey(b.gate) === g);
+            const active = inGate.filter((b) => b.is_active).length;
+            return `
+          <p class="section-head">${escapeHtml(g || "No gate")} <span class="subtle">&middot; ${active} active of ${inGate.length}</span></p>
+          <div class="table-wrap table-plain">
+            <table>
+              <thead>
+                <tr><th>Bay</th><th>Status</th><th></th></tr>
+              </thead>
+              <tbody>
+                ${inGate.map(rowHtml).join("")}
               </tbody>
             </table>
-          </div>
-        `;
+          </div>`;
+          })
+          .join("");
 
         document.querySelectorAll("[data-toggle]").forEach((btn) => {
           btn.addEventListener("click", () =>

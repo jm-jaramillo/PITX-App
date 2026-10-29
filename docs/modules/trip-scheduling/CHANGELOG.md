@@ -4470,3 +4470,11 @@ Approvals queue). Seeded with SQL; nothing assigned by hand.
 
 ---
 
+### 117. Bays page grouped by gate (29 Oct)
+
+The Bays page now shows one table per gate (Gate 2, 4, 5, then bays with no gate),
+each headed with its active/total count. Rename, Activate and Deactivate work as
+before. Checked in the browser: 4 groups, 27 bays, 27 action buttons.
+
+---
+
