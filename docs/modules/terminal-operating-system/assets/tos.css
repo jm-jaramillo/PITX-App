@@ -253,6 +253,7 @@
 .tos-board td { padding: 11px 14px; color: var(--text); font-size: clamp(13px, 1.5vw, 17px); font-weight: 600; border-bottom: 1px solid var(--divider); }
 .tos-board tbody tr:nth-child(even) td { background: var(--inset); }
 .tos-board td.etd { color: var(--blue-ink); font-weight: 800; }
+.tos-board td.trip { color: var(--blue-ink); font-weight: 800; letter-spacing: 0.04em; white-space: nowrap; }
 .tos-board td.dest { color: var(--title); font-weight: 800; letter-spacing: 0.02em; text-transform: uppercase; }
 .tos-board td.dest small { display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: var(--label); margin-top: 2px; }
 .tos-board .bay-chip { display: inline-block; border: 1.5px solid var(--blue); color: var(--blue-ink); padding: 0 8px; border-radius: 6px; font-weight: 800; }
@@ -264,7 +265,7 @@
 .tos-remark.r-bad { background: var(--red-wash); color: var(--red-ink); border: 1px solid var(--red-br); }
 .tos-remark.r-gone { background: var(--neutral-wash); color: var(--neutral-ink); }
 .tos-board tr.gone td { color: var(--faint); }
-.tos-board tr.gone td.dest, .tos-board tr.gone td.etd { color: var(--faint); }
+.tos-board tr.gone td.dest, .tos-board tr.gone td.etd, .tos-board tr.gone td.trip { color: var(--faint); }
 .tos-board-empty { color: var(--label); padding: 22px clamp(14px, 3vw, 28px); margin: 0; }
 @keyframes tos-blink { 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) {
