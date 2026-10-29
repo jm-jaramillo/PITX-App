@@ -121,6 +121,8 @@ export function buildModel(s) {
     isTest: !!e.is_test,
     // Plate that was on the trip before staff swapped this bus onto it ("none" if it had none).
     swappedFrom: e.swapped_from,
+    // Plate staff typed for the bus when swapping (may differ from the camera read).
+    swappedTo: e.swapped_to,
   }));
 
   const gates = {};
@@ -232,9 +234,21 @@ export function substituteTrips(M, e, now = M.now()) {
 }
 
 /**
- * Buttons for a read waiting on staff. A substitute bus gets one "Swap plate"
- * button per candidate trip (Trip Scheduling's staff_set_booking_plate checks
- * the swap); anything else gets Open barrier.
+ * The swap form staff have open, kept here so a page refresh redraws it with
+ * what they typed. Only one is open at a time.
+ */
+export const swapDraft = { event: null, trip: null, plate: "" };
+
+/** True while staff are typing a plate, so pages hold off redrawing that card. */
+export function swapFormActive() {
+  return swapDraft.event != null && !!document.activeElement?.closest?.("[data-swap-form]");
+}
+
+/**
+ * Buttons for a read waiting on staff. A substitute bus gets one "Swap onto"
+ * button per candidate trip; choosing one asks for the plate number on the
+ * bus before anything changes (Trip Scheduling's staff_set_booking_plate then
+ * checks the swap). Anything else gets Open barrier.
  */
 export function reviewActionsHtml(M, e, busy = false) {
   const off = busy ? " disabled" : "";
@@ -246,17 +260,72 @@ export function reviewActionsHtml(M, e, busy = false) {
   if (!trips.length) {
     return `<span class="subtle" style="align-self:center">No trip of this operator is due any more.</span>${keep}`;
   }
+  const label = (t) => `${t.trip || t.route} · ${fmt(t.dep)}`;
+  const open = trips.find((t) => swapDraft.event === e.id && swapDraft.trip === t.id);
+  if (open) {
+    const inputId = `swap-plate-${e.id}`;
+    return `<form class="tos-swap" data-swap-form data-id="${e.id}" data-trip="${escapeHtml(open.id)}" data-label="${escapeHtml(open.trip || open.route)}">
+        <label for="${inputId}">Plate number on the bus for ${escapeHtml(label(open))}</label>
+        <div class="tos-swap-row">
+          <input id="${inputId}" name="plate" required autocomplete="off" spellcheck="false" maxlength="12"
+            placeholder="Type the plate, e.g. ${escapeHtml(e.plate)}" value="${escapeHtml(swapDraft.plate)}"${off} />
+          <button type="submit" class="btn-primary"${off}>Swap and open barrier</button>
+          <button type="button" class="btn-outline" data-act="swap-cancel"${off}>Cancel</button>
+        </div>
+        <p class="subtle">Camera read <b>${escapeHtml(e.plate)}</b>. ${
+          open.plate ? `The trip is booked with ${escapeHtml(open.plate)}.` : "The trip has no plate yet."
+        } The plate you type replaces it in Trip Scheduling.</p>
+      </form>`;
+  }
   return (
     trips
       .map(
-        (t) => `<button type="button" class="btn-primary" data-act="swap" data-id="${e.id}" data-trip="${escapeHtml(t.id)}"
-          data-plate="${escapeHtml(e.plate)}" data-label="${escapeHtml(t.trip || t.route)}"${off}
-          title="Sets ${escapeHtml(e.plate)} on this booking in Trip Scheduling and lets the bus in">Swap onto ${escapeHtml(t.trip || t.route)} · ${fmt(t.dep)}${
-            t.plate ? ` (was ${escapeHtml(t.plate)})` : " (no plate)"
-          }</button>`
+        (t) => `<button type="button" class="btn-primary" data-act="swap-open" data-id="${e.id}" data-trip="${escapeHtml(t.id)}"${off}>Swap onto ${escapeHtml(
+          label(t)
+        )}${t.plate ? ` (was ${escapeHtml(t.plate)})` : " (no plate)"}</button>`
       )
       .join("") + keep
   );
+}
+
+/**
+ * Wires the swap form on a page: opening, typing, cancelling and submitting.
+ * `onSwap({ event, trip, plate, label })` performs the swap; `rerender()`
+ * redraws the page.
+ */
+export function handleSwapForms({ onSwap, rerender }) {
+  let swapping = false;
+  document.addEventListener("click", (e) => {
+    const open = e.target.closest('[data-act="swap-open"]');
+    if (open && !open.disabled) {
+      Object.assign(swapDraft, { event: Number(open.dataset.id), trip: open.dataset.trip, plate: "" });
+      rerender();
+      document.querySelector("[data-swap-form] input")?.focus();
+    } else if (e.target.closest('[data-act="swap-cancel"]')) {
+      Object.assign(swapDraft, { event: null, trip: null, plate: "" });
+      rerender();
+    }
+  });
+  document.addEventListener("input", (e) => {
+    if (e.target.closest("[data-swap-form]")) swapDraft.plate = e.target.value.toUpperCase();
+  });
+  document.addEventListener("submit", async (e) => {
+    const form = e.target.closest("[data-swap-form]");
+    if (!form) return;
+    e.preventDefault();
+    if (swapping) return;
+    const plate = swapDraft.plate.replace(/[^A-Za-z0-9]/g, "");
+    if (plate.length < 2) {
+      toast("Type the plate number shown on the bus.");
+      form.querySelector("input")?.focus();
+      return;
+    }
+    const args = { event: Number(form.dataset.id), trip: form.dataset.trip, plate, label: form.dataset.label };
+    swapping = true;
+    const done = await onSwap(args).finally(() => (swapping = false));
+    if (done) Object.assign(swapDraft, { event: null, trip: null, plate: "" });
+    rerender();
+  });
 }
 
 /* --------------------------------------------------- expected at the gates */
