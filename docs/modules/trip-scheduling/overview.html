@@ -195,6 +195,9 @@
       <p class="section-head">By gate</p>
       <div id="by-gate"></div>
 
+      <p class="section-head util-section">By bay</p>
+      <div id="by-bay"></div>
+
       <p class="section-head util-section">Busiest times</p>
       <div id="by-slot"></div>
 
@@ -247,8 +250,11 @@
       const toInput = document.getElementById("to");
       // Default to the last 30 days, the window most "how are we doing"
       // questions are actually about.
-      toInput.value = todayISO();
-      fromInput.value = addDays(todayISO(), -29);
+      const qs = new URLSearchParams(location.search);
+      const isDate = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v ?? "");
+      toInput.value = isDate(qs.get("to")) ? qs.get("to") : todayISO();
+      fromInput.value = isDate(qs.get("from")) ? qs.get("from") : addDays(todayISO(), -29);
+      let bayList = [];
       document.getElementById("apply").addEventListener("click", loadUtilization);
       document.getElementById("export-csv").addEventListener("click", exportCsv);
 
@@ -417,8 +423,16 @@
         gateRows = data ?? [];
 
         await loadSlotProfile(from, to);
+        if (bayList.length === 0) {
+          const { data: bays } = await supabase
+            .from("bays")
+            .select("id, name, gate, is_active")
+            .eq("is_active", true);
+          bayList = bays ?? [];
+        }
         renderUtilKpis();
         renderByGate();
+        renderByBay();
         renderBySlot();
       }
 
@@ -429,7 +443,7 @@
         const { data, error } = await fetchAllRows((a, b) =>
           supabase
             .from("bookings")
-            .select("slot")
+            .select("slot, assigned_bay_id")
             .eq("status", "approved")
             .gte("booking_date", from)
             .lte("booking_date", to)
@@ -518,6 +532,62 @@
             </table>
           </div>
         `;
+      }
+
+      // Trips per bay across the range, grouped by gate. With the balanced
+      // assignment (202610291200) the counts inside a gate should sit within a
+      // trip or two of each other - the bar is each bay's share of its gate's
+      // busiest bay, and the header line states the spread.
+      function renderByBay() {
+        const host = document.getElementById("by-bay");
+        const counts = new Map();
+        for (const r of slotRows) {
+          if (r.assigned_bay_id != null) {
+            counts.set(Number(r.assigned_bay_id), (counts.get(Number(r.assigned_bay_id)) ?? 0) + 1);
+          }
+        }
+        const used = bayList.filter((b) => counts.has(Number(b.id)));
+        if (used.length === 0) {
+          host.innerHTML = `<p class="empty">No approved trips with a bay in this range.</p>`;
+          return;
+        }
+        const natural = (a, b) => String(a.name).localeCompare(String(b.name), undefined, { numeric: true });
+        const gates = [...new Set(bayList.map((b) => b.gate ?? "No gate"))].sort();
+        host.innerHTML = gates
+          .map((gate) => {
+            const bays = bayList
+              .filter((b) => (b.gate ?? "No gate") === gate)
+              .sort(natural);
+            const loads = bays.map((b) => counts.get(Number(b.id)) ?? 0);
+            const max = Math.max(...loads);
+            if (max === 0) return "";
+            const min = Math.min(...loads);
+            return `
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>${escapeHtml(gate)}</th><th>Approved trips</th>
+                  <th>Load within gate</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${bays
+                  .map((b, i) => `
+                <tr>
+                  <td data-label="Bay">${escapeHtml(b.name)}</td>
+                  <td data-label="Approved trips">${loads[i]}</td>
+                  <td data-label="Load within gate">${barHtml(Math.round((loads[i] / max) * 1000) / 10)}</td>
+                </tr>`)
+                  .join("")}
+              </tbody>
+              <tfoot>
+                <tr><td colspan="3" class="subtle">${bays.length} bays, ${min}&ndash;${max} trips each (spread ${max - min})</td></tr>
+              </tfoot>
+            </table>
+          </div>`;
+          })
+          .join("");
       }
 
       function renderBySlot() {

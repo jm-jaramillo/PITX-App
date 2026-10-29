@@ -4426,3 +4426,22 @@ error rather than failing silently.
   cancelling an *approved* booking, closing the other half of this
   question; worth deciding whether cancellation should eventually have its own
   cutoff too.
+### 114. Demo of the balanced bay assignment (29 Oct)
+
+Demo week **2-8 Nov 2026**: 157 trips from 20+ operators, inserted with **no bay**
+so the new trigger chose every one (nothing assigned by hand); ~80% approved
+keeping their bay, 31 left pending so Approvals shows the preselected "(auto)" bay.
+Heavy same-time clusters on Gate 4 (e.g. four operators at 18:00) would have been
+Bays 18, 19, 20... every day under the old rule.
+
+- **Overview -> Utilization -> new "By bay" table**: approved trips per bay,
+  grouped by gate, with a bar and the spread (max - min) per gate. Opens with
+  `overview.html?from=2026-11-02&to=2026-11-08` (new `from`/`to` query params).
+- `scripts/trip-scheduling/seed-demo-week` sibling `seed-balanced-bay-demo.mjs`
+  holds the same trip list (needs `DATABASE_URL`); the live data was seeded with
+  the equivalent SQL.
+- Result (approved, 2-8 Nov): Gate 4 bays 12-19 trips each, Gate 5 bays 5-6,
+  Gate 2 bays 2 each; no trip without a bay.
+
+---
+
