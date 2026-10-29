@@ -58,8 +58,13 @@
 
     <!-- ------------------------------------------------- details dialog -->
     <dialog class="details-dialog" id="details-dialog">
-      <h2 class="dialog-title" id="details-title"></h2>
-      <p class="subtle" id="details-sub"></p>
+      <div class="details-head">
+        <span class="details-head-logo" id="details-head-logo"></span>
+        <span class="details-head-text">
+          <h2 class="dialog-title" id="details-title"></h2>
+          <p class="subtle" id="details-sub"></p>
+        </span>
+      </div>
       <div id="details-body" class="details-grid"></div>
       <div class="dialog-actions">
         <button type="button" class="btn-outline" id="details-close">Close</button>
@@ -84,6 +89,11 @@
       let rows = [];
       let profileFilter = "all";
       let rowsById = new Map();
+      // logo_path -> signed URL. Signed in one batch by load() so the card
+      // grid renders every logo without one request per operator; the
+      // details dialog reuses the same map and only signs on demand when a
+      // path is missing from it (e.g. expired on a long-open tab).
+      let logoUrlByPath = new Map();
       // The exact filtered set currently on screen - shared between
       // render() and exportCsv() so the CSV always matches what's visible.
       // Must be declared up here, before the `await load()` a few lines
@@ -181,6 +191,20 @@
         }));
         rowsById = new Map(rows.map((r) => [r.id, r]));
 
+        const logoPaths = [
+          ...new Set((profiles ?? []).map((p) => p.logo_path).filter(Boolean)),
+        ];
+        if (logoPaths.length) {
+          const { data: signed } = await supabase.storage
+            .from("operator-docs")
+            .createSignedUrls(logoPaths, 3600);
+          logoUrlByPath = new Map(
+            (signed ?? [])
+              .filter((s) => s?.signedUrl && !s.error)
+              .map((s) => [s.path, s.signedUrl])
+          );
+        }
+
         render();
       }
 
@@ -220,9 +244,14 @@
               .map((r) => {
                 const p = r.companyProfile;
                 const label = r.operator_name || r.username;
+                const logoUrl = p?.logo_path ? logoUrlByPath.get(p.logo_path) : null;
                 return `
               <button type="button" class="record-card" data-open="${r.id}" title="${escapeHtml(label)}">
-                <span class="record-card-avatar">${escapeHtml(initials(label))}</span>
+                <span class="record-card-avatar${logoUrl ? " has-logo" : ""}">${
+                  logoUrl
+                    ? `<img src="${escapeHtml(logoUrl)}" alt="" loading="lazy" />`
+                    : escapeHtml(initials(label))
+                }</span>
                 <span class="record-card-body">
                   <span class="record-card-title">${escapeHtml(label)}</span>
                   <span class="record-card-sub">${escapeHtml(p?.company_name || "@" + r.username)}</span>
@@ -269,9 +298,6 @@
             <div class="detail-item"><span class="detail-label">Booking system</span><span class="detail-value">${
               p.has_booking_system ? escapeHtml(p.booking_system_name || "Yes") : "No"
             }</span></div>
-            <div class="detail-item"><span class="detail-label">Logo</span><span class="detail-value" id="details-logo" data-logo-path="${escapeHtml(p.logo_path ?? "")}">${
-              p.logo_path ? "&hellip;" : "—"
-            }</span></div>
             <div class="detail-item detail-documents">
               <span class="detail-label">Contacts</span>
               <span class="detail-value">${
@@ -281,17 +307,23 @@
               }</span>
             </div>
           `;
+        const head = document.getElementById("details-head-logo");
+        head.className = "details-head-logo";
+        head.innerHTML = escapeHtml(initials(label));
         document.getElementById("details-dialog").showModal();
 
         if (p?.logo_path) {
-          const { data } = await supabase.storage
-            .from("operator-docs")
-            .createSignedUrl(p.logo_path, 300);
-          const cell = document.getElementById("details-logo");
-          if (cell) {
-            cell.innerHTML = data?.signedUrl
-              ? `<a href="${data.signedUrl}" target="_blank" rel="noopener">View logo</a>`
-              : "—";
+          let url = logoUrlByPath.get(p.logo_path);
+          if (!url) {
+            const { data } = await supabase.storage
+              .from("operator-docs")
+              .createSignedUrl(p.logo_path, 3600);
+            url = data?.signedUrl;
+            if (url) logoUrlByPath.set(p.logo_path, url);
+          }
+          if (url) {
+            head.className = "details-head-logo has-logo";
+            head.innerHTML = `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" title="View full size"><img src="${escapeHtml(url)}" alt="${escapeHtml(label)} logo" /></a>`;
           }
         }
       }

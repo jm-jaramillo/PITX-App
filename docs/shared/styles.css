@@ -1732,6 +1732,64 @@ dialog.details-dialog {
   justify-content: center;
 }
 
+.record-card-avatar.has-logo {
+  background: #fff;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+/* Logos run from square to wide banner - contain so none is cropped or
+   stretched, on white so transparent PNGs stay legible. */
+.record-card-avatar img,
+.details-head-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* Details dialog: logo sits top-left, beside the title. */
+.details-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.details-head-text {
+  min-width: 0;
+}
+
+.details-head-logo {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: var(--blue-wash);
+  color: var(--blue-ink);
+  font-size: 17px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* A logo gets a wide box rather than the initials circle - most operator
+   logos are horizontal wordmarks, and a 56px circle renders them as an
+   unreadable sliver. Height stays 56px so the header keeps its rhythm. */
+.details-head-logo.has-logo {
+  width: 132px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.details-head-logo a {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 .record-card-body {
   min-width: 0;
   flex: 1 1 auto;
