@@ -49,7 +49,8 @@ A trip's ETD is its Trip Scheduling slot start. Its **bay window** opens 30
 minutes before ETD, and the gate rules are measured from that moment:
 
 1. Plate read below the minimum confidence: ask staff.
-2. Plate not in the approved masterfile: the "Unregistered plate" rule.
+2. Plate not in the approved masterfile: the "Unregistered plate" rule
+   (default: ask staff).
 3. CPC or OR/CR expired: the "Expired CPC or OR/CR" rule.
 4. No approved trip today for the plate: if the operator has a trip to the
    same destination due now, the "Substitute bus" rule (default: ask staff);
@@ -59,6 +60,17 @@ minutes before ETD, and the gate rules are measured from that moment:
 7. Otherwise the barrier opens.
 
 The exit gate marks the trip departed.
+
+### Unregistered and unclear reads: staff record the plate
+
+An unregistered plate, or a read below the minimum confidence, waits for
+staff. The review card has a plate box with **Let in** and **Keep closed**,
+and staff must type the plate on the bus for either choice. The typed plate
+is stored in `gate_events.confirmed_plate`, and the event reason says what it
+is, e.g. "Staff entered NKC1637: registered to CERES-GOLDSTAR, trip CEB1600 at
+16:00 (camera read CDF2443)". If the typed plate is a registered bus with a
+trip due today, letting it in records the arrival on that trip. Keeping it
+out never cancels a trip.
 
 ### Substitute buses (different plate from the booking)
 
@@ -104,6 +116,7 @@ Migrations:
 | `tos_snapshot(date)` | every page: rules, gates, devices, bays, the day's trips with their gate state, gate events, and the vehicles involved |
 | `tos_gate_read(gate, plate, confidence, booking, test)` | the device adapter (and test reads) |
 | `tos_resolve_review(event, allow)` | Open barrier / Keep closed |
+| `tos_confirm_plate(event, plate, allow)` | Unregistered or unclear read: record the typed plate, then let in or keep out (`202610291800_…_confirm_plate.sql`) |
 | `tos_swap_plate(event, booking, plate)` | Swap a substitute bus onto a trip using the plate staff typed (`202610291400_…_plate_swap.sql`, plate entry added in `202610291600_…_swap_plate_entry.sql`) |
 | `tos_set_rules(jsonb)` | Devices & rules |
 | `tos_simulate(kind)` / `tos_clear_tests()` | test reads until the hardware is connected |
