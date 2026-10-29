@@ -16,7 +16,8 @@ Live: <https://jm-jaramillo.github.io/PITX-App/>
   [README](docs/modules/trip-scheduling/README.md) ·
   [CHANGELOG](docs/modules/trip-scheduling/CHANGELOG.md)
 - **Terminal Operating System docs:**
-  [README](docs/modules/terminal-operating-system/README.md)
+  [README](docs/modules/terminal-operating-system/README.md) ·
+  [CHANGELOG](docs/modules/terminal-operating-system/CHANGELOG.md)
 
 ## Layout
 
