@@ -11,7 +11,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="../../shared/styles.css" />
-    <link rel="stylesheet" href="assets/tos.css?v=20261029-2" />
+    <link rel="stylesheet" href="assets/tos.css?v=20261030-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -83,7 +83,7 @@
     </div>
 
     <script type="module">
-      import { guardPage, renderNav, escapeHtml, showMessage, supabase, buildModel, act, pill, fmt, formatDateTime } from "./assets/tos.js?v=20261029-2";
+      import { guardPage, renderNav, escapeHtml, showMessage, supabase, buildModel, act, pill, fmt, formatDateTime } from "./assets/tos.js?v=20261030-1";
 
       const profile = await guardPage("staff");
       if (!profile) throw new Error("unauthorised");

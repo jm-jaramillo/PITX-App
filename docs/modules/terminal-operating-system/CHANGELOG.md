@@ -182,6 +182,27 @@ Commits `cc8b40c`, `7dd16ea`, `e6b2986`
   default *REVIEW*.
 - Pages bumped to `?v=20261029-2`.
 
+## 10 · Analytics (30 Oct)
+
+- **New Analytics page** (`analytics.html`, sidebar link *Analytics*). Pick a
+  date range of up to 62 days; by default it shows the last 7 days. Test reads
+  are left out unless *Include test reads* is ticked.
+- **Totals:** trips booked, average bay utilization, late arrivals, early
+  arrivals and unregistered plates.
+- **Four sheets**, each with **Export CSV**:
+  - **Bay utilization**: per bay, the approved trips booked on it, hours
+    booked (30 min per trip), days used, busiest 15-minute slot, and
+    utilization as booked time over 24 h per day.
+  - **Late arrivals**: gate reads more than the grace period after the bay
+    window opened, with trip, operator, plate, minutes late and outcome.
+  - **Early arrivals**: buses sent to staging, with minutes early and when
+    they were released.
+  - **Unregistered**: camera read, read confidence, the plate staff entered,
+    and the outcome.
+- **Migration** `202610301000_terminal-operating-system_analytics.sql`:
+  `tos_analytics(from, to, include_tests)`.
+- Pages bumped to `?v=20261030-1`.
+
 ---
 
 ## Migrations (in order)
@@ -194,6 +215,7 @@ Commits `cc8b40c`, `7dd16ea`, `e6b2986`
 | `202610291400_terminal-operating-system_plate_swap.sql` | 6 |
 | `202610291600_terminal-operating-system_swap_plate_entry.sql` | 7 |
 | `202610291800_terminal-operating-system_confirm_plate.sql` | 9 |
+| `202610301000_terminal-operating-system_analytics.sql` | 10 |
 
 ## Open items
 

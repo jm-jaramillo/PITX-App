@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Analytics · PITX Terminal Operations</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../../shared/styles.css" />
+    <link rel="stylesheet" href="assets/tos.css?v=20261030-1" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" id="nav"></aside>
+      <div class="app-content">
+        <main class="wrap">
+          <div class="page-head">
+            <div>
+              <p class="eyebrow">Terminal Operations &middot; Reports</p>
+              <h1>Analytics</h1>
+              <p class="subtle">
+                Bay utilization from the trips booked in Trip Scheduling, and the late, early and
+                unregistered buses the gates recorded, for any range of up to 62 days. Each sheet
+                exports to CSV.
+              </p>
+            </div>
+            <form class="tos-head-right" id="range">
+              <div class="field">
+                <label for="from">From</label>
+                <input type="date" id="from" required />
+              </div>
+              <div class="field">
+                <label for="to">To</label>
+                <input type="date" id="to" required />
+              </div>
+              <label class="tos-check"><input type="checkbox" id="tests" /> Include test reads</label>
+              <button type="submit" class="btn-primary">Show</button>
+            </form>
+          </div>
+
+          <div class="hidden" id="message"></div>
+          <div class="kpis" id="kpis"></div>
+
+          <div class="tos-tabs" role="tablist" aria-label="Analytics sheets" id="tabs"></div>
+          <section class="table-wrap" style="margin-top: 0" id="sheet"><p class="tos-none">Loading…</p></section>
+        </main>
+      </div>
+    </div>
+
+    <script type="module">
+      import {
+        guardPage,
+        renderNav,
+        escapeHtml,
+        showMessage,
+        supabase,
+        downloadCsv,
+        formatDateTime,
+        manilaToday,
+        pill,
+      } from "./assets/tos.js?v=20261030-1";
+
+      const profile = await guardPage("staff");
+      if (!profile) throw new Error("unauthorised");
+      renderNav(profile);
+
+      const SHEETS = [
+        ["bays", "Bay utilization"],
+        ["late", "Late arrivals"],
+        ["early", "Early arrivals"],
+        ["unregistered", "Unregistered"],
+      ];
+      const params = new URLSearchParams(location.search);
+      const addDays = (iso, n) => {
+        const d = new Date(`${iso}T12:00:00+08:00`);
+        d.setUTCDate(d.getUTCDate() + n);
+        return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(d);
+      };
+      const today = manilaToday();
+      const fromInput = document.getElementById("from");
+      const toInput = document.getElementById("to");
+      const testsInput = document.getElementById("tests");
+      fromInput.value = params.get("from") || addDays(today, -6);
+      toInput.value = params.get("to") || today;
+      testsInput.checked = params.get("tests") === "1";
+      let sheet = SHEETS.some(([k]) => k === params.get("sheet")) ? params.get("sheet") : "bays";
+      let A = null;
+
+      const time = (iso) => (iso ? formatDateTime(iso) : "—");
+      const hhmm = (iso) =>
+        iso ? new Date(iso).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "2-digit", minute: "2-digit", hour12: false }) : "—";
+      const outcome = (r) =>
+        r.pending
+          ? pill("Waiting for staff", "s-hold")
+          : r.resolution
+            ? pill(r.resolution === "ALLOWED" ? "Let in by staff" : "Kept out by staff", r.resolution === "ALLOWED" ? "s-ok" : "s-bad")
+            : r.decision === "DENY"
+              ? pill("Refused", "s-bad")
+              : r.decision === "REVIEW"
+                ? pill("Waiting for staff", "s-hold")
+                : pill(r.opened ? "Let in" : r.decision ?? "—", r.opened ? "s-ok" : "s-done");
+      const outcomeText = (r) =>
+        r.pending || (!r.resolution && r.decision === "REVIEW")
+          ? "Waiting for staff"
+          : r.resolution
+            ? r.resolution === "ALLOWED" ? "Let in by staff" : "Kept out by staff"
+            : r.decision === "DENY" ? "Refused" : r.opened ? "Let in" : r.decision ?? "";
+      const testTag = (r) => (r.is_test ? ` ${pill("Test", "s-muted")}` : "");
+
+      async function load() {
+        const from = fromInput.value;
+        const to = toInput.value;
+        const url = new URL(location.href);
+        url.searchParams.set("from", from);
+        url.searchParams.set("to", to);
+        url.searchParams.set("sheet", sheet);
+        if (testsInput.checked) url.searchParams.set("tests", "1");
+        else url.searchParams.delete("tests");
+        history.replaceState(null, "", url);
+
+        document.getElementById("sheet").innerHTML = `<p class="tos-none">Loading…</p>`;
+        const { data, error } = await supabase.rpc("tos_analytics", { p_from: from, p_to: to, p_include_tests: testsInput.checked });
+        if (error) {
+          showMessage("message", error.message);
+          document.getElementById("sheet").innerHTML = "";
+          return;
+        }
+        showMessage("message", "");
+        A = data;
+        render();
+      }
+
+      function render() {
+        const t = A.totals;
+        const avg = A.bays.length ? A.bays.reduce((s, b) => s + Number(b.utilization), 0) / A.bays.length : 0;
+        const kpi = (label, value, sub) =>
+          `<div class="kpi"><div class="kpi-label">${label}</div><div class="kpi-value"><strong style="font-size:26px">${value}</strong></div><div class="subtle">${sub}</div></div>`;
+        document.getElementById("kpis").innerHTML = [
+          kpi("Trips booked", t.trips, `${A.days} day${A.days === 1 ? "" : "s"} · ${t.trips_without_plate} without a plate`),
+          kpi("Average bay utilization", `${avg.toFixed(1)}%`, `of 24 hours, across ${A.bays.length} bays`),
+          kpi("Late arrivals", t.late, `after the ${A.grace_min}-min grace period`),
+          kpi("Early arrivals", t.early, `sent to staging (more than ${A.early_min} min early)`),
+          kpi("Unregistered", t.unregistered, "plates not in the masterfile"),
+        ].join("");
+
+        document.getElementById("tabs").innerHTML = SHEETS.map(
+          ([k, l]) =>
+            `<button type="button" role="tab" data-sheet="${k}" aria-selected="${k === sheet}">${l}<span>${
+              k === "bays" ? A.bays.length : A[k].length
+            }</span></button>`
+        ).join("");
+
+        const host = document.getElementById("sheet");
+        const head = (title, sub) =>
+          `<div class="tos-panel-head"><h3>${title}</h3><div class="tos-actions"><span class="subtle">${sub}</span><button type="button" class="btn-outline" data-export="${sheet}">Export CSV</button></div></div>`;
+        const range = `${A.from} to ${A.to}`;
+
+        if (sheet === "bays") {
+          const max = Math.max(1, ...A.bays.map((b) => Number(b.utilization)));
+          host.innerHTML =
+            head("Bay utilization", `${range} · a booked trip holds its bay for its 30-minute window`) +
+            `<div style="overflow-x:auto"><table><thead><tr><th>Bay</th><th>Gate</th><th>Trips booked</th><th>Hours booked</th><th>Days used</th><th>Busiest slot</th><th style="min-width:220px">Utilization (of 24 h)</th></tr></thead><tbody>${A.bays
+              .map(
+                (b) => `<tr${b.active ? "" : ' class="muted"'}><td class="cell-strong">${escapeHtml(b.bay)}${b.active ? "" : " (inactive)"}</td>
+                  <td>${escapeHtml(b.gate ?? "—")}</td><td class="tos-num">${b.trips}</td><td class="tos-num">${(b.booked_minutes / 60).toFixed(1)}</td>
+                  <td class="tos-num">${b.days_used} / ${A.days}</td><td class="tos-num">${escapeHtml(b.busiest_slot ?? "—")}</td>
+                  <td><div class="tos-bar"><div class="tos-bar-track"><i style="width:${(Number(b.utilization) / max) * 100}%"></i></div><span>${Number(b.utilization).toFixed(1)}%</span></div></td></tr>`
+              )
+              .join("")}</tbody></table></div>` +
+            (t.trips_without_bay ? `<p class="tos-none">${t.trips_without_bay} trip${t.trips_without_bay === 1 ? " has" : "s have"} no bay assigned and ${t.trips_without_bay === 1 ? "is" : "are"} not counted.</p>` : "");
+        } else if (sheet === "late") {
+          host.innerHTML =
+            head("Late arrivals", `${range} · read more than ${A.grace_min} min after the bay window opened`) +
+            (A.late.length
+              ? `<div style="overflow-x:auto"><table><thead><tr><th>Read at</th><th>Trip</th><th>Operator</th><th>Plate</th><th>Bay window</th><th>Minutes late</th><th>Outcome</th></tr></thead><tbody>${A.late
+                  .map(
+                    (r) => `<tr><td class="tos-num">${time(r.at)}</td><td><span class="cell-strong">${escapeHtml(r.route ?? "—")}</span><span class="cell-sub">${escapeHtml(r.trip ?? "")}${r.bay ? " · " + escapeHtml(r.bay) : ""}</span></td>
+                      <td>${escapeHtml(r.operator ?? "—")}</td><td><span class="tos-plate">${escapeHtml(r.plate)}</span></td>
+                      <td class="tos-num">${r.etd ? hhmm(new Date(Date.parse(r.etd) - 30 * 60000).toISOString()) : "—"}</td>
+                      <td class="tos-num tos-exp">${r.minutes_late ?? "—"}</td><td>${outcome(r)}${testTag(r)}</td></tr>`
+                  )
+                  .join("")}</tbody></table></div>`
+              : `<p class="tos-none">No late arrivals in this range.</p>`);
+        } else if (sheet === "early") {
+          host.innerHTML =
+            head("Early arrivals", `${range} · read more than ${A.early_min} min before the bay window, sent to staging`) +
+            (A.early.length
+              ? `<div style="overflow-x:auto"><table><thead><tr><th>Read at</th><th>Trip</th><th>Operator</th><th>Plate</th><th>Bay window</th><th>Minutes early</th><th>Released from staging</th></tr></thead><tbody>${A.early
+                  .map(
+                    (r) => `<tr><td class="tos-num">${time(r.at)}</td><td><span class="cell-strong">${escapeHtml(r.route ?? "—")}</span><span class="cell-sub">${escapeHtml(r.trip ?? "")}${r.bay ? " · " + escapeHtml(r.bay) : ""}</span></td>
+                      <td>${escapeHtml(r.operator ?? "—")}</td><td><span class="tos-plate">${escapeHtml(r.plate)}</span>${testTag(r)}</td>
+                      <td class="tos-num">${r.etd ? hhmm(new Date(Date.parse(r.etd) - 30 * 60000).toISOString()) : "—"}</td>
+                      <td class="tos-num">${r.minutes_early ?? "—"}</td><td class="tos-num">${r.released_at ? hhmm(r.released_at) : "Not yet"}</td></tr>`
+                  )
+                  .join("")}</tbody></table></div>`
+              : `<p class="tos-none">No early arrivals in this range.</p>`);
+        } else {
+          host.innerHTML =
+            head("Unregistered plates", `${range} · plates not in the approved vehicle masterfile`) +
+            (A.unregistered.length
+              ? `<div style="overflow-x:auto"><table><thead><tr><th>Read at</th><th>Gate</th><th>Camera read</th><th>Plate entered by staff</th><th>Outcome</th><th>Note</th></tr></thead><tbody>${A.unregistered
+                  .map(
+                    (r) => `<tr><td class="tos-num">${time(r.at)}</td><td>${escapeHtml(r.gate)}</td>
+                      <td><span class="tos-plate is-unknown">${escapeHtml(r.camera_plate)}</span><span class="cell-sub">${Math.round(Number(r.confidence) * 100)}% read</span></td>
+                      <td>${r.confirmed_plate ? `<span class="tos-plate">${escapeHtml(r.confirmed_plate)}</span>` : '<span class="muted">—</span>'}</td>
+                      <td>${outcome(r)}${testTag(r)}</td><td><span class="cell-sub" style="max-width:340px">${escapeHtml(r.reason ?? "")}</span></td></tr>`
+                  )
+                  .join("")}</tbody></table></div>`
+              : `<p class="tos-none">No unregistered plates in this range.</p>`);
+        }
+      }
+
+      function exportSheet(kind) {
+        const name = `tos-${kind}-${A.from}-to-${A.to}.csv`;
+        if (kind === "bays") {
+          downloadCsv(name, ["Bay", "Gate", "Active", "Trips booked", "Hours booked", "Days used", "Days in range", "Busiest slot", "Utilization % of 24h"],
+            A.bays.map((b) => [b.bay, b.gate ?? "", b.active ? "Yes" : "No", b.trips, (b.booked_minutes / 60).toFixed(1), b.days_used, A.days, b.busiest_slot ?? "", b.utilization]));
+        } else if (kind === "late") {
+          downloadCsv(name, ["Read at", "Trip", "Destination", "Operator", "Plate", "Bay", "ETD", "Minutes late", "Outcome", "Test read"],
+            A.late.map((r) => [time(r.at), r.trip ?? "", r.route ?? "", r.operator ?? "", r.plate, r.bay ?? "", r.etd ? hhmm(r.etd) : "", r.minutes_late ?? "", outcomeText(r), r.is_test ? "Yes" : "No"]));
+        } else if (kind === "early") {
+          downloadCsv(name, ["Read at", "Trip", "Destination", "Operator", "Plate", "Bay", "ETD", "Minutes early", "Released from staging", "Test read"],
+            A.early.map((r) => [time(r.at), r.trip ?? "", r.route ?? "", r.operator ?? "", r.plate, r.bay ?? "", r.etd ? hhmm(r.etd) : "", r.minutes_early ?? "", r.released_at ? time(r.released_at) : "", r.is_test ? "Yes" : "No"]));
+        } else {
+          downloadCsv(name, ["Read at", "Gate", "Camera read", "Read confidence %", "Plate entered by staff", "Outcome", "Note", "Test read"],
+            A.unregistered.map((r) => [time(r.at), r.gate, r.camera_plate, Math.round(Number(r.confidence) * 100), r.confirmed_plate ?? "", outcomeText(r), r.reason ?? "", r.is_test ? "Yes" : "No"]));
+        }
+      }
+
+      document.getElementById("range").addEventListener("submit", (e) => {
+        e.preventDefault();
+        load();
+      });
+      testsInput.addEventListener("change", load);
+      document.getElementById("tabs").addEventListener("click", (e) => {
+        const b = e.target.closest("[data-sheet]");
+        if (!b || !A) return;
+        sheet = b.dataset.sheet;
+        const url = new URL(location.href);
+        url.searchParams.set("sheet", sheet);
+        history.replaceState(null, "", url);
+        render();
+      });
+      document.getElementById("sheet").addEventListener("click", (e) => {
+        const b = e.target.closest("[data-export]");
+        if (b && A) exportSheet(b.dataset.export);
+      });
+
+      await load();
+    </script>
+  </body>
+</html>

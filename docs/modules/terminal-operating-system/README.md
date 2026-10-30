@@ -25,6 +25,7 @@ it in Trip Scheduling first.
 | `bays.html` | Bay timeline for any day, with trip detail, documents and gate history |
 | `board.html` | Concourse departures board in PITX blue and red, with All / Provincial / Commuter tabs |
 | `feed.html` | What TOS receives from Trip Scheduling: approved trips for a day, the vehicle masterfile, and vehicles with expired documents |
+| `analytics.html` | Four sheets for a date range of up to 62 days, each exportable to CSV: bay utilization from booked trips, late arrivals, early arrivals (staging), and unregistered plates |
 | `rules.html` | Gate rules (saved to the database), devices, clearing test reads, and which destinations are commuter or provincial |
 
 **Commuter or provincial:** Trip Scheduling stores no service type, so TOS
@@ -116,6 +117,7 @@ Migrations:
 | `tos_snapshot(date)` | every page: rules, gates, devices, bays, the day's trips with their gate state, gate events, and the vehicles involved |
 | `tos_gate_read(gate, plate, confidence, booking, test)` | the device adapter (and test reads) |
 | `tos_resolve_review(event, allow)` | Open barrier / Keep closed |
+| `tos_analytics(from, to, include_tests)` | Analytics sheets: bay utilization (a booked trip holds its bay for its 30-minute window; utilization is booked time over 24 h per day), late, early and unregistered reads, and daily totals (`202610301000_…_analytics.sql`) |
 | `tos_confirm_plate(event, plate, allow)` | Unregistered or unclear read: record the typed plate, then let in or keep out (`202610291800_…_confirm_plate.sql`) |
 | `tos_swap_plate(event, booking, plate)` | Swap a substitute bus onto a trip using the plate staff typed (`202610291400_…_plate_swap.sql`, plate entry added in `202610291600_…_swap_plate_entry.sql`) |
 | `tos_set_rules(jsonb)` | Devices & rules |
