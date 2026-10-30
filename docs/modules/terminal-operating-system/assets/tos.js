@@ -19,6 +19,7 @@ const LINKS = [
   { href: "bays.html", label: "Bay timeline", icon: ICONS.bays },
   { href: "board.html", label: "Passenger board", icon: ICONS.calendar },
   { href: "feed.html", label: "Trip feed", icon: ICONS.bus },
+  { href: "analytics.html", label: "Analytics", icon: ICONS.chart },
   { href: "rules.html", label: "Devices & rules", icon: ICONS.building },
 ];
 
