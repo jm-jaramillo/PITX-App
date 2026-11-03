@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { CompanyLogo } from "@/components/company-logo";
 import { peso, todayManila } from "@/lib/format";
+import { ticketHref } from "@/lib/paths";
 import { canAccess } from "@/lib/roles";
 import {
   scopedTickets,
@@ -68,7 +69,7 @@ export default function DashboardPage() {
           <ul className="mt-2 space-y-1 text-sm text-red-900">
             {problems.map(({ ticket, trip, reason }) => (
               <li key={ticket.id}>
-                <Link className="underline" href={`/tickets/${ticket.id}`}>
+                <Link className="underline" href={ticketHref(ticket.id)}>
                   {ticket.ticketNo}
                 </Link>{" "}
                 · {ticket.passengerName} · {trip.tripNo} seat {ticket.seatNo} · {reason}

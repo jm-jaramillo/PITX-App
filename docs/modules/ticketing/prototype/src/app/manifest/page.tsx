@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { peso, todayManila } from "@/lib/format";
+import { ticketHref } from "@/lib/paths";
 import { scopedTrips, setBoarded, useDb } from "@/lib/store";
 
 export default function ManifestPage() {
@@ -87,7 +88,7 @@ export default function ManifestPage() {
                     <td className="px-3 py-2">{t.seatNo}</td>
                     <td className="px-3 py-2">{t.passengerName}</td>
                     <td className="px-3 py-2 font-mono text-xs">
-                      <Link className="text-brand underline" href={`/tickets/${t.id}`}>
+                      <Link className="text-brand underline" href={ticketHref(t.id)}>
                         {t.ticketNo}
                       </Link>
                     </td>

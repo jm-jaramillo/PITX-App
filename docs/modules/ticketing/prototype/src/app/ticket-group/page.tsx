@@ -1,14 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { BoardingPass } from "@/components/boarding-pass";
 import { peso } from "@/lib/format";
+import { ticketHref } from "@/lib/paths";
 import { markPrinted, scopedTickets, useDb } from "@/lib/store";
 
 export default function GroupPassesPage() {
+  return (
+    <Suspense>
+      <GroupPasses />
+    </Suspense>
+  );
+}
+
+function GroupPasses() {
   const db = useDb();
-  const { id } = useParams<{ id: string }>();
+  const id = useSearchParams().get("id") ?? "";
   const tickets = scopedTickets(db)
     .filter((t) => t.groupId === id)
     .sort((a, b) => a.seatNo - b.seatNo);
@@ -68,7 +78,7 @@ export default function GroupPassesPage() {
           <div key={ticket.id} className="print:break-after-page">
             <BoardingPass db={db} ticket={ticket} />
             <p className="no-print mt-2 text-center text-sm">
-              <Link className="text-brand underline" href={`/tickets/${ticket.id}`}>
+              <Link className="text-brand underline" href={ticketHref(ticket.id)}>
                 Change seat, reprint or refund
               </Link>
             </p>

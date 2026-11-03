@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { dateTimeManila, peso } from "@/lib/format";
+import { ticketHref } from "@/lib/paths";
 import { decideRequest, generateCloseCode, refundAmountFor, useDb } from "@/lib/store";
 
 export default function ApprovalsPage() {
@@ -43,7 +44,7 @@ export default function ApprovalsPage() {
                   <tr key={r.id} className="border-t border-slate-100">
                     <td className="px-3 py-2">{r.type}</td>
                     <td className="px-3 py-2 font-mono text-xs">
-                      <Link className="text-brand underline" href={`/tickets/${r.ticketId}`}>
+                      <Link className="text-brand underline" href={ticketHref(r.ticketId)}>
                         {ticket?.ticketNo}
                       </Link>
                     </td>

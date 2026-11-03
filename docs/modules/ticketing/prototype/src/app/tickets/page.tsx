@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { peso } from "@/lib/format";
+import { ticketHref } from "@/lib/paths";
 import { scopedTickets, useDb } from "@/lib/store";
 
 const STATUSES = ["All", "Booked", "Issued", "Boarded", "Voided"];
@@ -70,7 +71,7 @@ export default function TicketsPage() {
               return (
                 <tr key={t.id} className="border-t border-slate-100">
                   <td className="px-3 py-2 font-mono text-xs">
-                    <Link className="text-brand underline" href={`/tickets/${t.id}`}>
+                    <Link className="text-brand underline" href={ticketHref(t.id)}>
                       {t.ticketNo}
                     </Link>
                   </td>

@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState, type FormEvent } from "react";
 import { SeatMap } from "@/components/seat-map";
 import { peso, todayManila } from "@/lib/format";
+import { groupHref } from "@/lib/paths";
 import {
   computeFare,
   issueTickets,
@@ -97,7 +98,7 @@ function Pos() {
       setError(result.error);
       return;
     }
-    router.push(`/tickets/group/${result.tickets![0].groupId}`);
+    router.push(groupHref(result.tickets![0].groupId!));
   }
 
   return (

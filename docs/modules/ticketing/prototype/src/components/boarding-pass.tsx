@@ -4,6 +4,7 @@ import QRCode from "qrcode";
 import { useEffect, useState } from "react";
 import { CompanyLogo } from "@/components/company-logo";
 import { dateTimeManila, peso } from "@/lib/format";
+import { asset } from "@/lib/paths";
 import type { Db, Ticket } from "@/lib/types";
 
 export function BoardingPass({ db, ticket, className = "" }: { db: Db; ticket: Ticket; className?: string }) {
@@ -39,7 +40,7 @@ export function BoardingPass({ db, ticket, className = "" }: { db: Db; ticket: T
     <div className={`mx-auto max-w-sm rounded-lg border border-slate-200 bg-white p-5 ${className}`}>
       <div className="text-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/pitx-stacked-on-light.png" alt="PITX" className="mx-auto w-36" />
+        <img src={asset("/brand/pitx-stacked-on-light.png")} alt="PITX" className="mx-auto w-36" />
         <div className="mt-3 border-y border-accent py-1 text-xs font-semibold tracking-widest text-accent">
           BOARDING PASS
         </div>

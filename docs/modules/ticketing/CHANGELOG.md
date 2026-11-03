@@ -4,6 +4,7 @@ Build history of the Ticketing and Booking module of PITX App.
 Owner: @victoriaronald
 Repo: <https://github.com/jm-jaramillo/PITX-App>
 Plan: [PLAN.md](PLAN.md)
+Demo (prototype, dummy data): <https://jm-jaramillo.github.io/PITX-App/modules/ticketing/demo/>
 
 Dates and times are Manila time. Every update is pushed to `main` and logged here,
 newest first. Migrations are listed with the entry that added them.
@@ -25,6 +26,23 @@ newest first. Migrations are listed with the entry that added them.
 Still to agree with the other owners: the trip feed functions, the new `teller` and
 `account` roles, and how passenger seat requests hand over to Ticketing (PLAN.md
 sections 2 and 3).
+
+---
+
+## 3 · Prototype viewable on the site (3 Nov)
+
+- The prototype now runs on the live site as a demo:
+  <https://jm-jaramillo.github.io/PITX-App/modules/ticketing/demo/>
+- [demo/](demo/) is the prototype built as static files (no build step on Pages). Data is
+  still dummy data kept in each visitor's browser; no Supabase.
+- Source changes so it can be built as static files: ticket and group pages take the id
+  from the address (`ticket/?id=`) instead of the path, image paths follow the site
+  sub-folder, and `STATIC_EXPORT_BASE_PATH` switches the build to static output.
+- [prototype/README.md](prototype/README.md) explains how to rebuild the demo.
+- Tested locally under the same sub-folder: sign in, sell a ticket, boarding pass, open a
+  ticket, reload. Some background page preloads return 404 and fall back to normal page
+  loads; nothing visible breaks.
+- No shared files or migrations changed.
 
 ---
 

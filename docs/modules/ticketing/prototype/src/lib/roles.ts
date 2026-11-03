@@ -25,7 +25,8 @@ export function isCompanyRole(role: Role): boolean {
 
 export function canAccess(role: Role, pathname: string): boolean {
   // Passes are opened from POS, Tickets and Manifest, so they follow the Manifest roles.
-  const path = pathname.startsWith("/tickets/") ? "/manifest" : pathname;
+  const trimmed = pathname.replace(/\/$/, "") || "/";
+  const path = trimmed === "/ticket" || trimmed === "/ticket-group" ? "/manifest" : trimmed;
   const item = NAV.find((n) => (n.href === "/" ? path === "/" : path.startsWith(n.href)));
   return item ? item.roles.includes(role) : true;
 }

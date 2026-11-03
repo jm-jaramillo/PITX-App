@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { CompanyLogo } from "@/components/company-logo";
+import { asset } from "@/lib/paths";
 import { canAccess, homeFor, isCompanyRole, NAV } from "@/lib/roles";
 import { resetDemoData, signIn, signOut, useDb, useHydrated } from "@/lib/store";
 import { ROLES, type Role } from "@/lib/types";
@@ -33,7 +34,7 @@ function SignIn() {
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
       <div className="flex flex-col items-center justify-center gap-6 border-b-8 border-accent bg-brand px-8 py-12 text-center lg:border-r-8 lg:border-b-0">
-        <img src="/brand/pitx-stacked-on-dark.png" alt="PITX, Parañaque Integrated Terminal Exchange" className="w-64 max-w-full lg:w-80" />
+        <img src={asset("/brand/pitx-stacked-on-dark.png")} alt="PITX, Parañaque Integrated Terminal Exchange" className="w-64 max-w-full lg:w-80" />
         <p className="text-lg font-semibold text-white">Centralized Ticketing System</p>
       </div>
       <div className="flex items-center justify-center p-6">
@@ -99,7 +100,7 @@ function Shell({ children }: { children: ReactNode }) {
     <div className="min-h-screen">
       <aside className="no-print flex flex-col border-b-4 border-accent bg-brand text-white lg:fixed lg:inset-y-0 lg:left-0 lg:w-64 lg:border-r-4 lg:border-b-0">
         <div className="border-b border-white/15 px-5 py-4">
-          <img src="/brand/pitx-horizontal-on-dark.png" alt="PITX, Parañaque Integrated Terminal Exchange" className="w-52 max-w-full" />
+          <img src={asset("/brand/pitx-horizontal-on-dark.png")} alt="PITX, Parañaque Integrated Terminal Exchange" className="w-52 max-w-full" />
           <div className="mt-2 text-xs font-semibold tracking-wide text-white/70">TICKETING</div>
         </div>
         <nav className="flex flex-1 flex-wrap gap-1 overflow-y-auto p-3 text-sm lg:flex-col lg:flex-nowrap">

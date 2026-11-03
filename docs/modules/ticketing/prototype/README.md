@@ -11,6 +11,21 @@ rules being rebuilt in `docs/modules/ticketing/` (see [../PLAN.md](../PLAN.md) a
 - Bus company names come from the operator list; fares, plates, trips and passengers
   are made up.
 
+## Try it on the site
+
+Live demo: <https://jm-jaramillo.github.io/PITX-App/modules/ticketing/demo/>
+
+`../demo/` is this app built as static files. Rebuild it after changing the source:
+
+```bash
+cd docs/modules/ticketing/prototype
+npm install
+STATIC_EXPORT_BASE_PATH=/PITX-App/modules/ticketing/demo npm run build
+```
+
+Then replace `../demo/` with the new `out/` folder. On Windows PowerShell, set the
+variable first with `$env:STATIC_EXPORT_BASE_PATH='/PITX-App/modules/ticketing/demo'`.
+
 ## Run it locally
 
 Needs Node.js 20 or later.

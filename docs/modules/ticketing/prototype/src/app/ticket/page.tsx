@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState, type FormEvent } from "react";
 import { BoardingPass } from "@/components/boarding-pass";
 import { SeatMap } from "@/components/seat-map";
 import { dateTimeManila, peso } from "@/lib/format";
@@ -28,8 +28,16 @@ import { PAYMENT_METHODS, type PaymentMethod } from "@/lib/types";
 type Panel = "none" | "move" | "refund" | "reprint";
 
 export default function BoardingPassPage() {
+  return (
+    <Suspense>
+      <TicketDetail />
+    </Suspense>
+  );
+}
+
+function TicketDetail() {
   const db = useDb();
-  const { id } = useParams<{ id: string }>();
+  const id = useSearchParams().get("id") ?? "";
   const [panel, setPanel] = useState<Panel>("none");
   const [moveTripId, setMoveTripId] = useState("");
   const [moveSeat, setMoveSeat] = useState(0);
