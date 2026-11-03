@@ -30,6 +30,14 @@ export const MODULES = [
     path: "modules/terminal-operating-system/",
     roles: { staff: "gates.html" },
   },
+  {
+    id: "ticketing",
+    name: "Ticketing and Booking",
+    description: "Counter sales, boarding passes, refunds and daily sales collection.",
+    path: "modules/ticketing/",
+    comingSoon: true, // build plan under review (docs/modules/ticketing/PLAN.md); remove once it has pages
+    roles: { staff: "index.html" },
+  },
 ];
 
 /** Modules this role can open. Pass { includeComingSoon: true } to list placeholders too. */
