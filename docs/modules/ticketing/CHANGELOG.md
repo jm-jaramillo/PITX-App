@@ -29,6 +29,19 @@ sections 2 and 3).
 
 ---
 
+## 4 · Asked for Supabase access (3 Nov)
+
+- Opened [#3](https://github.com/jm-jaramillo/PITX-App/issues/3) for @jm-jaramillo (cc
+  @Jcbllanto16): Supabase access or a dev project, OK on the `teller` and `account` roles
+  and `profiles.operator_id`, OK on the `ticketing` schema, and the Trip Scheduling feed
+  functions Ticketing needs.
+- Checked the shared project with the public key: the seat layouts are readable, but no
+  upcoming approved trip has a plate with a seat layout yet, and `tos_trip_feed` is staff
+  only. So the demo stays on dummy data until #3 is settled.
+- No pages, shared files or migrations changed.
+
+---
+
 ## 3 · Prototype viewable on the site (3 Nov)
 
 - The prototype now runs on the live site as a demo:
