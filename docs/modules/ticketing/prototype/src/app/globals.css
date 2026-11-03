@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-brand: #0b2a5b;
+  --color-brand-dark: #071c3f;
+  --color-brand-tint: #e8edf6;
+  --color-accent: #8e1b1f;
+  --color-accent-dark: #6e1417;
+}
+
+body {
+  background: #f2f4f8;
+  color: #14213d;
+  font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+}
+
+h1 {
+  color: #0b2a5b;
+}
+
+label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #3b4a66;
+}
+
+input,
+select {
+  display: block;
+  width: 100%;
+  margin-top: 0.25rem;
+  padding: 0.5rem 0.625rem;
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: #14213d;
+  background: #fff;
+  border: 1px solid #c3cddd;
+  border-radius: 0.375rem;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #0b2a5b;
+  outline-offset: 1px;
+}
+
+input[type="checkbox"] {
+  display: inline-block;
+  width: auto;
+  margin: 0 0.375rem 0 0;
+}
+
+/* Every table header in the app carries the dark blue theme. */
+main thead {
+  background: #0b2a5b;
+  color: #fff;
+}
+
+main thead th {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+main tbody tr:hover {
+  background: #f6f8fc;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
+  main thead {
+    background: #fff;
+    color: #000;
+  }
+}

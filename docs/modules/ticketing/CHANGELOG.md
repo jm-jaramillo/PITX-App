@@ -28,14 +28,14 @@ sections 2 and 3).
 
 ---
 
-## Before the repo: prototype (28 Oct to 3 Nov)
+## 2 · Prototype added for reference (3 Nov)
 
-- The ticketing rules were built and tested as a separate prototype (Next.js, data kept
-  in the browser only) on the owner's PC. It is not in this repo and is not used by
-  PITX App; it is the reference for the screens and rules here.
-- It covered POS with multi-seat sales and the 8 seat layouts, boarding passes with QR,
-  refunds and reprints with approvals, Close Sales and blind Daily Collection,
-  manifests, ticket availability, reports with Excel export, and System Parameters.
+- Added the Next.js prototype at [prototype/](prototype/), as committed on the
+  owner's PC (`96310d6`). Only tracked files; no dependencies, build output or env files.
+- It is reference only: not linked from the site, no Supabase, dummy browser data.
+  Its draft SQL is not read by the team's migration runner.
+- Added [prototype/README.md](prototype/README.md) on how to run it and where the rules are.
+- No pages, shared files or migrations changed.
 
 ---
 
@@ -46,3 +46,14 @@ sections 2 and 3).
   for @jm-jaramillo and @Jcbllanto16.
 - Added this CHANGELOG.
 - No pages, shared files or migrations changed.
+
+---
+
+## Before the repo: prototype (28 Oct to 3 Nov)
+
+- The ticketing rules were built and tested as a separate prototype (Next.js, data kept
+  in the browser only) on the owner's PC. It is the reference for the screens and rules
+  here, and is now in [prototype/](prototype/).
+- It covered POS with multi-seat sales and the 8 seat layouts, boarding passes with QR,
+  refunds and reprints with approvals, Close Sales and blind Daily Collection,
+  manifests, ticket availability, reports with Excel export, and System Parameters.

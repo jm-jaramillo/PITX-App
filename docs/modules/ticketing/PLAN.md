@@ -4,7 +4,7 @@ Owner: @victoriaronald. Status: **draft for review by @jm-jaramillo and @Jcbllan
 Nothing here is built or migrated yet.
 
 The ticketing rules were worked out in a separate prototype (Next.js, browser storage
-only, not in this repo). This plan moves them into this repo the way CONTRIBUTING.md
+only), kept for reference in [prototype/](prototype/). This plan moves them into this repo the way CONTRIBUTING.md
 asks: plain pages in `docs/modules/ticketing/`, a `ticketing` schema with RLS, and trip
 data only through functions Trip Scheduling exposes.
 
