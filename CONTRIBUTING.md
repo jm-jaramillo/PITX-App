@@ -24,7 +24,7 @@ supabase/
 1. **Stay in your folder.** Module code lives in `docs/modules/<module>/` and imports
    `../../shared/platform.js` (the Trip Scheduling `assets/app.js` re-exports it, so its
    pages import from one place). A module never imports from another module.
-2. **Changes to `shared/` need both owners' review** - they affect every module.
+2. **Changes to `shared/` need all module owners' review** - they affect every module.
    `shared/platform.js` must never import from a module.
 3. **Register your module** in `shared/modules.js`: id, name, folder, and which
    `profiles.role` values may enter, each with a landing page. Login and the portal
@@ -54,7 +54,7 @@ supabase/
   GitHub Pages within a minute, so only push what works.
 - Before pushing: `git pull --rebase origin main`. Push small, frequent commits.
 - Stay in your module folder so pushes rarely touch the same files. A change to
-  `docs/shared/` or `supabase/migrations/` affects every module: tell the other owner
+  `docs/shared/` or `supabase/migrations/` affects every module: tell the other module owners
   first.
 - `.github/CODEOWNERS` records who owns what. Without branch protection it is
   advisory only (it is not enforced on direct pushes).

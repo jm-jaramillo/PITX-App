@@ -7,7 +7,7 @@ login, one Supabase project, made of modules:
 |---|---|---|---|
 | Trip Scheduling | [`docs/modules/trip-scheduling/`](docs/modules/trip-scheduling/) | @jm-jaramillo | Live |
 | Terminal Operating System | [`docs/modules/terminal-operating-system/`](docs/modules/terminal-operating-system/) | @Jcbllanto16 | Live, gate hardware not connected yet ([#1](https://github.com/jm-jaramillo/PITX-App/issues/1)) |
-| Ticketing and Booking | `docs/modules/ticketing/` | TBD | Not started |
+| Ticketing and Booking | `docs/modules/ticketing/` | @victoriaronald | Not started |
 
 Live: <https://jm-jaramillo.github.io/PITX-App/>
 
