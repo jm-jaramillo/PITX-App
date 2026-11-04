@@ -1,7 +1,8 @@
 # Ticketing and Booking: build plan
 
 Owner: @victoriaronald. Status: **draft for review by @jm-jaramillo and @Jcbllanto16.**
-Nothing here is built or migrated yet.
+The `ticketing` schema and demo data are on Supabase (CHANGELOG entry 5). Roles, the
+trip feed and the pages are not built yet.
 
 The ticketing rules were worked out in a separate prototype (Next.js, browser storage
 only), kept for reference in [prototype/](prototype/). This plan moves them into this repo the way CONTRIBUTING.md
