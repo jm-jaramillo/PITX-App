@@ -217,6 +217,7 @@ declare
   tid      uuid;
   out      jsonb := '[]';
   total    numeric := 0;
+  demo     boolean;
 begin
   if auth.uid() is null then raise exception 'Sign in first' using errcode = '42501'; end if;
   select * into me from ticketing.passengers where user_id = auth.uid();
@@ -224,7 +225,8 @@ begin
   select * into s from ticketing.settings where id = 1;
 
   -- One booking at a time per trip, so two passengers can't take the same seat.
-  perform 1 from ticketing.trips where id = p_trip for update;
+  -- Bookings on a demo trip are demo rows too, so ticketing_clear_demo() can remove them.
+  select is_demo into demo from ticketing.trips where id = p_trip for update;
   select * into o from ticketing.online_trips where trip_id = p_trip;
   if not found then raise exception 'This trip is not open for online booking'; end if;
 
@@ -264,17 +266,17 @@ begin
     begin
       insert into ticketing.tickets (ticket_no, group_id, source, booking_ref, trip_id, seat_no, passenger_name,
                                      contact_no, email, fare_type, fare, insurance, id_no, status, hold_until,
-                                     booked_by, sold_by)
+                                     booked_by, sold_by, is_demo)
       values (tno, grp, 'Online', 'BK-' || upper(substr(replace(grp::text, '-', ''), 1, 8)), p_trip, seat,
               trim(x->>'passenger_name'), me.contact_no, email, ftype, fare, s.insurance_price,
-              nullif(trim(x->>'id_no'), ''), 'Reserved', hold, auth.uid(), 'Online: ' || me.full_name)
+              nullif(trim(x->>'id_no'), ''), 'Reserved', hold, auth.uid(), 'Online: ' || me.full_name, demo)
       returning id into tid;
     exception when unique_violation then
       raise exception 'Seat % was just taken. Pick another seat.', seat;
     end;
 
-    insert into ticketing.audit_log (by_name, by_id, action, ticket_id, trip_id, detail)
-    values (me.full_name, auth.uid(), 'Online booking', tid, p_trip, tno || ', ' || o.trip_no || ' seat ' || seat);
+    insert into ticketing.audit_log (by_name, by_id, action, ticket_id, trip_id, detail, is_demo)
+    values (me.full_name, auth.uid(), 'Online booking', tid, p_trip, tno || ', ' || o.trip_no || ' seat ' || seat, demo);
 
     out   := out || jsonb_build_object('ticket_no', tno, 'seat_no', seat, 'passenger_name', trim(x->>'passenger_name'),
                                        'fare_type', ftype, 'fare', fare + s.insurance_price);

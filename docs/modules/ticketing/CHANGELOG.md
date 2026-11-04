@@ -30,6 +30,27 @@ sections 2 and 3).
 
 ---
 
+## 8 · Database tested on PGlite (4 Nov)
+
+- Added [database/test/test.mjs](database/test/test.mjs): runs the three migrations on
+  PGlite (Postgres 16 in Node) with Supabase stand-ins and checks 38 things. All pass:
+  - demo data loads (231 tickets, 16 trips)
+  - not signed in: can list bookable trips and taken seats, without names; can't read
+    tables or book
+  - passengers: must register first; discount fares need an ID; can't take a held seat,
+    pick a seat twice, pick a seat not on the bus, book more than 5, or book a departed
+    trip
+  - passengers see and cancel only their own bookings, and never see ID numbers
+  - expired holds are voided and free the seat; cancelled seats free up
+  - passengers can't open the staff snapshot; the admin can
+  - clear-demo removes everything demo
+- Fixed: online bookings on demo trips are now marked demo. Before, they blocked
+  `ticketing_clear_demo()` with a foreign-key error.
+- Not covered: two passengers booking the same seat at the exact same moment. The row lock
+  plus the unique seat index should stop it, but PGlite runs one connection only.
+
+---
+
 ## 7 · Passenger accounts and online booking (4 Nov)
 
 - Added [`202611041002_ticketing_passengers.sql`](database/migrations/202611041002_ticketing_passengers.sql)
@@ -46,7 +67,7 @@ sections 2 and 3).
 - Tickets gain `booked_by`, `hold_until` and the `Reserved` status. Payment method is now
   required only once a ticket is paid.
 - Not done: the passenger pages, the Teller step that turns a hold into a paid ticket,
-  and online payment. Not tested on a database yet (no Postgres on this PC).
+  and online payment. (Tested in entry 8.)
 - Overlap to settle with @jm-jaramillo: Trip Scheduling already has passenger seat
   requests (0051). Both should not stay.
 

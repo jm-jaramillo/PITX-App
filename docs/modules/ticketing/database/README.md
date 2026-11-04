@@ -12,6 +12,19 @@ and must not get Ticketing files.
 | `202611041002_ticketing_passengers.sql` | Passenger accounts and online booking (holds paid at the counter) |
 | `remove_from_trip_scheduling.sql` | One-off: removes the copy that was first applied to the Trip Scheduling project by mistake |
 
+## Testing without a project
+
+[test/test.mjs](test/test.mjs) runs all migrations on PGlite (Postgres in Node) with small
+stand-ins for Supabase's `auth.users`, `auth.uid()` and the `anon`/`authenticated` roles,
+then checks access and the passenger booking rules (38 checks). It needs
+`@electric-sql/pglite`, which is not in the repo's package.json, so run it from a
+separate folder:
+
+```bash
+npm install @electric-sql/pglite@0.2.17
+node path/to/test.mjs path/to/docs/modules/ticketing/database/migrations
+```
+
 ## Setting up the project
 
 1. Create the project in the Megawide Construction Corporation org (needs the org owner
