@@ -30,6 +30,28 @@ sections 2 and 3).
 
 ---
 
+## 7 · Passenger accounts and online booking (4 Nov)
+
+- Added [`202611041002_ticketing_passengers.sql`](database/migrations/202611041002_ticketing_passengers.sql)
+  for the Ticketing project (not applied yet: the project doesn't exist).
+- Passengers sign up through the project's Auth and register with a name and contact
+  number (`ticketing.passengers`). They are not staff `members` and can't read any table.
+- Anyone can list bookable trips and see a trip's taken seats. A signed-in passenger can
+  book up to 5 seats per trip, see their own bookings and cancel unpaid ones. Functions
+  are listed in [database/README.md](database/README.md#passengers).
+- A booking is a 30-minute hold (`Reserved`), paid and issued at a PITX counter. Holds that
+  run out free their seats. Online booking closes 60 minutes before departure. All three
+  limits are in System Parameters (`online_hold_min`, `online_cutoff_min`,
+  `online_max_seats`), plus an `online_booking` on/off switch.
+- Tickets gain `booked_by`, `hold_until` and the `Reserved` status. Payment method is now
+  required only once a ticket is paid.
+- Not done: the passenger pages, the Teller step that turns a hold into a paid ticket,
+  and online payment. Not tested on a database yet (no Postgres on this PC).
+- Overlap to settle with @jm-jaramillo: Trip Scheduling already has passenger seat
+  requests (0051). Both should not stay.
+
+---
+
 ## 6 · Own database, off the Trip Scheduling project (4 Nov)
 
 - Decision: Ticketing and Booking gets its **own Supabase project** in the Megawide
