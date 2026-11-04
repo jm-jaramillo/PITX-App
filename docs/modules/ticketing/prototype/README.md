@@ -6,8 +6,8 @@ is dummy data kept in the browser. It is here as the reference for the screens a
 rules being rebuilt in `docs/modules/ticketing/` (see [../PLAN.md](../PLAN.md) and
 [../CHANGELOG.md](../CHANGELOG.md)).
 
-- The SQL in `supabase/migrations/` here is a draft for the prototype only. The team's
-  migration runner reads the top-level `supabase/migrations/` and never these files.
+- The SQL in `supabase/migrations/` here is a draft for the prototype only. The real
+  Ticketing database is in [../database/](../database/).
 - Bus company names come from the operator list; fares, plates, trips and passengers
   are made up.
 

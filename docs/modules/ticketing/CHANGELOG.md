@@ -22,6 +22,7 @@ newest first. Migrations are listed with the entry that added them.
 | Boarding validation | The automated gate (TOS), not staff |
 | Teller refund rule | A Teller can refund any ticket of their operator up to 4 hours before departure; closer than that needs the Ticketing Admin |
 | Seat layouts | The 8 diagrams in "PTX. OPS. Seat Configuration" (2026-10-27), the same ones Trip Scheduling uses |
+| Database | Ticketing's own Supabase project in the Megawide org, separate from the Trip Scheduling project ([database/](database/)) |
 
 Still to agree with the other owners: the trip feed functions, the new `teller` and
 `account` roles, and how passenger seat requests hand over to Ticketing (PLAN.md
@@ -29,7 +30,28 @@ sections 2 and 3).
 
 ---
 
+## 6 · Own database, off the Trip Scheduling project (4 Nov)
+
+- Decision: Ticketing and Booking gets its **own Supabase project** in the Megawide
+  Construction Corporation org. It does not use the PITX Trip Scheduling project.
+- Moved the two migrations from `supabase/migrations/` (the Trip Scheduling project's
+  runner) to [database/migrations/](database/migrations/). See
+  [database/README.md](database/README.md) for setup.
+- `202611041000_ticketing_init.sql` no longer uses Trip Scheduling's `profiles`,
+  `is_ticketing()` or `is_staff()`. It adds `ticketing.members` with the four Ticketing
+  roles (`teller`, `pub_admin`, `account`, `admin`) and `ticketing.is_member()` /
+  `my_role()`. `ticketing_snapshot` also returns the caller's membership.
+- [database/remove_from_trip_scheduling.sql](database/remove_from_trip_scheduling.sql)
+  drops the copy applied to the Trip Scheduling project in entry 5. Checked first: only
+  the 17 Ticketing tables, demo rows only, nothing outside depends on them.
+- Not done yet: the new project. Creating it in the Megawide org needs the org owner or
+  an admin; the owner's account doesn't have that permission.
+
+---
+
 ## 5 · Ticketing database on Supabase (4 Nov)
+
+> Replaced by entry 6: this went to the Trip Scheduling project by mistake.
 
 - Applied to the shared Supabase project (`nuezknlzwfkfxlicrgol`) from the owner's
   dashboard login, at the owner's request. No dev project was used.

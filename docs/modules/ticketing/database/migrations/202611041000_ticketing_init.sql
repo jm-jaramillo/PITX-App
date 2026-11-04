@@ -1,19 +1,26 @@
 -- Ticketing and Booking: tables for counter selling, passes, refunds, reprints,
 -- Close Sales and Daily Sales Collection (docs/modules/ticketing/PLAN.md).
 --
--- Tables live in the ticketing schema (CONTRIBUTING.md: one schema per module).
--- The schema is not exposed through the REST API: pages read it only through
--- the public.ticketing_* functions below, each of which checks
--- public.is_ticketing() or public.is_staff().
+-- Runs on Ticketing's own Supabase project, NOT the PITX Trip Scheduling
+-- project. Nothing here reads or changes Trip Scheduling's tables, and the
+-- team's supabase/migrations/ runner never sees these files.
+--
+-- Tables live in the ticketing schema. The schema is not exposed through the
+-- REST API: pages read it only through the public.ticketing_* functions
+-- below, each of which checks ticketing.is_member().
+--
+-- Accounts: ticketing.members gives a user of this project one of the four
+-- Ticketing roles. Add the first admin by hand in the SQL Editor after they
+-- sign up:
+--   insert into ticketing.members (user_id, full_name, role)
+--   select id, 'Name', 'admin' from auth.users where email = '...';
 --
 -- companies, buses and trips mirror the prototype so the demo data has
--- something to sell against. Once Trip Scheduling exposes
--- public.ticketing_trip_feed (issue #3), real trips come from that feed and
--- trips.booking_id points at the Trip Scheduling booking. Like TOS, that is
--- deliberately not a foreign key.
+-- something to sell against. Once Trip Scheduling exposes a trip feed
+-- (issue #3), real trips are copied in from it and trips.booking_id holds the
+-- Trip Scheduling booking id. It cannot be a foreign key: it is another database.
 --
 -- Every demo row has is_demo = true and is removed by ticketing_clear_demo().
--- No shared table (profiles, bookings, vehicles) is changed here.
 
 create schema if not exists ticketing;
 
@@ -58,8 +65,8 @@ create table if not exists ticketing.towns (
   is_demo        boolean not null default false
 );
 
--- A bus company Ticketing sells for. operator_id links it to the operator's
--- account in profiles once accounts exist (not a foreign key, same as TOS).
+-- A bus company Ticketing sells for. operator_id is the operator's id in
+-- Trip Scheduling, filled in once the trip feed exists.
 create table if not exists ticketing.companies (
   code             text primary key,
   name             text not null,
@@ -297,6 +304,42 @@ create table if not exists ticketing.audit_log (
 );
 create index if not exists audit_log_at_idx on ticketing.audit_log (at desc);
 
+/* ------------------------------------------------------------------ Members */
+
+-- teller: sells for one company at one counter. pub_admin: one company's
+-- trips, units, manifests. account: Daily Sales Collection. admin: approvals,
+-- close codes, fares, settings, reports.
+create table if not exists ticketing.members (
+  user_id       uuid primary key references auth.users(id) on delete cascade,
+  full_name     text not null,
+  role          text not null check (role in ('teller', 'pub_admin', 'account', 'admin')),
+  company_code  text references ticketing.companies(code),
+  counter_code  text references ticketing.counters(code),
+  active        boolean not null default true,
+  created_at    timestamptz not null default now(),
+  check (role not in ('teller', 'pub_admin') or company_code is not null)
+);
+
+create or replace function ticketing.my_role()
+returns text
+language sql
+stable
+security definer
+set search_path = ticketing
+as $$
+  select role from ticketing.members where user_id = auth.uid() and active;
+$$;
+
+create or replace function ticketing.is_member()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ticketing
+as $$
+  select ticketing.my_role() is not null;
+$$;
+
 /* ------------------------------------------------------------------- Access */
 
 do $$
@@ -304,17 +347,21 @@ declare t text;
 begin
   foreach t in array array['settings', 'provinces', 'towns', 'companies', 'counters', 'bus_types',
                            'buses', 'routes', 'counter_fares', 'trips', 'seat_marks', 'tickets',
-                           'reprints', 'requests', 'close_codes', 'closings', 'audit_log'] loop
+                           'reprints', 'requests', 'close_codes', 'closings', 'audit_log', 'members'] loop
     execute format('alter table ticketing.%I enable row level security', t);
-    execute format('drop policy if exists "ticketing and staff can read" on ticketing.%I', t);
-    execute format('create policy "ticketing and staff can read" on ticketing.%I for select to authenticated '
-                   'using ((select public.is_ticketing()) or (select public.is_staff()))', t);
+    execute format('drop policy if exists "members can read" on ticketing.%I', t);
+    execute format('create policy "members can read" on ticketing.%I for select to authenticated '
+                   'using ((select ticketing.is_member()))', t);
   end loop;
 end $$;
 
 revoke all on schema ticketing from public, anon;
 grant usage on schema ticketing to authenticated;
 grant select on all tables in schema ticketing to authenticated;
+revoke all on function ticketing.my_role() from public, anon;
+revoke all on function ticketing.is_member() from public, anon;
+grant execute on function ticketing.my_role() to authenticated;
+grant execute on function ticketing.is_member() to authenticated;
 
 /* ---------------------------------------------------------------- Functions */
 
@@ -331,13 +378,14 @@ declare
   d0 date := coalesce(p_from, (now() at time zone 'Asia/Manila')::date);
   d1 date := coalesce(p_to, d0 + 7);
 begin
-  if not (public.is_ticketing() or public.is_staff()) then
-    raise exception 'Only Ticketing and PITX staff can open Ticketing' using errcode = '42501';
+  if not ticketing.is_member() then
+    raise exception 'This account is not a Ticketing member' using errcode = '42501';
   end if;
   return jsonb_build_object(
     'now',        now(),
     'from',       d0,
     'to',         d1,
+    'me',         (select to_jsonb(m) from ticketing.members m where m.user_id = auth.uid()),
     'settings',   (select to_jsonb(s) from ticketing.settings s where id = 1),
     'provinces',  (select coalesce(jsonb_agg(to_jsonb(x) order by x.code), '[]') from ticketing.provinces x),
     'towns',      (select coalesce(jsonb_agg(to_jsonb(x) order by x.code), '[]') from ticketing.towns x),
@@ -370,7 +418,7 @@ set search_path = public, ticketing
 as $$
 declare n int;
 begin
-  if not public.is_ticketing() then
+  if ticketing.my_role() is distinct from 'admin' then
     raise exception 'Only the Ticketing Admin can clear demo data' using errcode = '42501';
   end if;
   delete from ticketing.audit_log  where is_demo;
