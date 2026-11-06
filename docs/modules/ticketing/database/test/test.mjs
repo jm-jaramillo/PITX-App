@@ -35,7 +35,11 @@ await db.exec(`
     status text default 'approved', ltfrb_status text, bus_type text, body_number text, seating_capacity int,
     cpc_validity date, orcr_validity date, sticker_no text, route text, trade_name text);
   create table public.bookings (id uuid primary key default gen_random_uuid(), route text, plate_no text, operator_id uuid,
-    operator_name text, trade_name text, trip_number text, status text, booking_date date, slot smallint);
+    operator_name text, trade_name text, trip_number text, status text, booking_date date, slot smallint,
+    assigned_bay_id bigint);
+  create table public.bays (id bigint primary key, name text, gate text);
+  create function public.is_staff() returns boolean language sql stable security definer as
+    $$ select exists (select 1 from public.profiles where id = auth.uid() and role = 'staff') $$;
   create table public.route_gates (route text primary key, gate text);
   create table public.seat_layouts (capacity int primary key, config text);
   create table public.notifications (id bigint generated always as identity, recipient_role text, type text, title text,

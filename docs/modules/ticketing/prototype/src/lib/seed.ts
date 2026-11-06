@@ -19,7 +19,7 @@ import type {
 // Everything else here, including the other operators' routes, fares, plates, units,
 // trips and passengers, is dummy data for testing.
 const SLUG = (denomination: string) => denomination.split(" ")[0];
-const PLACEHOLDER_FARE: Record<string, number> = {
+export const PLACEHOLDER_FARE: Record<string, number> = {
   BAGUIO: 750,
   BATANGAS: 250,
   BICOL: 1200,

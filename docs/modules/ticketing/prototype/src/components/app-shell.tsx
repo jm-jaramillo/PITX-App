@@ -5,34 +5,87 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { CompanyLogo } from "@/components/company-logo";
+import { dateTimeManila } from "@/lib/format";
+import { companyIdForOperator, loadLive } from "@/lib/live";
 import { asset } from "@/lib/paths";
-import { moduleHomeUrl, onPortalSite, portalUrl, portalUser } from "@/lib/portal";
-import { canAccess, homeFor, isCompanyRole, NAV } from "@/lib/roles";
-import { resetDemoData, signIn, signOut, useDb, useHydrated } from "@/lib/store";
+import { moduleHomeUrl, onPortalSite, portalUrl, portalUser, type PortalUser } from "@/lib/portal";
+import { canAccess, homeFor, isCompanyRole, NAV, sells } from "@/lib/roles";
+import { getDb, replaceData, resetDemoData, saveRecord, signIn, signOut, useDb, useHydrated } from "@/lib/store";
 import { ROLES, type Db, type Role, type Session } from "@/lib/types";
 
+// Real PITX data: read once per page load, and again on "Refresh from PITX".
+type LiveState = "idle" | "loading" | "loaded" | "empty";
+let liveState: LiveState = "idle";
+
+async function refreshLive(setState: (state: LiveState) => void) {
+  liveState = "loading";
+  setState(liveState);
+  const result = await loadLive(getDb());
+  if (result) replaceData(result.db);
+  liveState = result ? "loaded" : "empty";
+  setState(liveState);
+}
+
+// An operator account on the portal (profiles.role = operator, e.g. genesis-ops) is a bus
+// company: one role, Bus Company (Teller and PUB Admin together), for its own company only.
+const isOperator = (user: PortalUser | null) => user?.role === "operator";
+
+/** The operator's own company: by operator id (real PITX data), else by name. */
+function operatorCompanyId(db: Db, user: PortalUser): string | undefined {
+  const byId = user.operatorId ? companyIdForOperator(user.operatorId) : "";
+  const name = user.name.trim().toUpperCase();
+  return (
+    db.companies.find((c) => c.id === byId) ??
+    db.companies.find((c) => c.name.toUpperCase() === name || c.description?.toUpperCase() === name)
+  )?.id;
+}
+
 /** A session for the portal user in the given demo role, with the first active counter/company. */
-function portalSession(db: Db, name: string, role: Role): Session {
+function portalSession(db: Db, user: PortalUser, role: Role): Session {
+  const operator = isOperator(user);
+  const sessionRole: Role = operator ? "Bus Company" : role;
   return {
-    name,
-    role,
-    counterId:
-      role === "Teller"
-        ? db.settings.defaultCounterId || db.counters.find((c) => c.status === "Active")?.id
+    name: user.name,
+    role: sessionRole,
+    counterId: sells(sessionRole)
+      ? db.settings.defaultCounterId || db.counters.find((c) => c.status === "Active")?.id
+      : undefined,
+    companyId: operator
+      ? operatorCompanyId(db, user)
+      : isCompanyRole(sessionRole)
+        ? db.companies.find((c) => c.status === "Active")?.id
         : undefined,
-    companyId: isCompanyRole(role) ? db.companies.find((c) => c.status === "Active")?.id : undefined,
   };
 }
 
+/** An operator with no company yet in this data gets one, so it never sees other companies. */
+function addOperatorCompany(user: PortalUser) {
+  const code = user.name.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6) || "OPER";
+  saveRecord("companies", {
+    id: user.operatorId ? companyIdForOperator(user.operatorId) : `op-${code}`,
+    code,
+    name: user.name,
+    registrationNo: "Not set",
+    ptuNo: "Not set",
+    tin: "Not set",
+    ticketCode: code,
+    advanceDays: 7,
+    address: "Not set",
+    contactPerson: "Not set",
+    mobileNo: "Not set",
+    status: "Active",
+  });
+}
+
 /** On the site: which demo role to view as. Replaces the demo's own sign-in. */
-function ViewAs({ db, session }: { db: Db; session: Session }) {
+function ViewAs({ db, session, user }: { db: Db; session: Session; user: PortalUser }) {
   return (
     <label className="block text-white/70">
       View as
       <select
         className="mt-1 w-full rounded border border-white/40 bg-brand px-2 py-1.5 text-sm text-white"
         value={session.role}
-        onChange={(e) => signIn(portalSession(db, session.name, e.target.value as Role))}
+        onChange={(e) => signIn(portalSession(db, user, e.target.value as Role))}
       >
         {ROLES.map((r) => (
           <option key={r}>{r}</option>
@@ -48,7 +101,7 @@ function SignIn() {
   const [role, setRole] = useState<Role>("Teller");
   const counters = db.counters.filter((c) => c.status === "Active");
   const [counterId, setCounterId] = useState(db.settings.defaultCounterId || counters[0]?.id || "");
-  const needsCounter = role === "Teller";
+  const needsCounter = sells(role);
   const needsCompany = isCompanyRole(role);
   const companies = db.companies.filter((c) => c.status === "Active");
   const [companyId, setCompanyId] = useState("");
@@ -129,16 +182,34 @@ function Shell({ children }: { children: ReactNode }) {
   const user = onSite ? portalUser() : null;
 
   // On the site, the portal sign-in is the sign-in: signed out there means back to it.
+  // Operators stay on their own company, also after the data is swapped for real PITX data.
+  const operatorCompany = user && isOperator(user) ? operatorCompanyId(db, user) : undefined;
+  const sessionStale =
+    !!user &&
+    (!session ||
+      session.name !== user.name ||
+      (isOperator(user) && (session.role !== "Bus Company" || session.companyId !== operatorCompany)));
   useEffect(() => {
     if (!onSite) return;
     if (!user) {
       location.replace(moduleHomeUrl());
-    } else if (!session || session.name !== user.name) {
-      signIn(portalSession(db, user.name, session?.role ?? "Super Admin"));
+    } else if (isOperator(user) && !operatorCompany) {
+      addOperatorCompany(user);
+    } else if (sessionStale) {
+      // Same person: keep the role they picked. Someone else: start as Super Admin.
+      signIn(portalSession(db, user, session && session.name === user.name ? session.role : "Super Admin"));
     }
-  }, [onSite, user, session, db]);
+  }, [onSite, user, session, db, operatorCompany, sessionStale]);
 
-  if (!session || (onSite && session.name !== user?.name)) {
+  // On the site, read real PITX trips once per page load (live.ts).
+  const [live, setLive] = useState<LiveState>(liveState);
+  const signedIn = !!session && !!user;
+  useEffect(() => {
+    if (!onSite || !signedIn || liveState !== "idle") return;
+    refreshLive(setLive);
+  }, [onSite, signedIn]);
+
+  if (!session || (onSite && (!user || sessionStale))) {
     return onSite ? <p className="p-6 text-sm text-slate-500">Signing in…</p> : <SignIn />;
   }
 
@@ -178,7 +249,7 @@ function Shell({ children }: { children: ReactNode }) {
               {counter ? ` · ${counter.code}` : ""}
             </div>
           </div>
-          {onSite && <ViewAs db={db} session={session} />}
+          {onSite && user && !isOperator(user) && <ViewAs db={db} session={session} user={user} />}
           <div className="flex flex-wrap gap-2">
             {onSite ? (
               <a className="rounded border border-white/40 px-3 py-1.5 hover:bg-brand-dark" href={portalUrl()}>
@@ -189,12 +260,22 @@ function Shell({ children }: { children: ReactNode }) {
                 Sign out
               </button>
             )}
+            {onSite && session.role === "Super Admin" && (
+              <button
+                className="rounded border border-white/40 px-3 py-1.5 hover:bg-brand-dark disabled:opacity-50"
+                disabled={live === "loading"}
+                onClick={() => refreshLive(setLive)}
+              >
+                {live === "loading" ? "Reading PITX…" : "Refresh from PITX"}
+              </button>
+            )}
             {session.role === "Super Admin" && (
               <button
                 className="rounded border border-white/40 px-3 py-1.5 hover:bg-brand-dark"
                 onClick={() => {
                   if (window.confirm("Reset all demo data? Tickets and changes in this browser will be lost.")) {
                     resetDemoData();
+                    if (onSite) refreshLive(setLive);
                   }
                 }}
               >
@@ -206,7 +287,11 @@ function Shell({ children }: { children: ReactNode }) {
       </aside>
       <div className="flex min-h-screen flex-col lg:ml-64 print:ml-0">
         <div className="no-print bg-brand-tint px-4 py-1 text-center text-xs text-brand">
-          Prototype: dummy data saved in this browser only. No real payments yet.
+          {db.source === "pitx"
+            ? `Real PITX trips, operators and plates from Trip Scheduling (read ${dateTimeManila(db.loadedAt ?? "")}). Fares are placeholders. Sales are saved in this browser only.`
+            : live === "empty"
+              ? "Sample data: no real trips are open to your account. Sales are saved in this browser only."
+              : "Prototype: dummy data saved in this browser only. No real payments yet."}
         </div>
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 lg:px-6">
           {canAccess(session.role, pathname) ? (

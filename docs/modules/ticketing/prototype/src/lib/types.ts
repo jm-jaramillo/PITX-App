@@ -247,7 +247,8 @@ export interface SeatMark {
   until?: string; // ISO timestamp for temporary marks
 }
 
-export const ROLES = ["Teller", "PUB Admin", "Account", "Super Admin"] as const;
+// Bus Company: an operator account on the PITX App portal, Teller and PUB Admin in one.
+export const ROLES = ["Bus Company", "Teller", "PUB Admin", "Account", "Super Admin"] as const;
 export type Role = (typeof ROLES)[number];
 
 export interface Session {
@@ -283,4 +284,6 @@ export interface Db {
   requests: ApprovalRequest[];
   closeCodes: CloseCode[];
   closings: SalesClosing[];
+  source?: "sample" | "pitx"; // pitx: masterfiles and trips read from the other modules (live.ts)
+  loadedAt?: string; // ISO timestamp of the last read from PITX
 }

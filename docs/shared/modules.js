@@ -37,7 +37,7 @@ export const MODULES = [
     path: "modules/ticketing/",
     // index.html opens the demo (prototype on sample data) until the Supabase
     // pages are built (docs/modules/ticketing/PLAN.md).
-    roles: { staff: "index.html", ticketing: "index.html" },
+    roles: { staff: "index.html", ticketing: "index.html", operator: "index.html" },
   },
 ];
 

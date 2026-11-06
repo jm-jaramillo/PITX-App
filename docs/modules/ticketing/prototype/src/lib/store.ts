@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from "react";
 import type { PlanLine } from "./import";
 import { shiftRemittance } from "./reports";
+import { sells, setsUnits } from "./roles";
 import { getLayout, parseBlockedSeats } from "./seat-layouts";
 import { seedDb } from "./seed";
 import type {
@@ -80,7 +81,17 @@ export function useHydrated(): boolean {
 }
 
 export function resetDemoData() {
-  commit(seedDb());
+  commit({ ...seedDb(), session: load().session });
+}
+
+/** The current data, outside React (for live.ts). */
+export function getDb(): Db {
+  return load();
+}
+
+/** Swaps in data read from PITX (live.ts), keeping whoever is signed in. */
+export function replaceData(next: Db) {
+  commit({ ...next, session: load().session });
 }
 
 function entry(data: Db, action: string, detail: string, ids: { ticketId?: string; tripId?: string } = {}): AuditEntry {
@@ -172,7 +183,7 @@ export function tripGroup(data: Db, trip: Trip): TripGroup {
 /** The PUB Admin sets the vehicle for a trip, which decides its seat map. */
 export function assignUnit(tripId: string, busId: string): string | null {
   const current = load();
-  if (current.session?.role !== "PUB Admin") return "Only the PUB Admin can set the unit.";
+  if (!setsUnits(current.session?.role)) return "Only the PUB Admin can set the unit.";
   const trip = current.trips.find((t) => t.id === tripId);
   if (!trip || !canReachTrip(current, trip)) return "This trip belongs to another company.";
   if (trip.status === "Departed" || trip.status === "Cancelled") return `This trip is ${trip.status.toLowerCase()}.`;
@@ -558,7 +569,7 @@ export function refundPlan(data: Db, ticket: Ticket, now: number): { block?: str
   if (ticket.status !== "Issued") return { step, block: `A ${ticket.status.toLowerCase()} ticket can't be refunded.` };
   const session = data.session;
   if (session?.role === "Super Admin") return { step };
-  if (session?.role !== "Teller") return { step, block: "Only a Teller of this company or the Super Admin can refund this ticket." };
+  if (!sells(session?.role)) return { step, block: "Only a Teller of this company or the Super Admin can refund this ticket." };
   const trip = data.trips.find((t) => t.id === ticket.tripId);
   if (!trip || !canReachTrip(data, trip)) return { step, block: "This ticket belongs to another company." };
   const hours = data.settings.refundCutoffHours;
@@ -672,7 +683,7 @@ export function reprintPlan(data: Db, ticket: Ticket): { block?: string; step: A
   const trip = data.trips.find((t) => t.id === ticket.tripId);
   if (!canReachTrip(data, trip)) return { step, block: "This ticket belongs to another company." };
   if (data.session?.role === "Super Admin") return { step };
-  if (data.session?.role !== "Teller") return { step, block: "Only a Teller or the Super Admin can reprint tickets." };
+  if (!sells(data.session?.role)) return { step, block: "Only a Teller or the Super Admin can reprint tickets." };
   return { step: stepForMode(data.settings.reprintApproval) };
 }
 
@@ -817,7 +828,7 @@ export function generateCloseCode(): string | null {
 export function closeSales(code: string, tellerCount: number, today: string): string | null {
   const current = load();
   const session = current.session;
-  if (session?.role !== "Teller" || !session.counterId) return "Sign in as a Teller with a counter.";
+  if (!sells(session?.role) || !session?.counterId) return "Sign in as a Teller with a counter.";
   if (salesClosedToday(current, today)) return "Your sales for today are already closed.";
   const match = current.closeCodes.find((c) => c.code === code.trim() && !c.used);
   if (!match) return "That approval code isn't valid or was already used.";

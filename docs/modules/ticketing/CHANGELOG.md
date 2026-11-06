@@ -35,6 +35,66 @@ sections 2 and 3).
 
 ---
 
+## 12 · Real PITX data in the demo, and a Bus Company role for operators (6 Nov)
+
+**Real data from the other modules** (`prototype/src/lib/live.ts`)
+
+The demo reads real data on open, then again on "Refresh from PITX". It reads as the portal
+user, through the other modules' functions only:
+
+| Function | Gives | Who can read it |
+|---|---|---|
+| `tos_trip_feed(date)` | Approved trips for today and the next 2 days, with plate and bay | PITX staff |
+| `tos_vehicle_masterfile()` | Approved vehicles per operator | PITX staff |
+| `list_seat_trips(date)` | Seat count of a trip's bus | Anyone |
+| `get_trip_seats(booking)` | Seats passengers requested, held in the demo | Anyone |
+
+How the real data becomes demo data:
+- Operators become companies (DLTB, KRS and the others keep their logo and code).
+- Each route is labelled the way Trip Scheduling names it.
+- Trip times come from the 15-minute slots.
+- Trips whose slot has passed show as Departed.
+- Not in the other modules, so set as placeholders:
+  - fares, by destination keyword (they can be changed in Master Data)
+  - PTU/TIN ("Not set")
+  - seat maps for buses with no known seat count. Those trips show no seat map until one
+    is set.
+- Tickets sold on the same real trips are kept on refresh.
+- The banner says which data is showing. With nothing readable (no trips, or not staff),
+  the sample data stays.
+
+**Bus Company role** (from your message of 6 Nov)
+- An operator account on the portal (`profiles.role = 'operator'`, e.g. `genesis-ops`) now
+  opens Ticketing as **Bus Company**: Teller and PUB Admin in one role, for its own company only.
+- The Bus Company role covers POS, Tickets, Availability, Close Sales, Unit Assignment and
+  Manifest. It has no "View as" switch.
+- An operator not yet in the data gets its own empty company, so it never sees another
+  company's trips.
+- PITX staff and Ticketing Admins keep "View as". When a different portal user signs in,
+  the role starts again at Super Admin.
+- `docs/shared/modules.js`: the Ticketing card now also shows for `operator`. Operators now
+  land on the module list (2 modules) instead of going straight to Trip Scheduling.
+- Per-user roles come later.
+
+**For JM** ([database/for-trip-scheduling.sql](database/for-trip-scheduling.sql), section 2)
+- Proposal: let `tos_trip_feed` and `tos_vehicle_masterfile` also return an operator's own
+  rows, not only staff's, with the same signatures.
+- Until that's in, an operator sees only real trips whose bus has a seat map. There are
+  none today, so operators see their own sample company or an empty one.
+
+**Tested**
+- Live loader against a fake PITX feed: 21/21. Covers staff feed, seat maps, held seats,
+  placeholders, keeping tickets on refresh, non-staff, and nothing real.
+- Locally in the browser:
+  - an operator matching a sample company sees only its trips
+  - a new operator (Genesis) gets its own empty company
+  - a staff user after an operator starts at Super Admin
+- Database test: 74/74, now also checking that JM's proposed functions compile.
+- Real data not seen: no staff account was used, and `list_seat_trips` returns no trips
+  for the next 4 days.
+
+---
+
 ## 11 · One sign-in: the portal (6 Nov)
 
 - The demo's own sign-in form is gone on the site. You sign in once on the PITX App portal,

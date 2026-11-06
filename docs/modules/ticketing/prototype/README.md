@@ -27,8 +27,15 @@ Then replace `../demo/` with the new `out/` folder. On Windows PowerShell, set t
 variable first with `$env:STATIC_EXPORT_BASE_PATH='/PITX-App/modules/ticketing/demo'`.
 
 On the site the demo has no sign-in of its own: you sign in on the PITX App portal, and
-`../index.html` hands your name to the demo (`src/lib/portal.ts`). Pick the demo role with
-"View as" in the sidebar. Signed out of the portal, the demo sends you to the portal login.
+`../index.html` hands your name to the demo (`src/lib/portal.ts`). Signed out of the portal,
+the demo sends you to the portal login.
+
+- Operator accounts (e.g. `genesis-ops`) get one role, **Bus Company** (Teller and PUB Admin
+  together), for their own company only.
+- PITX staff and Ticketing Admins pick the demo role with "View as" in the sidebar.
+- The demo reads real PITX trips, operators and plates through the other modules' functions
+  (`src/lib/live.ts`). Fares, PTU/TIN and missing seat maps are placeholders. With nothing
+  readable it keeps the sample data.
 
 ## Run it locally
 

@@ -110,7 +110,7 @@ export const SAMPLE_OPERATORS: (OperatorCompany & { logo: string })[] = [
 
 const FILLER = new Set(["INC", "CORP", "CO", "THE", "AND", "OF", "CORPORATION", "COMPANY"]);
 
-function baseCode(name: string): string {
+export function baseCode(name: string): string {
   const inParens = name.match(/\(([A-Z]{2,})\)/);
   if (inParens) return inParens[1];
   const clean = name.toUpperCase().replace(/[^A-Z0-9 ]/g, " ");

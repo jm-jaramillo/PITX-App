@@ -6,11 +6,25 @@ import { BASE_PATH } from "./paths";
 // the demo keeps its own sign-in form.
 const HANDOFF_KEY = "pitx-ticketing-portal-user";
 // Supabase keeps the portal's sign-in under this key (shared/config.js project).
-const PORTAL_AUTH_KEY = "sb-nuezknlzwfkfxlicrgol-auth-token";
+export const PORTAL_AUTH_KEY = "sb-nuezknlzwfkfxlicrgol-auth-token";
+// Public by design, same values as docs/shared/config.js.
+export const SUPABASE_URL = "https://nuezknlzwfkfxlicrgol.supabase.co";
+export const SUPABASE_ANON_KEY = "sb_publishable_kWt3qzqMcrsOhyG4aiVb0A_uFTRMe6J";
+
+/** The portal's access token, so calls run as the signed-in user. */
+export function portalAccessToken(): string | null {
+  try {
+    const raw = localStorage.getItem(PORTAL_AUTH_KEY);
+    return raw ? ((JSON.parse(raw) as { access_token?: string }).access_token ?? null) : null;
+  } catch {
+    return null;
+  }
+}
 
 export interface PortalUser {
   name: string;
   role: string; // profiles.role on the portal
+  operatorId?: string; // profiles.id, for role = operator
 }
 
 export function onPortalSite(): boolean {

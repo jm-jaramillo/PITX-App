@@ -3,6 +3,11 @@
 Changes to `docs/shared/`, `supabase/functions/` and `core` migrations.
 Newest first. Owners: @jm-jaramillo @Jcbllanto16 @victoriaronald
 
+## 2026-11-06 - Operators can open Ticketing and Booking (@victoriaronald)
+- `modules.js`: the Ticketing card now also shows for `operator`, which opens as that operator's
+  bus company only (Ticketing CHANGELOG entry 12). Operators now land on the module list with two
+  modules instead of going straight to Trip Scheduling, and get the "All modules" link.
+
 ## 2026-11-06 - Ticketing and Booking card opens (@victoriaronald)
 - `modules.js`: removed `comingSoon` from Ticketing and Booking now that
   `docs/modules/ticketing/index.html` exists. It opens the demo (the prototype on sample data in

@@ -17,12 +17,17 @@
       const profile = await getProfile();
       if (!profile) {
         location.replace("../../login.html");
-      } else if (!["staff", "ticketing"].includes(profile.role)) {
+      } else if (!["staff", "ticketing", "operator"].includes(profile.role)) {
         location.replace("../../index.html");
       } else {
+        // Operators (e.g. genesis-ops) open it as their bus company only.
         localStorage.setItem(
           "pitx-ticketing-portal-user",
-          JSON.stringify({ name: profile.operator_name || profile.username, role: profile.role })
+          JSON.stringify({
+            name: profile.operator_name || profile.username,
+            role: profile.role,
+            operatorId: profile.role === "operator" ? profile.id : undefined,
+          })
         );
         location.replace("demo/");
       }
