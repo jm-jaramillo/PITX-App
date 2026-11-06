@@ -1,12 +1,13 @@
 # Ticketing and Booking: build plan
 
 Owner: @victoriaronald. Status: **draft for review by @jm-jaramillo and @Jcbllanto16.**
-**Database decision (4 Nov):** Ticketing runs on its own Supabase project, not the Trip
-Scheduling project. Its schema, roles and demo data are in [database/](database/)
-(CHANGELOG entry 6), which replaces sections 3 and 4 below where they differ. Passengers
-can book online as holds paid at the counter (entry 7), which settles the "Online booking"
-question in section 7 as owned here. The new project, the trip feed and the pages are not
-built yet.
+**Database decision (6 Nov):** Ticketing runs in the shared PITX project, in its own
+`ticketing` schema linked to JM's `core` layer (CHANGELOG entry 9; this reverses entry 6).
+Operators, plates and destinations come from core. Ticketing keeps only its own fields:
+ticket code, PTU/TIN, bus type and fares. Schema, roles and links are described in
+[database/](database/), which replaces sections 3 and 4 below where they differ.
+Passengers can book online as holds paid at the counter (entry 7), so online booking (the
+question in section 7) is owned here. The pages are not built yet.
 
 The ticketing rules were worked out in a separate prototype (Next.js, browser storage
 only), kept for reference in [prototype/](prototype/). This plan moves them into this repo the way CONTRIBUTING.md

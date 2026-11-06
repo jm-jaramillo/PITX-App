@@ -22,11 +22,68 @@ newest first. Migrations are listed with the entry that added them.
 | Boarding validation | The automated gate (TOS), not staff |
 | Teller refund rule | A Teller can refund any ticket of their operator up to 4 hours before departure; closer than that needs the Ticketing Admin |
 | Seat layouts | The 8 diagrams in "PTX. OPS. Seat Configuration" (2026-10-27), the same ones Trip Scheduling uses |
-| Database | Ticketing's own Supabase project in the Megawide org, separate from the Trip Scheduling project ([database/](database/)) |
+| Database | The shared PITX project, `ticketing` schema linked to JM's `core` layer (entry 9, replacing entry 6's separate project). See [database/](database/) |
+| Source of truth for operators, plates, destinations | `core`. Ticketing keeps only ticket code, PTU/TIN, bus type and fares |
+| Demo data | Dev only, and hidden everywhere unless `settings.demo_mode` is on |
 
 Still to agree with the other owners: the trip feed functions, the new `teller` and
 `account` roles, and how passenger seat requests hand over to Ticketing (PLAN.md
 sections 2 and 3).
+
+---
+
+## 9 · Back in the shared project, linked to core (6 Nov)
+
+- Decision: follow JM's merge plan ([docs/MERGE_PROMPTS.md](../../MERGE_PROMPTS.md),
+  `e2b512b`). Ticketing goes back in the shared project and links to the `core` layer.
+  This reverses entry 6; no separate project is needed.
+- Moved `202611041000_ticketing_init.sql` and `202611041002_ticketing_passengers.sql` into
+  `supabase/migrations/`. They run before JM's `202611061000_core_shared_master_data.sql`.
+- Demo data is no longer a migration. It is now [database/demo_data.sql](database/demo_data.sql),
+  run by hand on dev only.
+- Added [`202611061100_ticketing_core_links.sql`](../../../supabase/migrations/202611061100_ticketing_core_links.sql),
+  covering the 4 items in JM's prompt:
+  1. **Link review.** `ticketing.link_review` lists unlinked or wrong real rows:
+     - companies with no operator
+     - buses with no vehicle, with a note when no vehicle or several vehicles share the plate
+     - buses whose vehicle belongs to another operator
+     - buses whose capacity doesn't match the seat layout
+     - routes with no destination
+     - real trips with no booking
+
+     [database/link_fix.sql](database/link_fix.sql) has the hand fixes, then validates
+     `companies_operator_fk`, `buses_vehicle_fk`, `routes_destination_fk` and the new
+     `trips_booking_fk`.
+  2. **Core is the source of truth.**
+     - Pages get plate, capacity and status from `core.vehicles`, through
+       `ticketing.bus_units`.
+     - Operator names come from `core.operators`.
+     - A bus can only link to its company operator's vehicle.
+     - A linked bus whose capacity doesn't match its seat layout isn't sold online.
+  3. **Booking links.**
+     - `trips.booking_id` now references `public.bookings`.
+     - Ticketing treats seats requested through `request_seats()` as taken.
+     - New `ticketing_taken_seats(booking_id)` and `ticketing_booking_vehicle(booking_id)`
+       let Trip Scheduling do the same in reverse.
+     - The `request_seats()` and `get_trip_seats()` change itself is JM's:
+       [database/for-trip-scheduling.sql](database/for-trip-scheduling.sql) is a proposal.
+       No Trip Scheduling or TOS table or function was changed.
+  4. **Demo data separate.**
+     - New `settings.demo_mode`, off by default.
+     - With it off, demo rows are hidden from the snapshot, online trips, bookings and
+       reports.
+     - Demo rows can't link to real operators, vehicles or bookings.
+- Accounts with `profiles.role = 'ticketing'` (from 0051) count as Ticketing Admin.
+- `remove_from_trip_scheduling.sql` is now [database/reset_old_copy.sql](database/reset_old_copy.sql).
+  It drops the 4 Nov copy before the migrations are applied fresh.
+- Tested on PGlite with stand-ins for the Trip Scheduling and TOS tables: **74/74 pass**.
+  This includes core's own migration and the `request_seats()` proposal.
+- **Nothing applied to any project.** The order is:
+  1. JM reviews and applies core on a dev branch.
+  2. Then the reset, the ticketing migrations and `link_fix.sql`.
+
+  The production data still has to be reviewed: what `link_review` shows there can't be
+  known until core is applied.
 
 ---
 
@@ -74,6 +131,8 @@ sections 2 and 3).
 ---
 
 ## 6 · Own database, off the Trip Scheduling project (4 Nov)
+
+> Replaced by entry 9: Ticketing is back in the shared project, linked to core.
 
 - Decision: Ticketing and Booking gets its **own Supabase project** in the Megawide
   Construction Corporation org. It does not use the PITX Trip Scheduling project.
