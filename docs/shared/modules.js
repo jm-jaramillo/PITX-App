@@ -35,7 +35,7 @@ export const MODULES = [
     name: "Ticketing and Booking",
     description: "Counter sales, boarding passes, refunds and daily sales collection.",
     path: "modules/ticketing/",
-    comingSoon: true, // build plan under review (docs/modules/ticketing/PLAN.md); remove once it has pages
+    comingSoon: true, // build plan approved (docs/modules/ticketing/PLAN.md); remove once it has pages
     roles: { staff: "index.html" },
   },
 ];

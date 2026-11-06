@@ -11,6 +11,9 @@ newest first. Migrations are listed with the entry that added them.
 
 ---
 
+## 2026-11-06 - Build plan approved
+- PLAN.md is approved by @jm-jaramillo; the Ticketing pages can now be built. The portal card stays "Coming soon" until `docs/modules/ticketing/index.html` exists.
+
 ## Decisions as agreed
 
 | Decision | Choice |

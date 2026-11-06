@@ -1,6 +1,6 @@
 # Ticketing and Booking: build plan
 
-Owner: @victoriaronald. Status: **draft for review by @jm-jaramillo and @Jcbllanto16.**
+Owner: @victoriaronald. Status: **approved 6 Nov 2026 (@jm-jaramillo, @Jcbllanto16 changes are auto-approved).** Build the pages next.
 **Database decision (6 Nov):** Ticketing runs in the shared PITX project, in its own
 `ticketing` schema linked to JM's `core` layer (CHANGELOG entry 9; this reverses entry 6).
 Operators, plates and destinations come from core. Ticketing keeps only its own fields:
