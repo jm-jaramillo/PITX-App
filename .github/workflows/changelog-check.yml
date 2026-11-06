@@ -1,0 +1,55 @@
+# No review is required for module changes, but every change to a module,
+# the shared platform or a migration must be logged in that module's CHANGELOG.md
+# in the same push (or pull request). Direct pushes cannot be blocked without
+# branch protection; a failing run here is the signal to add the entry.
+name: changelog-check
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Every touched module has a changelog entry
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"; HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE="${{ github.event.before }}"; HEAD="${{ github.sha }}"
+          fi
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then BASE="$HEAD~1"; fi
+          files=$(git diff --name-only "$BASE" "$HEAD")
+          declare -A touched
+          log_for() {
+            case "$1" in
+              trip-scheduling) echo docs/modules/trip-scheduling/CHANGELOG.md ;;
+              terminal-operating-system) echo docs/modules/terminal-operating-system/CHANGELOG.md ;;
+              ticketing) echo docs/modules/ticketing/CHANGELOG.md ;;
+              shared) echo docs/shared/CHANGELOG.md ;;
+            esac
+          }
+          while IFS= read -r f; do
+            case "$f" in
+              */CHANGELOG.md) ;;
+              docs/modules/trip-scheduling/*) touched[trip-scheduling]=1 ;;
+              docs/modules/terminal-operating-system/*) touched[terminal-operating-system]=1 ;;
+              docs/modules/ticketing/*) touched[ticketing]=1 ;;
+              docs/shared/*) touched[shared]=1 ;;
+              supabase/migrations/[0-9][0-9][0-9][0-9]_*) touched[trip-scheduling]=1 ;;
+              supabase/migrations/*_trip-scheduling_*) touched[trip-scheduling]=1 ;;
+              supabase/migrations/*_terminal-operating-system_*) touched[terminal-operating-system]=1 ;;
+              supabase/migrations/*_ticketing_*) touched[ticketing]=1 ;;
+              supabase/migrations/*_core_*|supabase/functions/*) touched[shared]=1 ;;
+            esac
+          done <<< "$files"
+          fail=0
+          for m in "${!touched[@]}"; do
+            log=$(log_for "$m")
+            if ! grep -qx "$log" <<< "$files"; then
+              echo "::error::Changes to '$m' need an entry in $log"; fail=1
+            fi
+          done
+          exit $fail
