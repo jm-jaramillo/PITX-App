@@ -48,6 +48,13 @@ supabase/
   never collide.
 - Work against a separate dev/staging Supabase project or branch, not production.
 
+## Changelog (required, no review needed)
+
+Changes do not need approval from the other owners, but every push that touches a module,
+`docs/shared/`, `supabase/functions/` or a migration must add an entry to that module's
+`CHANGELOG.md` (`docs/shared/CHANGELOG.md` for shared and `core` changes). The
+`changelog-check` GitHub Action fails the push if the entry is missing.
+
 ## Git
 
 - Everyone commits straight to `main`; there is no dev branch. `main` deploys to
