@@ -7,7 +7,7 @@ migration first, then the other two.
 
 Shared context for all three prompts: read CONTRIBUTING.md, the draft core migration, and the
 module README. Never query another module's tables; go through core views or RPCs. Do not run SQL
-against production: use the dev/staging project or a Supabase branch. Migrations are named
+against production only with additive, reversible migrations (there is no dev branch; do not create one). Migrations are named
 `YYYYMMDDHHMM_<module>_<what>.sql`. Pull with rebase before pushing.
 
 ## JM (Trip Scheduling, `public`, owner of core)
@@ -15,7 +15,7 @@ against production: use the dev/staging project or a Supabase branch. Migrations
 > You own Trip Scheduling and the shared `core` layer. Review `supabase/migrations/202611061000_core_shared_master_data.sql`
 > against the live `public` schema (profiles, operator_profiles, vehicles, route_gates, bookings). Check: plate_norm
 > collisions in public.vehicles, whether role='operator' is the only operator role, and that every route string in
-> bookings/vehicles maps to a core.destinations row. Apply it to a dev branch first, read core.link_report, fix the
+> bookings/vehicles maps to a core.destinations row. It is already applied; read core.link_report, fix the
 > mapping gaps, then tell Jcbllanto16 and victoriaronald it is ready. After that: add public RPC wrappers
 > (core_operators(), core_vehicle_by_plate(plate), core_destinations()) so the other modules never touch core directly,
 > make tos_trip_feed/tos_vehicle_masterfile/tos_vehicle_lookup read via core.vehicles, and add FKs from bookings.route
@@ -30,7 +30,7 @@ against production: use the dev/staging project or a Supabase branch. Migrations
 > so camera reads match vehicles regardless of spacing/dashes; (4) decide what to do with the standalone PITX TOS
 > project (bekjgnqtazbfoejoldxw): its 505 gate_events and 350 bookings look like simulated data. Confirm that with
 > the team before importing anything into tos.gate_events. Keep function signatures the TOS pages call unchanged,
-> and test with tos_simulate on the dev branch.
+> and test with tos_simulate (clear the test reads afterwards with tos_clear_tests).
 
 ## victoriaronald (Ticketing, `ticketing`)
 

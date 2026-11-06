@@ -46,7 +46,7 @@ supabase/
 - **Migrations:** the existing `0001`-`0051` series belongs to Trip Scheduling and is
   frozen. New migrations are named `YYYYMMDDHHMM_<module>_<what>.sql` so two people
   never collide.
-- Work against a separate dev/staging Supabase project or branch, not production.
+- There is no dev/staging project or Supabase branch: migrations are applied to the one project directly. Write them additive and reversible, and read the result before the next step.
 
 ## Changelog (required, no review needed)
 
@@ -65,7 +65,7 @@ Changes do not need approval from the other owners, but every push that touches 
   first.
 - `.github/CODEOWNERS` records who owns what. Without branch protection it is
   advisory only (it is not enforced on direct pushes).
-- Test against the dev Supabase project, never production.
+- Apply migrations to the single Supabase project; keep them additive (new columns/tables, NOT VALID constraints) so a bad one is easy to undo.
 
 ## Adding a module
 
