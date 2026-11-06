@@ -3,6 +3,14 @@
 Changes to `docs/shared/`, `supabase/functions/` and `core` migrations.
 Newest first. Owners: @jm-jaramillo @Jcbllanto16 @victoriaronald
 
+## 2026-11-06 - Ticketing and Booking card opens (@victoriaronald)
+- `modules.js`: removed `comingSoon` from Ticketing and Booking now that
+  `docs/modules/ticketing/index.html` exists. It opens the demo (the prototype on sample data in
+  the browser) until the Supabase pages are built.
+- The card is shown to `staff` and, new, `ticketing` (Ticketing Admin). Ticketing Admins now land
+  on the portal with two modules instead of going straight to Trip Scheduling, and get the
+  "All modules" link.
+
 ## 2026-11-06 - Ticketing build plan approved
 - Updated the note in `modules.js` (plan approved). `comingSoon` stays until Ticketing has pages.
 

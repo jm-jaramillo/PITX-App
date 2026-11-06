@@ -35,6 +35,19 @@ sections 2 and 3).
 
 ---
 
+## 10 · Ticketing and Booking card live on the portal (6 Nov)
+
+- Added [index.html](index.html), the module home, so the card can leave "Coming soon" (the
+  condition in the plan approval above). For now it opens the demo,
+  <https://jm-jaramillo.github.io/PITX-App/modules/ticketing/demo/>.
+- Removed "Coming soon" from the Ticketing and Booking card (`docs/shared/modules.js`, logged
+  in `docs/shared/CHANGELOG.md`). PITX `staff` and the Ticketing Admin role (`ticketing`)
+  see the card.
+- It is still the prototype: sample data kept in each browser, not Supabase. The Supabase
+  pages replace it as they are built.
+
+---
+
 ## 9 · Back in the shared project, linked to core (6 Nov)
 
 - Decision: follow JM's merge plan ([docs/MERGE_PROMPTS.md](../../MERGE_PROMPTS.md),
