@@ -3,12 +3,44 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { CompanyLogo } from "@/components/company-logo";
 import { asset } from "@/lib/paths";
+import { moduleHomeUrl, onPortalSite, portalUrl, portalUser } from "@/lib/portal";
 import { canAccess, homeFor, isCompanyRole, NAV } from "@/lib/roles";
 import { resetDemoData, signIn, signOut, useDb, useHydrated } from "@/lib/store";
-import { ROLES, type Role } from "@/lib/types";
+import { ROLES, type Db, type Role, type Session } from "@/lib/types";
+
+/** A session for the portal user in the given demo role, with the first active counter/company. */
+function portalSession(db: Db, name: string, role: Role): Session {
+  return {
+    name,
+    role,
+    counterId:
+      role === "Teller"
+        ? db.settings.defaultCounterId || db.counters.find((c) => c.status === "Active")?.id
+        : undefined,
+    companyId: isCompanyRole(role) ? db.companies.find((c) => c.status === "Active")?.id : undefined,
+  };
+}
+
+/** On the site: which demo role to view as. Replaces the demo's own sign-in. */
+function ViewAs({ db, session }: { db: Db; session: Session }) {
+  return (
+    <label className="block text-white/70">
+      View as
+      <select
+        className="mt-1 w-full rounded border border-white/40 bg-brand px-2 py-1.5 text-sm text-white"
+        value={session.role}
+        onChange={(e) => signIn(portalSession(db, session.name, e.target.value as Role))}
+      >
+        {ROLES.map((r) => (
+          <option key={r}>{r}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
 
 function SignIn() {
   const db = useDb();
@@ -93,8 +125,22 @@ function Shell({ children }: { children: ReactNode }) {
   const session = db.session;
   const counter = db.counters.find((c) => c.id === session?.counterId);
   const company = db.companies.find((c) => c.id === session?.companyId);
+  const onSite = onPortalSite();
+  const user = onSite ? portalUser() : null;
 
-  if (!session) return <SignIn />;
+  // On the site, the portal sign-in is the sign-in: signed out there means back to it.
+  useEffect(() => {
+    if (!onSite) return;
+    if (!user) {
+      location.replace(moduleHomeUrl());
+    } else if (!session || session.name !== user.name) {
+      signIn(portalSession(db, user.name, session?.role ?? "Super Admin"));
+    }
+  }, [onSite, user, session, db]);
+
+  if (!session || (onSite && session.name !== user?.name)) {
+    return onSite ? <p className="p-6 text-sm text-slate-500">Signing in…</p> : <SignIn />;
+  }
 
   return (
     <div className="min-h-screen">
@@ -132,10 +178,17 @@ function Shell({ children }: { children: ReactNode }) {
               {counter ? ` · ${counter.code}` : ""}
             </div>
           </div>
+          {onSite && <ViewAs db={db} session={session} />}
           <div className="flex flex-wrap gap-2">
-            <button className="rounded border border-white/40 px-3 py-1.5 hover:bg-brand-dark" onClick={signOut}>
-              Sign out
-            </button>
+            {onSite ? (
+              <a className="rounded border border-white/40 px-3 py-1.5 hover:bg-brand-dark" href={portalUrl()}>
+                All modules
+              </a>
+            ) : (
+              <button className="rounded border border-white/40 px-3 py-1.5 hover:bg-brand-dark" onClick={signOut}>
+                Sign out
+              </button>
+            )}
             {session.role === "Super Admin" && (
               <button
                 className="rounded border border-white/40 px-3 py-1.5 hover:bg-brand-dark"

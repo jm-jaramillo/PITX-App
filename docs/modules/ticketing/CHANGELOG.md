@@ -35,6 +35,30 @@ sections 2 and 3).
 
 ---
 
+## 11 · One sign-in: the portal (6 Nov)
+
+- The demo's own sign-in form is gone on the site. You sign in once on the PITX App portal,
+  and clicking Ticketing and Booking opens the demo already signed in with your name.
+- [index.html](index.html) checks the portal sign-in:
+  - not signed in: goes to the portal login
+  - signed in, but not `staff` or `ticketing`: goes to the module list
+  - signed in with either role: passes your name to the demo
+- In the demo:
+  - "View as" in the sidebar switches the role (Teller, PUB Admin, Account, Super Admin).
+    It starts as Super Admin, and Teller and PUB Admin get the first active counter and
+    company.
+  - "All modules" replaces "Sign out" and goes back to the portal.
+  - Signed out of the portal, any demo page sends you to the portal login.
+- Source: new `prototype/src/lib/portal.ts`, changes in `prototype/src/components/app-shell.tsx`.
+  The demo was rebuilt from it. Run locally, the prototype keeps its own sign-in form.
+- Tested locally under `/PITX-App/` with a stand-in portal session: signed out goes to login,
+  signed in opens the dashboard with no form, "View as" Teller shows the Teller pages,
+  deep links (POS) work, and signing out of the portal sends you back to login.
+- Not tested with a real portal account: the handoff from `index.html` needs a real sign-in.
+- Still the prototype: sample data in each browser, not Supabase.
+
+---
+
 ## 10 · Ticketing and Booking card live on the portal (6 Nov)
 
 - Added [index.html](index.html), the module home, so the card can leave "Coming soon" (the

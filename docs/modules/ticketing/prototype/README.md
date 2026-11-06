@@ -26,6 +26,10 @@ STATIC_EXPORT_BASE_PATH=/PITX-App/modules/ticketing/demo npm run build
 Then replace `../demo/` with the new `out/` folder. On Windows PowerShell, set the
 variable first with `$env:STATIC_EXPORT_BASE_PATH='/PITX-App/modules/ticketing/demo'`.
 
+On the site the demo has no sign-in of its own: you sign in on the PITX App portal, and
+`../index.html` hands your name to the demo (`src/lib/portal.ts`). Pick the demo role with
+"View as" in the sidebar. Signed out of the portal, the demo sends you to the portal login.
+
 ## Run it locally
 
 Needs Node.js 20 or later.
