@@ -3,8 +3,10 @@
 Changes to `docs/shared/`, `supabase/functions/` and `core` migrations.
 Newest first. Owners: @jm-jaramillo @Jcbllanto16 @victoriaronald
 
+## 2026-11-06 - Ticketing build plan approved
+- Updated the note in `modules.js` (plan approved). `comingSoon` stays until Ticketing has pages.
 
- - Core shared master-data layer (applied)
+## 2026-11-06 - Core shared master-data layer (applied)
 - Added and applied `supabase/migrations/202611061000_core_shared_master_data.sql`: `core` schema with
   operators (78), vehicles (1,832), destinations (104) and gates, plus links from `tos.route_service` and the
   ticketing tables. Recorded in `public._schema_migrations`.
