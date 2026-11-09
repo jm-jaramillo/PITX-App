@@ -1,7 +1,6 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import type { PlanLine } from "./import";
 import { shiftRemittance } from "./reports";
 import { sells, setsUnits } from "./roles";
 import { getLayout, parseBlockedSeats } from "./seat-layouts";
@@ -28,7 +27,7 @@ import type {
 
 // Prototype data layer: browser localStorage. All reads and writes go through this
 // file so it can be swapped for a real backend without touching the screens.
-const KEY = "pitx-tms-db-v10"; // v10: Genesis added to the sample data
+const KEY = "pitx-tms-db-v11"; // v11: 9 Nov review (Reserved status, seat holds, new roles)
 
 let db: Db | null = null;
 const listeners = new Set<() => void>();
@@ -139,6 +138,8 @@ export function scopedTrips(data: Db): Trip[] {
 }
 
 export function scopedTickets(data: Db): Ticket[] {
+  // A passenger only ever sees the tickets they booked.
+  if (data.session?.role === "Passenger") return data.tickets.filter((t) => t.bookedBy === data.session?.name);
   const ids = new Set(scopedTrips(data).map((t) => t.id));
   return data.tickets.filter((t) => ids.has(t.tripId));
 }
@@ -148,11 +149,11 @@ export function departurePassed(trip: Trip): boolean {
   return Date.parse(`${trip.date}T${trip.time}:00+08:00`) <= Date.now();
 }
 
-export const AVAILABILITY_STATUSES = ["Available", "Selling Fast", "Sold Out", "On-Hold"] as const;
+export const AVAILABILITY_STATUSES = ["Available", "Last Few Seats", "Sold Out", "On-Hold"] as const;
 export type AvailabilityStatus = (typeof AVAILABILITY_STATUSES)[number];
 
-// Assumed cutoff: Selling Fast once 20% or fewer of the seats are left.
-const SELLING_FAST_SHARE = 0.2;
+// Assumed cutoff: Last Few Seats once 20% or fewer of the seats are left.
+const LAST_FEW_SHARE = 0.2;
 
 /** Ticket availability as named in the OBTS and PIDS specs. */
 export function ticketAvailability(data: Db, trip: Trip): { status: AvailabilityStatus; left: number } {
@@ -160,30 +161,26 @@ export function ticketAvailability(data: Db, trip: Trip): { status: Availability
   const left = trip.busId ? Math.max(0, capacity - takenSeats(data, trip.id).size) : 0;
   if (!trip.busId || trip.stopSelling) return { status: "On-Hold", left };
   if (left === 0) return { status: "Sold Out", left };
-  return { status: left <= capacity * SELLING_FAST_SHARE ? "Selling Fast" : "Available", left };
+  return { status: left <= capacity * LAST_FEW_SHARE ? "Last Few Seats" : "Available", left };
 }
 
-export const TRIP_GROUPS = [
-  ...AVAILABILITY_STATUSES,
-  "Waiting for unit",
-  "Past departure",
-  "Successful",
-  "Cancelled",
-] as const;
+// One group per trip, no overlaps (9 Nov review): selling, almost full, full, not
+// selling (no unit yet, stopped, or past its time but not yet departed in TOS), gone.
+export const TRIP_GROUPS = ["Selling", "Last Few Seats", "Sold Out", "Not Selling", "Departed", "Cancelled"] as const;
 export type TripGroup = (typeof TRIP_GROUPS)[number];
 
 export function tripGroup(data: Db, trip: Trip): TripGroup {
-  if (trip.status === "Departed") return "Successful";
+  if (trip.status === "Departed") return "Departed";
   if (trip.status === "Cancelled") return "Cancelled";
-  if (departurePassed(trip)) return "Past departure";
-  if (!trip.busId) return "Waiting for unit";
-  return ticketAvailability(data, trip).status;
+  if (departurePassed(trip)) return "Not Selling";
+  const status = ticketAvailability(data, trip).status;
+  return status === "Available" ? "Selling" : status === "On-Hold" ? "Not Selling" : status;
 }
 
-/** The PUB Admin sets the vehicle for a trip, which decides its seat map. */
+/** The Operator Admin sets the vehicle for a trip, which decides its seat map. */
 export function assignUnit(tripId: string, busId: string): string | null {
   const current = load();
-  if (!setsUnits(current.session?.role)) return "Only the PUB Admin can set the unit.";
+  if (!setsUnits(current.session?.role)) return "Only the Operator Admin can set the unit.";
   const trip = current.trips.find((t) => t.id === tripId);
   if (!trip || !canReachTrip(current, trip)) return "This trip belongs to another company.";
   if (trip.status === "Departed" || trip.status === "Cancelled") return `This trip is ${trip.status.toLowerCase()}.`;
@@ -264,7 +261,7 @@ export function removeSeatMark(tripId: string, markId: string) {
 /** What a unit change does to sold seats: the same seat number carries over, or staff move the passenger. */
 export function unitChangeImpact(data: Db, trip: Trip, busId: string): { kept: number; manual: number } {
   const { layout, blocked } = tripSeating(data, { ...trip, busId });
-  const sold = data.tickets.filter((t) => t.tripId === trip.id && (t.status === "Issued" || t.status === "Booked"));
+  const sold = data.tickets.filter((t) => t.tripId === trip.id && t.status === "Reserved");
   const manual = layout ? sold.filter((t) => t.seatNo > layout.seats || blocked.has(t.seatNo)).length : 0;
   return { kept: sold.length - manual, manual };
 }
@@ -281,67 +278,76 @@ export function takenSeats(data: Db, tripId: string): Set<number> {
   );
 }
 
-function nextTripNo(data: Db): string {
-  let n = data.trips.length + 1;
-  while (data.trips.some((t) => t.tripNo === `T-${String(n).padStart(4, "0")}`)) n++;
-  return `T-${String(n).padStart(4, "0")}`;
+/** Who holds a seat: one key per person and role, so a teller and a passenger never share holds. */
+export function holderKey(session: Session | null | undefined): string {
+  return session ? `${session.role}|${session.name}|${session.counterId ?? ""}` : "";
 }
 
-export function saveTrip(input: Omit<Trip, "id" | "tripNo" | "status">): string | null {
+function activeHolds(trip: Trip, now = Date.now()) {
+  return (trip.holds ?? []).filter((h) => Date.parse(h.until) > now);
+}
+
+/** Seats someone else picked and hasn't paid for yet. They can't be picked here. */
+export function heldByOthers(data: Db, trip: Trip): Set<number> {
+  const me = holderKey(data.session);
+  return new Set(activeHolds(trip).filter((h) => h.holder !== me).map((h) => h.seatNo));
+}
+
+/** My held seats on a trip, with when the hold runs out. */
+export function myHolds(data: Db, trip: Trip) {
+  const me = holderKey(data.session);
+  return activeHolds(trip).filter((h) => h.holder === me);
+}
+
+/**
+ * Picking a seat holds it (booked without pay) so no other teller, counter or online buyer
+ * can pick it, until it is paid (Reserved) or the hold runs out.
+ */
+export function holdSeat(tripId: string, seatNo: number): string | null {
   const current = load();
-  const route = current.routes.find((r) => r.id === input.routeId);
-  const bus = current.buses.find((b) => b.id === input.busId);
-  if (!route) return "Select a route.";
-  if (bus && route.companyId !== bus.companyId) return "The bus and route belong to different companies.";
-  const clash = current.trips.some(
-    (t) => bus && t.busId === input.busId && t.date === input.date && t.time === input.time && t.status !== "Cancelled",
-  );
-  if (clash) return `${bus?.plateNo} already has a trip at ${input.time}.`;
-  const tripNo = nextTripNo(current);
-  const trip: Trip = { ...input, id: crypto.randomUUID(), tripNo, status: "Scheduled" };
-  commit({
-    ...current,
-    trips: [...current.trips, trip],
-    audit: [...current.audit, entry(current, "Trip added", tripNo, { tripId: trip.id })],
-  });
+  const trip = current.trips.find((t) => t.id === tripId);
+  if (!trip || !current.session) return "Trip not found.";
+  const { layout, blocked } = tripSeating(current, trip);
+  if (!layout || seatNo < 1 || seatNo > layout.seats || blocked.has(seatNo)) return `Seat ${seatNo} can't be picked.`;
+  if (takenSeats(current, tripId).has(seatNo)) return `Seat ${seatNo} was just sold. Pick another seat.`;
+  const me = holderKey(current.session);
+  const other = activeHolds(trip).find((h) => h.seatNo === seatNo && h.holder !== me);
+  if (other) return `Seat ${seatNo} is being held by ${other.holderName}. Pick another seat.`;
+  const until = new Date(Date.now() + current.settings.seatHoldMinutes * 60_000).toISOString();
+  // Picking another seat restarts the clock on all of mine for this trip.
+  const mine = [
+    ...activeHolds(trip).filter((h) => h.holder === me && h.seatNo !== seatNo).map((h) => ({ ...h, until })),
+    { seatNo, holder: me, holderName: current.session.name, until },
+  ];
+  const others = activeHolds(trip).filter((h) => h.holder !== me);
+  commit({ ...current, trips: current.trips.map((t) => (t.id === tripId ? { ...t, holds: [...others, ...mine] } : t)) });
   return null;
 }
 
-/** Trip numbers are unique per bus operator per day. */
-export function editTrip(id: string, changes: { time: string; tripNo: string }): string | null {
+/** Lets go of my held seats on a trip (all of them, or the ones given). */
+export function releaseSeats(tripId: string, seatNos?: number[]) {
   const current = load();
-  const trip = current.trips.find((t) => t.id === id);
-  if (!trip) return "Trip not found.";
-  if (trip.status === "Departed" || trip.status === "Cancelled") return `This trip is ${trip.status.toLowerCase()}.`;
-  const tripNo = changes.tripNo.trim();
-  if (!tripNo || !/^\d{2}:\d{2}$/.test(changes.time)) return "Enter the trip number and time.";
-  const company = tripCompanyId(current, trip);
-  const duplicate = current.trips.some(
-    (t) => t.id !== id && t.date === trip.date && t.tripNo === tripNo && tripCompanyId(current, t) === company,
-  );
-  if (duplicate) return `${tripNo} is already used by this operator on ${trip.date}.`;
-  commit({
-    ...current,
-    trips: current.trips.map((t) => (t.id === id ? { ...t, time: changes.time, tripNo } : t)),
-    audit: [
-      ...current.audit,
-      entry(current, "Trip modified", `${trip.tripNo} ${trip.time} to ${tripNo} ${changes.time}`, { tripId: id }),
-    ],
-  });
+  const trip = current.trips.find((t) => t.id === tripId);
+  if (!trip?.holds?.length) return;
+  const me = holderKey(current.session);
+  const holds = activeHolds(trip).filter((h) => h.holder !== me || (seatNos !== undefined && !seatNos.includes(h.seatNo)));
+  commit({ ...current, trips: current.trips.map((t) => (t.id === tripId ? { ...t, holds } : t)) });
+}
+
+/** A sale only goes through for seats the seller still holds. */
+function holdProblem(data: Db, trip: Trip, seatNos: number[]): string | null {
+  const others = heldByOthers(data, trip);
+  const lost = seatNos.filter((n) => others.has(n));
+  if (lost.length) return `Seat ${lost.join(", ")} is being held by someone else. Pick another seat.`;
+  const mine = new Set(myHolds(data, trip).map((h) => h.seatNo));
+  const expired = seatNos.filter((n) => !mine.has(n));
+  if (expired.length) return `The hold on seat ${expired.join(", ")} ran out. Pick the seat again.`;
   return null;
 }
 
-export function cancelTrip(id: string, remark: string): string | null {
-  const current = load();
-  const trip = current.trips.find((t) => t.id === id);
-  if (!trip) return "Trip not found.";
-  if (!remark.trim()) return "Enter the reason for cancelling.";
-  commit({
-    ...current,
-    trips: current.trips.map((t) => (t.id === id ? { ...t, status: "Cancelled", cancelRemark: remark.trim() } : t)),
-    audit: [...current.audit, entry(current, "Trip cancelled", `${trip.tripNo}: ${remark.trim()}`, { tripId: id })],
-  });
-  return null;
+function withoutMyHolds(data: Db, tripId: string): Trip[] {
+  const me = holderKey(data.session);
+  return data.trips.map((t) => (t.id === tripId ? { ...t, holds: activeHolds(t).filter((h) => h.holder !== me) } : t));
 }
 
 export function updateTrip(id: string, changes: { status?: TripStatus; stopSelling?: boolean; remark?: string }) {
@@ -419,7 +425,7 @@ export function salesClosedToday(data: Db, today: string): boolean {
 export function sellingBlock(data: Db, trip: Trip, today: string): string | null {
   if (trip.status === "Departed" || trip.status === "Cancelled") return `This trip is ${trip.status.toLowerCase()}.`;
   if (!canReachTrip(data, trip)) return "This trip belongs to another company.";
-  if (!trip.busId) return "The PUB Admin hasn't set the unit yet, so seats aren't available.";
+  if (!trip.busId) return "The Operator Admin hasn't set the unit yet, so seats aren't available.";
   if (trip.stopSelling) return "Selling is stopped for this trip.";
   if (departurePassed(trip)) return "This trip's departure time has passed.";
   if (salesClosedToday(data, today)) return "Your sales for today are closed at this counter.";
@@ -492,6 +498,8 @@ export function issueTickets(input: IssueInput, today: string): { tickets?: Tick
   if (input.paymentMethod !== "Cash" && !input.paymentRef.trim()) {
     return { error: `Enter the ${input.paymentMethod} reference number.` };
   }
+  const holdError = holdProblem(current, trip, input.passengers.map((p) => p.seatNo));
+  if (holdError) return { error: holdError };
 
   const groupId = crypto.randomUUID();
   const issuedAt = new Date().toISOString();
@@ -515,10 +523,11 @@ export function issueTickets(input: IssueInput, today: string): { tickets?: Tick
     tendered: input.paymentMethod === "Cash" ? input.tendered : undefined,
     paymentRef: input.paymentRef.trim() || undefined,
     issuedAt,
-    status: "Issued",
+    status: "Reserved",
   }));
   commit({
     ...current,
+    trips: withoutMyHolds(current, trip.id),
     tickets: [...current.tickets, ...tickets],
     audit: [
       ...current.audit,
@@ -530,26 +539,75 @@ export function issueTickets(input: IssueInput, today: string): { tickets?: Tick
   return { tickets };
 }
 
-/** Issues the boarding pass for an online booking at the counter. */
-export function checkInBooking(id: string): string | null {
+export interface OnlineInput {
+  tripId: string;
+  passengers: PassengerInput[];
+  paymentMethod: Exclude<PaymentMethod, "Cash">;
+  paymentRef: string;
+}
+
+/** A passenger pays online for the seats they hold. The tickets are Reserved at once. */
+export function bookOnline(input: OnlineInput, today: string): { tickets?: Ticket[]; error?: string } {
   const current = load();
-  const ticket = current.tickets.find((t) => t.id === id);
-  if (!ticket || ticket.status !== "Booked") return "This booking is not waiting for a boarding pass.";
-  if (!canReachTrip(current, current.trips.find((t) => t.id === ticket.tripId))) {
-    return "This booking belongs to another company.";
+  const session = current.session;
+  if (session?.role !== "Passenger") return { error: "Sign in as a passenger to book online." };
+  const trip = current.trips.find((t) => t.id === input.tripId);
+  if (!trip) return { error: "Trip not found." };
+  const blockedReason = sellingBlock(current, trip, today);
+  if (blockedReason) return { error: blockedReason };
+  if (input.passengers.length === 0) return { error: "Pick at least one seat." };
+  const route = current.routes.find((r) => r.id === trip.routeId);
+  const company = current.companies.find((c) => c.id === route?.companyId);
+  if (!route || !company) return { error: "This trip's route is missing from Master Data." };
+  const taken = takenSeats(current, trip.id);
+  for (const p of input.passengers) {
+    if (!p.passengerName.trim()) return { error: `Enter the passenger name for seat ${p.seatNo}.` };
+    if (taken.has(p.seatNo)) return { error: `Seat ${p.seatNo} was just sold. Pick another seat.` };
+    if (p.fareType !== "Adult" && !p.idNo.trim()) return { error: `Enter the ${p.fareType} ID number for seat ${p.seatNo}.` };
   }
-  const counter = current.session?.counterId;
+  if (!input.paymentRef.trim()) return { error: `Enter the ${input.paymentMethod} reference number.` };
+  const holdError = holdProblem(current, trip, input.passengers.map((p) => p.seatNo));
+  if (holdError) return { error: holdError };
+
+  const groupId = crypto.randomUUID();
+  const issuedAt = new Date().toISOString();
+  const bookingRef = `PX-${String(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000))}`;
+  const tickets: Ticket[] = input.passengers.map((p, index) => ({
+    id: crypto.randomUUID(),
+    ticketNo: `${company.ticketCode}W-${String(current.tickets.length + index + 1).padStart(6, "0")}`,
+    groupId,
+    source: "Online",
+    bookingRef,
+    bookedBy: session.name,
+    tripId: trip.id,
+    seatNo: p.seatNo,
+    passengerName: p.passengerName.trim(),
+    contactNo: p.contactNo.trim() || undefined,
+    email: p.email.trim() || undefined,
+    fareType: p.fareType,
+    fare: computeFare(route, p.fareType),
+    insurance: current.settings.insurancePrice || undefined,
+    idNo: p.idNo.trim() || undefined,
+    paymentMethod: input.paymentMethod,
+    paymentRef: input.paymentRef.trim(),
+    issuedAt,
+    status: "Reserved",
+  }));
   commit({
     ...current,
-    tickets: current.tickets.map((t) =>
-      t.id === id ? { ...t, status: "Issued", counterId: counter, soldBy: current.session?.name } : t,
-    ),
+    trips: withoutMyHolds(current, trip.id),
+    tickets: [...current.tickets, ...tickets],
     audit: [
       ...current.audit,
-      entry(current, "Boarding pass issued", `${ticket.ticketNo}, booking ${ticket.bookingRef}`, { ticketId: id }),
+      ...tickets.map((t) =>
+        entry(current, "Booked online", `${t.ticketNo}, ${trip.tripNo} seat ${t.seatNo}, ${bookingRef}`, {
+          ticketId: t.id,
+          tripId: trip.id,
+        }),
+      ),
     ],
   });
-  return null;
+  return { tickets };
 }
 
 /** How the signed-in user may complete a refund or reprint. */
@@ -560,23 +618,21 @@ function stepForMode(mode: ApprovalMode): ApprovalStep {
 }
 
 /**
- * The Super Admin refunds directly. A Teller follows the refund setting up to the cutoff,
- * and inside the cutoff always needs the Super Admin's approval.
+ * Tellers refund directly, counter and online tickets alike, with no approval (9 Nov review).
+ * Once the bus has left, only the PITX Admin can refund.
  */
 export function refundPlan(data: Db, ticket: Ticket, now: number): { block?: string; step: ApprovalStep; note?: string } {
   const step: ApprovalStep = "direct";
-  if (ticket.source === "Online") return { step, block: "Cancel online bookings in the booking system, then import again." };
-  if (ticket.status !== "Issued") return { step, block: `A ${ticket.status.toLowerCase()} ticket can't be refunded.` };
+  if (ticket.status !== "Reserved") return { step, block: `A ${ticket.status.toLowerCase()} ticket can't be refunded.` };
   const session = data.session;
-  if (session?.role === "Super Admin") return { step };
-  if (!sells(session?.role)) return { step, block: "Only a Teller of this company or the Super Admin can refund this ticket." };
+  if (session?.role === "PITX Admin") return { step };
+  if (!sells(session?.role)) return { step, block: "Only a Teller of this company or the PITX Admin can refund this ticket." };
   const trip = data.trips.find((t) => t.id === ticket.tripId);
   if (!trip || !canReachTrip(data, trip)) return { step, block: "This ticket belongs to another company." };
-  const hours = data.settings.refundCutoffHours;
-  if (departureTime(trip) - now < hours * 3_600_000) {
-    return { step: "request", note: `Less than ${hours} hours before departure, so this needs the Super Admin's approval.` };
+  if (trip.status === "Departed" || departureTime(trip) <= now) {
+    return { step, block: "The trip has left, so only the PITX Admin can refund this ticket." };
   }
-  return { step: stepForMode(data.settings.refundApproval) };
+  return { step };
 }
 
 export function refundAmountFor(data: Db, ticket: Ticket): number {
@@ -679,11 +735,10 @@ export function reprintPlan(data: Db, ticket: Ticket): { block?: string; step: A
   const step: ApprovalStep = "direct";
   if (!data.settings.reprintAllowed) return { step, block: "Ticket reprints are turned off in System Parameters." };
   if (ticket.status === "Voided") return { step, block: "A voided ticket can't be reprinted." };
-  if (ticket.status === "Booked") return { step, block: "Issue the boarding pass first." };
   const trip = data.trips.find((t) => t.id === ticket.tripId);
   if (!canReachTrip(data, trip)) return { step, block: "This ticket belongs to another company." };
-  if (data.session?.role === "Super Admin") return { step };
-  if (!sells(data.session?.role)) return { step, block: "Only a Teller or the Super Admin can reprint tickets." };
+  if (data.session?.role === "PITX Admin") return { step };
+  if (!sells(data.session?.role)) return { step, block: "Only a Teller or the PITX Admin can reprint tickets." };
   return { step: stepForMode(data.settings.reprintApproval) };
 }
 
@@ -757,11 +812,11 @@ export function reprintTicket(id: string, input: ReprintInput): { error?: string
 
 export function decideRequest(id: string, approve: boolean): string | null {
   const current = load();
-  if (current.session?.role !== "Super Admin") return "Only the Super Admin can decide requests.";
+  if (current.session?.role !== "PITX Admin") return "Only the PITX Admin can decide requests.";
   const request = current.requests.find((r) => r.id === id);
   const ticket = current.tickets.find((t) => t.id === request?.ticketId);
   if (!request || !ticket || request.status !== "Pending") return "This request is no longer open.";
-  if (approve && request.type === "Refund" && ticket.status !== "Issued") {
+  if (approve && request.type === "Refund" && ticket.status !== "Reserved") {
     return `This ticket is now ${ticket.status.toLowerCase()}, so it can't be refunded.`;
   }
   let next = current;
@@ -812,10 +867,10 @@ export function saveSettings(settings: SystemParams) {
   });
 }
 
-/** A one-use code the Super Admin gives a Teller so they can close sales. */
+/** A one-use code the PITX Admin gives a Teller so they can close sales. */
 export function generateCloseCode(): string | null {
   const current = load();
-  if (current.session?.role !== "Super Admin") return null;
+  if (current.session?.role !== "PITX Admin") return null;
   const code = String(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000));
   commit({
     ...current,
@@ -853,7 +908,7 @@ export function closeSales(code: string, tellerCount: number, today: string): st
 /** Account's own blind count. Only after this do the counts and the system cash become visible. */
 export function submitCollection(id: string, accountCount: number): string | null {
   const current = load();
-  if (current.session?.role !== "Account") return "Only Account staff can enter the collection.";
+  if (current.session?.role !== "PITX Cashier") return "Only the PITX Cashier can enter the collection.";
   const closing = current.closings.find((c) => c.id === id);
   if (!closing || closing.reconciledAt) return "This closing is no longer open.";
   if (!(accountCount >= 0)) return "Enter the cash you counted.";
@@ -900,7 +955,7 @@ export function moveTicket(id: string, tripId: string, seatNo: number, reason: s
   const fromTrip = current.trips.find((t) => t.id === ticket?.tripId);
   if (!ticket || !toTrip || !fromTrip) return "Ticket or trip not found.";
   if (!canReachTrip(current, fromTrip)) return "This ticket belongs to another company.";
-  if (ticket.status !== "Issued" && ticket.status !== "Booked") {
+  if (ticket.status !== "Reserved") {
     return `A ${ticket.status.toLowerCase()} ticket can't be moved.`;
   }
   if (current.settings.seatTransferCheckRoute && toTrip.routeId !== fromTrip.routeId) {
@@ -938,12 +993,12 @@ export interface TicketProblem {
 export function ticketProblems(data: Db, today: string): TicketProblem[] {
   const problems: TicketProblem[] = [];
   for (const ticket of data.tickets) {
-    if (ticket.status !== "Issued" && ticket.status !== "Booked") continue;
+    if (ticket.status !== "Reserved") continue;
     const trip = data.trips.find((t) => t.id === ticket.tripId);
     if (!trip || trip.date < today || trip.status === "Departed") continue;
     if (!canReachTrip(data, trip)) continue;
     const { layout, blocked } = tripSeating(data, trip);
-    // Online seats on a trip with no unit yet get checked once the PUB Admin sets it.
+    // Online seats on a trip with no unit yet get checked once the Operator Admin sets it.
     if (!trip.busId && trip.status !== "Cancelled") continue;
     if (trip.status === "Cancelled") problems.push({ ticket, trip, reason: "Trip cancelled" });
     else if (!layout || ticket.seatNo > layout.seats) problems.push({ ticket, trip, reason: "Seat not on the assigned bus" });
@@ -998,7 +1053,7 @@ export function setBoarded(id: string, boarded: boolean) {
   const current = load();
   const ticket = current.tickets.find((t) => t.id === id);
   if (!ticket || ticket.status === "Voided") return;
-  const status = boarded ? "Boarded" : ticket.source === "Online" ? "Booked" : "Issued";
+  const status = boarded ? "Boarded" : "Reserved";
   commit({
     ...current,
     tickets: current.tickets.map((t) => (t.id === id ? { ...t, status } : t)),
@@ -1007,38 +1062,4 @@ export function setBoarded(id: string, boarded: boolean) {
       entry(current, boarded ? "Boarded" : "Boarding undone", `${ticket.ticketNo} (manifest)`, { ticketId: id }),
     ],
   });
-}
-
-export function applyTripPlan(lines: PlanLine<Trip>[]): number {
-  const current = load();
-  const records = lines.flatMap((l) => (l.record ? [l.record] : []));
-  const ids = new Set(records.map((r) => r.id));
-  commit({
-    ...current,
-    trips: [...current.trips.filter((t) => !ids.has(t.id)), ...records],
-    audit: [...current.audit, entry(current, "Trips imported", `${records.length} rows`)],
-  });
-  return records.length;
-}
-
-export function applyBookingPlan(lines: PlanLine<Ticket>[]): number {
-  const current = load();
-  const records = lines.flatMap((l) => (l.record ? [l.record] : []));
-  const ids = new Set(records.map((r) => r.id));
-  const kept = current.tickets.filter((t) => !ids.has(t.id));
-  let sequence = current.tickets.length;
-  const numbered = records.map((record) => {
-    if (record.ticketNo) return record;
-    sequence++;
-    const trip = current.trips.find((t) => t.id === record.tripId);
-    const route = current.routes.find((r) => r.id === trip?.routeId);
-    const code = current.companies.find((c) => c.id === route?.companyId)?.ticketCode ?? "ON";
-    return { ...record, ticketNo: `${code}W-${String(sequence).padStart(6, "0")}` };
-  });
-  commit({
-    ...current,
-    tickets: [...kept, ...numbered],
-    audit: [...current.audit, entry(current, "Bookings imported", `${records.length} rows`)],
-  });
-  return records.length;
 }

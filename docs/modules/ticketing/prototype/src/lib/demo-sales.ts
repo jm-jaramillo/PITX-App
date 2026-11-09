@@ -85,7 +85,7 @@ export function addDemoSales(db: Db): Db {
         tendered: paymentMethod === "Cash" ? Math.ceil(fare / 100) * 100 : undefined,
         paymentRef: paymentMethod === "Cash" ? undefined : `DEMO-REF-${sequence}`,
         issuedAt,
-        status: voided ? "Voided" : departed ? "Boarded" : online ? "Booked" : "Issued",
+        status: voided ? "Voided" : departed ? "Boarded" : "Reserved",
         voidReason: voided ? "Passenger changed plans (demo)" : undefined,
         voidedBy: voided ? soldBy : undefined,
         refundAmount: voided ? fare : undefined,

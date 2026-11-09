@@ -16,7 +16,7 @@ import { PageTitle } from "@/components/page-title";
 
 const STATUS_STYLE: Record<string, string> = {
   Available: "bg-green-100 text-green-900",
-  "Selling Fast": "bg-amber-100 text-amber-900",
+  "Last Few Seats": "bg-amber-100 text-amber-900",
   "Sold Out": "bg-accent text-white",
   "On-Hold": "bg-slate-200 text-slate-800",
 };

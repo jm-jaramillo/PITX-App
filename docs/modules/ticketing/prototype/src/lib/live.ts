@@ -13,7 +13,7 @@ import type { Bus, BusType, Company, Db, Route, SeatMark, Trip } from "./types";
 //   list_seat_trips(date)     approved trips whose bus has a seat map (anyone)
 //   get_trip_seats(booking)   seats passengers requested on a trip (anyone)
 // Fares, PTU/TIN and seat maps for buses without one are not in those modules:
-// they get placeholders the Super Admin can fix in Master Data. Trips with no sales
+// they get placeholders the PITX Admin can fix in Master Data. Trips with no sales
 // get made-up ones (demo-sales.ts). Sales stay in the browser, like the rest of the demo.
 
 const DAYS = 3; // today and the next two days

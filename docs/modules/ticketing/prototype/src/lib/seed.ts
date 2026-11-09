@@ -48,7 +48,7 @@ const BUS_TYPES: [string, string, string, string, string?][] = [
 
 interface TripPlan {
   route: string;
-  type?: string; // Bus type code. Blank means the PUB Admin hasn't set the unit.
+  type?: string; // Bus type code. Blank means the Operator Admin hasn't set the unit.
   time: string;
   bay: string;
   sold: number;
@@ -75,7 +75,7 @@ const TRIP_PLANS: TripPlan[] = [
   { route: "LOR-QUEZON", type: "REG45", time: "10:00", bay: "B08", sold: 4, day: 1 },
   { route: "OGW-NORTHERN", type: "DLX36", time: "09:00", bay: "B18", sold: 3, day: 1 },
   { route: "SCE-VISMIN", type: "HC63", time: "09:30", bay: "B22", sold: 6, day: 2 },
-  // Genesis: a full day of trips in every state, so its Bus Company account has something
+  // Genesis: a full day of trips in every state, so its Operator Admin account has something
   // to sell, board, refund and close.
   { route: "GEN-NORTHERN", type: "REG49", time: "04:30", bay: "B19", sold: 41, status: "Departed" },
   { route: "GEN-NORTHERN", type: "DLX45", time: "09:00", bay: "B19", sold: 30, status: "Departed" },
@@ -224,7 +224,7 @@ export function seedDb(): Db {
         tendered: paymentMethod === "Cash" ? Math.ceil(fare / 100) * 100 : undefined,
         paymentRef: paymentMethod === "Cash" ? undefined : `DEMO-REF-${sequence}`,
         issuedAt: new Date(saleStart + sequence * 60_000).toISOString(),
-        status: voided ? "Voided" : boarded ? "Boarded" : online ? "Booked" : "Issued",
+        status: voided ? "Voided" : boarded ? "Boarded" : "Reserved",
         voidReason: voided ? "Passenger changed plans (demo)" : undefined,
         voidedBy: voided ? `${company} Teller ${counterNo + 1}` : undefined,
         refundAmount: voided ? fare : undefined,
@@ -237,8 +237,8 @@ export function seedDb(): Db {
       audit.push({
         id: `log-${sequence}`,
         at: ticket.issuedAt,
-        by: ticket.soldBy ?? "Booking import",
-        action: online ? "Booking imported" : "Ticket sold",
+        by: ticket.soldBy ?? "Online booking",
+        action: online ? "Booked online" : "Ticket sold",
         ticketId: ticket.id,
         tripId: trip.id,
         detail: `${ticket.ticketNo}, ${trip.tripNo} seat ${seat}`,
@@ -246,17 +246,17 @@ export function seedDb(): Db {
     }
   });
 
-  // Genesis: one refund and one reprint waiting for the Ticketing Admin, on tickets
+  // Genesis: two reprints waiting for the PITX Admin (tellers refund directly now), on tickets
   // still to depart, so Approvals has work to show.
   const genesisOpen = tickets.filter(
-    (t) => t.ticketNo.startsWith("GEN") && t.source === "Counter" && t.status === "Issued",
+    (t) => t.ticketNo.startsWith("GEN") && t.source === "Counter" && t.status === "Reserved",
   );
   const requests: ApprovalRequest[] = genesisOpen.slice(0, 2).map((t, i) => ({
     id: `req-gen-${i + 1}`,
-    type: i === 0 ? "Refund" : "Reprint",
+    type: "Reprint",
     ticketId: t.id,
-    category: i === 0 ? "Passenger changed plans" : "Lost ticket",
-    remark: i === 0 ? "Passenger asked to travel tomorrow instead (demo)." : "Passenger lost the printed pass (demo).",
+    category: i === 0 ? "Damaged ticket" : "Lost ticket",
+    remark: i === 0 ? "Pass got wet and the QR code won't scan (demo)." : "Passenger lost the printed pass (demo).",
     requestedBy: t.soldBy ?? "GEN Teller 1",
     counterId: t.counterId,
     requestedAt: new Date(Date.parse(t.issuedAt) + 30 * 60_000).toISOString(),
@@ -307,6 +307,7 @@ export function seedDb(): Db {
       reprintCharge: 5,
       reprintApproval: "Password",
       reprintReasons: ["Lost ticket", "Damaged ticket", "Wrong passenger details", "Printer error", "Other"],
+      seatHoldMinutes: 10,
       approvalPassword: "demo1234",
     },
     requests,

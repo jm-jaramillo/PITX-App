@@ -4,7 +4,8 @@ import type { SeatLayout } from "@/lib/seat-layouts";
 
 const LEGEND = [
   { label: "Open", className: "border-slate-300 bg-white" },
-  { label: "Selected", className: "border-accent bg-accent" },
+  { label: "Held for you", className: "border-accent bg-accent" },
+  { label: "Held by someone else", className: "border-sky-300 bg-sky-100" },
   { label: "Sold", className: "border-slate-200 bg-slate-300" },
   { label: "Blocked (CR)", className: "border-amber-300 bg-amber-100" },
 ];
@@ -13,12 +14,15 @@ export function SeatMap({
   layout,
   taken,
   blocked,
+  held = new Set<number>(),
   selected,
   onSelect,
 }: {
   layout: SeatLayout;
   taken: Set<number>;
   blocked: Set<number>;
+  held?: Set<number>; // Picked by another teller or an online buyer, not yet paid
+
   selected: number[];
   onSelect: (seatNo: number) => void;
 }) {
@@ -39,13 +43,14 @@ export function SeatMap({
             {layout.cells.map((cell) => {
               const isBlocked = blocked.has(cell.seatNo);
               const isTaken = taken.has(cell.seatNo);
+              const isHeld = !isTaken && held.has(cell.seatNo);
               const isSelected = selected.includes(cell.seatNo);
-              const note = isBlocked ? ", blocked" : isTaken ? ", sold" : "";
+              const note = isBlocked ? ", blocked" : isTaken ? ", sold" : isHeld ? ", held by someone else" : "";
               return (
                 <button
                   key={cell.seatNo}
                   type="button"
-                  disabled={isBlocked || isTaken}
+                  disabled={isBlocked || isTaken || isHeld}
                   aria-pressed={isSelected}
                   aria-label={`Seat ${cell.seatNo}${note}`}
                   onClick={() => onSelect(cell.seatNo)}
@@ -55,7 +60,9 @@ export function SeatMap({
                       ? "cursor-not-allowed border-amber-300 bg-amber-100 text-amber-800"
                       : isTaken
                         ? "cursor-not-allowed border-slate-200 bg-slate-300 text-slate-500"
-                        : isSelected
+                        : isHeld
+                          ? "cursor-not-allowed border-sky-300 bg-sky-100 text-sky-800"
+                          : isSelected
                           ? "border-accent bg-accent font-semibold text-white"
                           : "border-slate-300 bg-white hover:border-brand"
                   }`}

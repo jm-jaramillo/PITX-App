@@ -23,7 +23,9 @@ newest first. Migrations are listed with the entry that added them.
 | Who sets the bus for a trip | The operator, through Trip Scheduling's existing plate field. Ticketing reads it |
 | Teller scope | One Teller sells for one bus operator only |
 | Boarding validation | The automated gate (TOS), not staff |
-| Teller refund rule | A Teller can refund any ticket of their operator up to 4 hours before departure; closer than that needs the Ticketing Admin |
+| Teller refund rule | A Teller refunds any ticket of their operator directly, no approval, until the bus leaves (9 Nov review, entry 18) |
+| Users | PITX Admin, PITX Cashier, Operator Admin, Teller, Passenger (9 Nov review, entry 18) |
+| Ticket status | Reserved (paid), Boarded, Voided. Picked but unpaid seats are held, not sold (entry 18) |
 | Seat layouts | The 8 diagrams in "PTX. OPS. Seat Configuration" (2026-10-27), the same ones Trip Scheduling uses |
 | Database | The shared PITX project, `ticketing` schema linked to JM's `core` layer (entry 9, replacing entry 6's separate project). See [database/](database/) |
 | Source of truth for operators, plates, destinations | `core`. Ticketing keeps only ticket code, PTU/TIN, bus type and fares |
@@ -34,6 +36,34 @@ Still to agree with the other owners: the trip feed functions, the new `teller` 
 sections 2 and 3).
 
 ---
+
+## 18 · Team review changes (9 Nov)
+
+Changes from the team's review of the demo.
+
+| Review note | What changed |
+|---|---|
+| Booked with pay, booked without pay (block seats) | Picking a seat in POS or Book a Trip **holds** it. Nobody else (other tellers, counters, online buyers) can pick it until it is paid or the hold runs out. The hold time is in System Parameters (default 10 minutes). Held seats show in light blue on the seat map |
+| Issued vs Booked | Merged into one status, **Reserved** (paid). The "Issue boarding pass" step for online bookings is gone |
+| Refund by tellers | Tellers and Operator Admins refund directly, counter and online tickets alike, with no approval, until the bus leaves. After that only the PITX Admin can. Approvals now only has reprints |
+| Reprint note | A reprinted pass has a red "REPRINT · COPY n" box saying when, by whom and why |
+| Slicers in Tickets | Filters by trip date range, bus company (PITX Admin), route and counter, plus slicer buttons for status, source, payment and fare type, with counts and the sales total |
+| Daily Trips | Trips come from Trip Scheduling and the status from TOS: no Add trip, no edit or cancel, no status dropdown. Stop selling, seat blocks and the log stay |
+| "Selling fast" | Renamed **Last Few Seats** |
+| Overlapping trip groups | Down from 9 to 6 groups, one per trip: Selling, Last Few Seats, Sold Out, Not Selling (with the reason: no unit, stopped or past departure), Departed, Cancelled |
+| Graphs on the dashboard | Overview has seats sold by departure hour, sales by payment, and (PITX Admin) seats sold by bus company |
+| Import tab | Removed. Trips come from Trip Scheduling |
+| Users | Roles are now **PITX Admin** (was Super Admin), **PITX Cashier** (was Account), **Operator Admin** (was Bus Company and PUB Admin), **Teller**, and the new **Passenger**. Portal operator accounts can view as Operator Admin or Teller of their own company |
+| Passenger, hold before payment | New **Book a Trip** page for passengers: pick a trip and seats (held while paying), pay by e-wallet or card, get the e-ticket, see "My tickets" |
+| QR reader | Gate Test and the Tickets search take a USB or Bluetooth QR reader as is (it types the ticket number and presses Enter). Scanning in Tickets opens that ticket |
+| BIR invoice | The boarding pass now carries the invoice part: operator name, address, TIN, MIN, serial no., PTU no., invoice no., regular fare, discount, VAT-exempt sale, "This document serves as your invoice". Finance to confirm the wording |
+
+Not changed yet:
+
+- **Bus size (2x2, 3x2) defined in Trip Scheduling:** for JM. Ticketing already takes the seat map from Trip Scheduling's capacity when on real data.
+- **Database:** the `ticketing` migrations still use Booked and Issued. To be renamed to Reserved before they are applied.
+
+Storage key is now `pitx-tms-db-v11`, so the demo loads fresh sample data once in every browser.
 
 ## 17 · Sample data for Genesis Transport (9 Nov)
 

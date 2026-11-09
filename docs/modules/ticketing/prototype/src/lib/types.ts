@@ -116,13 +116,22 @@ export interface Trip {
   date: string; // YYYY-MM-DD, Asia/Manila
   time: string; // HH:mm
   routeId: string;
-  busId: string; // Empty until the PUB Admin assigns the unit
+  busId: string; // Empty until the Operator Admin assigns the unit
   bay: string;
   status: TripStatus;
   stopSelling?: boolean;
   remark?: string;
   cancelRemark?: string;
   seatMarks?: SeatMark[];
+  holds?: SeatHold[];
+}
+
+/** A seat someone picked but hasn't paid for yet. Nobody else can pick it until it runs out. */
+export interface SeatHold {
+  seatNo: number;
+  holder: string; // holderKey() of the teller, admin or passenger
+  holderName: string;
+  until: string; // ISO timestamp
 }
 
 export const FARE_TYPES = ["Adult", "Student", "Senior", "PWD"] as const;
@@ -131,8 +140,9 @@ export type FareType = (typeof FARE_TYPES)[number];
 export const PAYMENT_METHODS = ["Cash", "Card", "E-Wallet"] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
-// Booked = paid online, boarding pass not yet issued at the counter.
-export type TicketStatus = "Booked" | "Issued" | "Boarded" | "Voided";
+// Reserved = paid, at the counter or online, so the seat is the passenger's. Booked and
+// Issued were merged into it at the 9 Nov review. Picked but unpaid seats are SeatHolds.
+export type TicketStatus = "Reserved" | "Boarded" | "Voided";
 export type TicketSource = "Counter" | "Online";
 
 export interface Ticket {
@@ -166,6 +176,7 @@ export interface Ticket {
   insurance?: number;
   printed?: boolean;
   reprints?: TicketReprint[];
+  bookedBy?: string; // Passenger account that bought it online
 }
 
 export interface TicketReprint {
@@ -179,7 +190,7 @@ export interface TicketReprint {
 
 export type ApprovalMode = "None" | "Admin" | "Password";
 
-/** Set by the Super Admin on the System Parameters screen. */
+/** Set by the PITX Admin on the System Parameters screen. */
 export interface SystemParams {
   defaultCounterId: string;
   counterCutoffMinutes: number; // Stop selling at counters this long before departure
@@ -188,7 +199,7 @@ export interface SystemParams {
   checkInAfterMinutes: number;
   insurancePrice: number; // Added per ticket
   seatTransferCheckRoute: boolean; // Only transfer within the same route
-  refundCutoffHours: number; // Closer than this, a Teller needs the Super Admin
+  refundCutoffHours: number; // Closer than this, a Teller needs the PITX Admin
   refundPercent: number;
   refundApproval: ApprovalMode;
   refundReasons: string[];
@@ -196,6 +207,7 @@ export interface SystemParams {
   reprintCharge: number;
   reprintApproval: ApprovalMode;
   reprintReasons: string[];
+  seatHoldMinutes: number; // How long a picked, unpaid seat stays held
   approvalPassword: string; // Demo only: real accounts must replace this
 }
 
@@ -247,8 +259,9 @@ export interface SeatMark {
   until?: string; // ISO timestamp for temporary marks
 }
 
-// Bus Company: an operator account on the PITX App portal, Teller and PUB Admin in one.
-export const ROLES = ["Bus Company", "Teller", "PUB Admin", "Account", "Super Admin"] as const;
+// The five users from the 9 Nov review (see roles.ts). Portal operator accounts
+// (e.g. genesis-ops) are Operator Admins of their own company.
+export const ROLES = ["PITX Admin", "PITX Cashier", "Operator Admin", "Teller", "Passenger"] as const;
 export type Role = (typeof ROLES)[number];
 
 export interface Session {

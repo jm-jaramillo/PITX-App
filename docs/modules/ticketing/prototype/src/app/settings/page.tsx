@@ -7,7 +7,7 @@ import { PageTitle } from "@/components/page-title";
 
 const MODES: { value: ApprovalMode; label: string }[] = [
   { value: "None", label: "No approval needed" },
-  { value: "Admin", label: "Super Admin approves" },
+  { value: "Admin", label: "PITX Admin approves" },
   { value: "Password", label: "Approval password" },
 ];
 
@@ -73,6 +73,7 @@ export default function SystemParametersPage() {
         {number("insurancePrice", "Insurance price per ticket (PHP)")}
         {number("counterCutoffMinutes", "Stop showing trips at counters (minutes before departure)")}
         {number("kioskCutoffMinutes", "Stop showing trips at kiosks (minutes before departure)")}
+        {number("seatHoldMinutes", "Seat hold (minutes a picked seat stays held before payment)")}
       </Group>
 
       <Group title="Check-in at the gate">
@@ -93,17 +94,7 @@ export default function SystemParametersPage() {
 
       <Group title="Refunds">
         {number("refundPercent", "Refund percentage", 100)}
-        {number("refundCutoffHours", "Teller cutoff (hours before departure). Closer needs the Super Admin")}
-        <label>
-          Approval before the cutoff
-          <select value={form.refundApproval} onChange={(e) => set("refundApproval", e.target.value as ApprovalMode)}>
-            {MODES.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <p className="self-end pb-2 text-xs text-slate-600">Tellers refund directly, no approval, until the bus leaves.</p>
         <label>
           Reason categories, separated by commas
           <input value={refundReasons} onChange={(e) => setRefundReasons(e.target.value)} />

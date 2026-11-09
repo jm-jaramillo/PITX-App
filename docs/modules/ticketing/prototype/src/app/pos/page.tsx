@@ -7,7 +7,11 @@ import { peso, todayManila } from "@/lib/format";
 import { groupHref } from "@/lib/paths";
 import {
   computeFare,
+  heldByOthers,
+  holdSeat,
   issueTickets,
+  myHolds,
+  releaseSeats,
   scopedTrips,
   seatCapacity,
   sellingBlock,
@@ -72,6 +76,8 @@ function Pos() {
   const capacity = trip ? seatCapacity(db, trip) : 0;
   const taken = trip ? takenSeats(db, trip.id) : new Set<number>();
   const block = trip ? sellingBlock(db, trip, today) : null;
+  const held = trip ? heldByOthers(db, trip) : new Set<number>();
+  const holdUntil = trip ? myHolds(db, trip).at(0)?.until : undefined;
   const counterId = db.session?.counterId;
   const insurance = db.settings.insurancePrice;
   const total = route ? passengers.reduce((sum, p) => sum + computeFare(route, p.fareType, counterId) + insurance, 0) : 0;
@@ -79,13 +85,27 @@ function Pos() {
   const change = tendered && received >= total ? received - total : null;
   const canCharge = Boolean(db.session?.counterId);
 
+  // Picking a seat holds it for everyone else (other tellers, online buyers) until paid.
   function toggleSeat(seatNo: number) {
     setError(null);
-    setPassengers((current) =>
-      current.some((p) => p.seatNo === seatNo)
-        ? current.filter((p) => p.seatNo !== seatNo)
-        : [...current, { seatNo, passengerName: "", contactNo: "", email: "", fareType: "Adult", idNo: "" }],
-    );
+    if (passengers.some((p) => p.seatNo === seatNo)) {
+      releaseSeats(tripId, [seatNo]);
+      setPassengers((current) => current.filter((p) => p.seatNo !== seatNo));
+      return;
+    }
+    const problem = holdSeat(tripId, seatNo);
+    if (problem) {
+      setError(problem);
+      return;
+    }
+    setPassengers((current) => [...current, { seatNo, passengerName: "", contactNo: "", email: "", fareType: "Adult", idNo: "" }]);
+  }
+
+  function changeTrip(next: string) {
+    if (tripId) releaseSeats(tripId);
+    setTripId(next);
+    setPassengers([]);
+    setError(null);
   }
 
   function editPassenger(seatNo: number, changes: Partial<PassengerInput>) {
@@ -121,8 +141,7 @@ function Pos() {
                 value={date}
                 onChange={(e) => {
                   setDate(e.target.value);
-                  setTripId("");
-                  setPassengers([]);
+                  changeTrip("");
                 }}
               />
             </label>
@@ -130,11 +149,7 @@ function Pos() {
               Trip
               <select
                 value={trip?.id ?? ""}
-                onChange={(e) => {
-                  setTripId(e.target.value);
-                  setPassengers([]);
-                  setError(null);
-                }}
+                onChange={(e) => changeTrip(e.target.value)}
               >
                 <option value="">{trips.length ? "Select one" : "No upcoming trips for your company on this date"}</option>
                 {trips.map((t) => (
@@ -230,12 +245,13 @@ function Pos() {
                 layout={seating.layout}
                 taken={taken}
                 blocked={seating.blocked}
+                held={held}
                 selected={passengers.map((p) => p.seatNo)}
                 onSelect={toggleSeat}
               />
             ) : (
               <p className="text-sm text-slate-500">
-                {trip ? "The seat map appears once the PUB Admin sets the unit." : "Select a trip to see its seats."}
+                {trip ? "The seat map appears once the Operator Admin sets the unit." : "Select a trip to see its seats."}
               </p>
             )}
           </div>
@@ -243,6 +259,12 @@ function Pos() {
 
         <form noValidate onSubmit={submit} className="h-fit space-y-3 rounded-lg border border-slate-200 bg-white p-4">
           {passengers.length === 0 && <p className="text-sm text-slate-500">Select a seat to start.</p>}
+          {passengers.length > 0 && holdUntil && (
+            <p className="text-xs text-slate-600">
+              Seats held for you until {new Date(holdUntil).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "2-digit", minute: "2-digit" })}.
+              Nobody else can pick them until then.
+            </p>
+          )}
           {passengers.map((p) => (
             <fieldset key={p.seatNo} className="space-y-2 rounded border border-slate-200 p-3">
               <legend className="px-1 text-xs font-semibold text-slate-600">
@@ -336,7 +358,7 @@ function Pos() {
             disabled={!trip || passengers.length === 0 || Boolean(block) || !canCharge}
             className="w-full rounded bg-accent py-2.5 font-semibold text-white hover:bg-accent-dark disabled:opacity-40"
           >
-            Record payment and issue {passengers.length > 1 ? `${passengers.length} tickets` : "ticket"}
+            Record payment and reserve {passengers.length > 1 ? `${passengers.length} seats` : "seat"}
           </button>
         </form>
       </div>

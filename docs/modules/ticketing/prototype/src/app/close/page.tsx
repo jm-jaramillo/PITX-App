@@ -42,7 +42,7 @@ export default function CloseSalesPage() {
             Count your cash and enter the amount. The system total stays hidden until Account has counted too.
           </p>
           <label>
-            Approval code from the Super Admin
+            Approval code from the PITX Admin
             <input autoComplete="off" value={code} onChange={(e) => setCode(e.target.value)} />
           </label>
           <label>

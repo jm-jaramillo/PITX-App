@@ -98,7 +98,7 @@ export default function ManifestPage() {
                     <td className="px-3 py-2">{t.status}</td>
                     <td className="no-print px-3 py-2 text-right">
                       {/* Boarding comes from the gate. This is the manual exception when the gate fails. */}
-                      {db.session?.role === "Super Admin" && (
+                      {db.session?.role === "PITX Admin" && (
                         <button
                           className="text-brand underline"
                           onClick={() => setBoarded(t.id, t.status !== "Boarded")}

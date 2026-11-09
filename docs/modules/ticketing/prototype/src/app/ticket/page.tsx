@@ -8,7 +8,6 @@ import { SeatMap } from "@/components/seat-map";
 import { dateTimeManila, peso } from "@/lib/format";
 import { canAccess } from "@/lib/roles";
 import {
-  checkInBooking,
   markPrinted,
   moveTicket,
   pendingRequest,
@@ -60,7 +59,8 @@ function TicketDetail() {
   const role = db.session?.role;
   const canManage = role ? canAccess(role, "/tickets") : false;
   const canSell = role ? canAccess(role, "/pos") : false;
-  const canMove = canManage && (ticket.status === "Issued" || ticket.status === "Booked");
+  const canMove = canManage && ticket.status === "Reserved";
+  const canPrint = canManage || role === "Passenger";
   // eslint-disable-next-line react-hooks/purity -- the refund cutoff depends on the current time
   const refund = refundPlan(db, ticket, Date.now());
   const reprint = reprintPlan(db, ticket);
@@ -102,14 +102,14 @@ function TicketDetail() {
     event.preventDefault();
     const result = refundTicket(ticket!.id, { category, remark: reason, method: refundMethod, ref: refundRef, password });
     finish(result.error ?? null);
-    if (result.pending) setNotice("Refund request sent to the Super Admin for approval.");
+    if (result.pending) setNotice("Refund request sent to the PITX Admin for approval.");
   }
 
   function submitReprint(event: FormEvent) {
     event.preventDefault();
     const result = reprintTicket(ticket!.id, { category, remark: reason, passengerName, contactNo, password });
     finish(result.error ?? null);
-    if (result.pending) setNotice("Reprint request sent to the Super Admin for approval.");
+    if (result.pending) setNotice("Reprint request sent to the PITX Admin for approval.");
     else if (!result.error) {
       setNotice(`Reprint recorded. Collect ${peso(db.settings.reprintCharge)} from the passenger.`);
       window.print();
@@ -128,15 +128,7 @@ function TicketDetail() {
       )}
 
       <div className="no-print flex flex-wrap justify-center gap-2">
-        {ticket.status === "Booked" && canManage && (
-          <button
-            className="rounded bg-brand px-4 py-2 text-sm font-semibold text-white"
-            onClick={() => setError(checkInBooking(ticket.id))}
-          >
-            Issue boarding pass
-          </button>
-        )}
-        {ticket.status !== "Booked" && ticket.status !== "Voided" && !ticket.printed && canManage && (
+        {ticket.status !== "Voided" && !ticket.printed && canPrint && (
           <button className="rounded bg-brand px-4 py-2 text-sm font-semibold text-white" onClick={printFirstCopy}>
             Print
           </button>
@@ -170,7 +162,7 @@ function TicketDetail() {
       )}
       {(refundPending || reprintPending) && (
         <p className="no-print text-center text-sm text-amber-800">
-          {refundPending ? "Refund" : "Reprint"} request is waiting for the Super Admin.
+          {refundPending ? "Refund" : "Reprint"} request is waiting for the PITX Admin.
         </p>
       )}
       {error && panel === "none" && (

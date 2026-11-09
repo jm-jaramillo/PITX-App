@@ -30,7 +30,6 @@ const NAV_ICONS: Record<string, IconName> = {
   "/validate": "bays",
   "/trips": "calendar",
   "/reports": "chart",
-  "/import": "building",
   "/master": "building",
   "/settings": "building",
 };
@@ -58,7 +57,7 @@ async function refreshLive(setState: (state: LiveState) => void) {
 }
 
 // An operator account on the portal (profiles.role = operator, e.g. genesis-ops) is a bus
-// company: one role, Bus Company (Teller and PUB Admin together), for its own company only.
+// company: Operator Admin (or Teller, to see the counter view), for its own company only.
 const isOperator = (user: PortalUser | null) => user?.role === "operator";
 
 const letters = (text: string | undefined) => (text ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -81,7 +80,7 @@ function operatorCompanyId(db: Db, user: PortalUser): string | undefined {
 /** A session for the portal user in the given demo role, with the first active counter/company. */
 function portalSession(db: Db, user: PortalUser, role: Role): Session {
   const operator = isOperator(user);
-  const sessionRole: Role = operator ? "Bus Company" : role;
+  const sessionRole: Role = operator && !isCompanyRole(role) ? "Operator Admin" : role;
   return {
     name: user.name,
     role: sessionRole,
@@ -124,7 +123,7 @@ function ViewAs({ db, session, user }: { db: Db; session: Session; user: PortalU
         value={session.role}
         onChange={(e) => signIn(portalSession(db, user, e.target.value as Role))}
       >
-        {ROLES.map((r) => (
+        {ROLES.filter((r) => !isOperator(user) || isCompanyRole(r)).map((r) => (
           <option key={r}>{r}</option>
         ))}
       </select>
@@ -225,7 +224,7 @@ function Shell({ children }: { children: ReactNode }) {
     !!user &&
     (!session ||
       session.name !== user.name ||
-      (isOperator(user) && (session.role !== "Bus Company" || session.companyId !== operatorCompany)));
+      (isOperator(user) && (!isCompanyRole(session.role) || session.companyId !== operatorCompany)));
   useEffect(() => {
     if (!onSite) return;
     if (!user) {
@@ -233,8 +232,8 @@ function Shell({ children }: { children: ReactNode }) {
     } else if (isOperator(user) && !operatorCompany) {
       addOperatorCompany(user);
     } else if (sessionStale) {
-      // Same person: keep the role they picked. Someone else: start as Super Admin.
-      signIn(portalSession(db, user, session && session.name === user.name ? session.role : "Super Admin"));
+      // Same person: keep the role they picked. Someone else: start as PITX Admin.
+      signIn(portalSession(db, user, session && session.name === user.name ? session.role : "PITX Admin"));
     }
   }, [onSite, user, session, db, operatorCompany, sessionStale]);
 
@@ -312,13 +311,13 @@ function Shell({ children }: { children: ReactNode }) {
                   {company ? ` · ${company.code}` : ""}
                   {counter ? ` · ${counter.code}` : ""}
                 </p>
-                {onSite && user && !isOperator(user) && <ViewAs db={db} session={session} user={user} />}
-                {onSite && session.role === "Super Admin" && (
+                {onSite && user && <ViewAs db={db} session={session} user={user} />}
+                {onSite && session.role === "PITX Admin" && (
                   <button type="button" className="btn-link" disabled={live === "loading"} onClick={() => refreshLive(setLive)}>
                     {live === "loading" ? "Reading PITX…" : "Refresh from PITX"}
                   </button>
                 )}
-                {session.role === "Super Admin" && (
+                {session.role === "PITX Admin" && (
                   <button
                     type="button"
                     className="btn-link"

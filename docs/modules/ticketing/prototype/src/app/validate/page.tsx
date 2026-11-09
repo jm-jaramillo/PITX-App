@@ -29,7 +29,8 @@ export default function GateTestPage() {
           sub={
             <>
           Boarding passes are validated by the automated gate, not by staff. This screen stands in for the gate until the
-          hardware is connected, using the same rules the gate will follow.
+          hardware is connected, using the same rules the gate will follow. A USB or Bluetooth QR reader works here as is:
+          it types the ticket number and presses Enter, and the box stays ready for the next scan.
         </>
           }
         >
@@ -38,8 +39,14 @@ export default function GateTestPage() {
       </div>
       <form onSubmit={submit} className="flex items-end gap-2 rounded-lg border border-slate-200 bg-white p-4">
         <label className="flex-1">
-          Code read by the gate
-          <input ref={inputRef} autoFocus value={code} onChange={(e) => setCode(e.target.value)} />
+          Scan the QR code, or type the ticket number
+          <input
+            ref={inputRef}
+            autoFocus
+            autoComplete="off"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+          />
         </label>
         <button className="rounded bg-brand px-4 py-2 text-sm font-semibold text-white">Test scan</button>
       </form>
