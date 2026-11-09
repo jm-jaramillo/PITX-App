@@ -6,7 +6,7 @@ create type record_status as enum ('Active', 'Inactive');
 create type trip_status as enum ('Scheduled', 'Boarding', 'Departed', 'Cancelled');
 create type fare_type as enum ('Adult', 'Student', 'Senior', 'PWD');
 create type payment_method as enum ('Cash', 'Card', 'E-Wallet');
-create type ticket_status as enum ('Booked', 'Issued', 'Boarded', 'Voided');
+create type ticket_status as enum ('Reserved', 'Boarded', 'Voided');
 create type ticket_source as enum ('Counter', 'Online');
 
 create table provinces (
@@ -121,7 +121,7 @@ create table tickets (
   tendered numeric(10, 2),
   payment_ref text,
   issued_at timestamptz not null default now(),
-  status ticket_status not null default 'Issued',
+  status ticket_status not null default 'Reserved',
   void_reason text
 );
 

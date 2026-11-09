@@ -185,6 +185,18 @@ r = await as("authenticated", p2, `select public.ticketing_cancel_booking($1) j`
 ok("passenger cancels own hold", !r.error && val(r) === 1, r.error);
 ok("cancelled seat is free again", !(await taken()).includes(s1));
 
+// Paid at the counter: still Reserved, and its old hold time no longer frees the seat
+r = await book(p1, [{ seat_no: s1, passenger_name: "Pia One" }]);
+const b3 = val(r);
+await db.query(`update ticketing.tickets set payment_method = 'Cash', hold_until = now() - interval '1 minute' where group_id = $1`, [b3?.group_id]);
+ok("paid hold keeps its seat after the hold time", (await taken()).includes(s1));
+const paid = await one(`select status from ticketing.tickets where group_id = $1`, [b3?.group_id]);
+ok("paid hold stays Reserved", paid?.status === "Reserved", JSON.stringify(paid));
+r = await as("authenticated", p1, `select public.ticketing_cancel_booking($1) j`, [b3?.group_id]);
+ok("passenger can't cancel a paid booking", /Nothing to cancel/.test(r.error ?? ""), r.error);
+const oldStatus = await db.query(`update ticketing.tickets set status = 'Issued' where group_id = $1`, [b3?.group_id]).then(() => false, () => true);
+ok("old Issued status is refused", oldStatus);
+
 // Staff
 r = await as("authenticated", p1, `select public.ticketing_snapshot() j`);
 ok("passenger can't open the staff snapshot", /not a Ticketing member/.test(r.error ?? ""), r.error);

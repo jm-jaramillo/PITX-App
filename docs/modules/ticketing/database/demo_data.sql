@@ -194,7 +194,7 @@ begin
         case when pay = 'Cash' then ceil(fare / 100) * 100 end,
         case when pay = 'Cash' then null else 'DEMO-REF-' || seq end,
         sale0 + make_interval(mins => seq),
-        case when voided then 'Voided' when boarded then 'Boarded' when online then 'Booked' else 'Issued' end,
+        case when voided then 'Voided' when boarded then 'Boarded' else 'Reserved' end,
         not online,
         case when voided then 'Passenger changed plans (demo)' end,
         case when voided then co || ' Teller ' || (ctr + 1) end,

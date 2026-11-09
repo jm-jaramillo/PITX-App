@@ -141,7 +141,7 @@ as $$
       union all
       select k.seat_no from ticketing.tickets k
        where k.trip_id = p_trip and k.status <> 'Voided'
-         and not (k.status = 'Reserved' and k.hold_until < now())
+         and not (k.status = 'Reserved' and k.payment_method is null and k.hold_until < now())
       union all
       select m.seat_no from ticketing.seat_marks m
        where m.trip_id = p_trip

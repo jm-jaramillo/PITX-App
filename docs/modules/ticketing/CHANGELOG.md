@@ -37,6 +37,23 @@ sections 2 and 3).
 
 ---
 
+## 19 · Reserved status in the database (9 Nov)
+
+The database now uses the same ticket statuses as the demo: **Reserved**, **Boarded**, **Voided**. Booked and Issued are gone. The migrations were not applied yet, so they were edited in place.
+
+| File | What changed |
+|---|---|
+| `202611041000_ticketing_init.sql` | Tickets default to Reserved. Status check is Reserved, Boarded, Voided |
+| `202611041002_ticketing_passengers.sql` | An online hold is a Reserved ticket with `hold_until` and no payment yet. When the Teller records the payment it stays Reserved. Only **unpaid** holds expire or can be cancelled by the passenger. The two checks became one: a ticket needs a payment or a hold time, unless voided |
+| `202611061100_ticketing_core_links.sql` | Seats taken: an expired hold frees the seat only if it was never paid |
+| `database/demo_data.sql` | Sample tickets are Reserved instead of Booked or Issued |
+| `prototype/supabase/migrations/0001_cts.sql` (old draft) | Same status list |
+| `database/test/test.mjs` | 4 new checks: a paid hold keeps its seat after the hold time, stays Reserved, can't be cancelled online, and Issued is refused. 78 of 78 pass |
+
+Still different from the demo: online bookings in the database are pay-at-counter holds (no online payment yet). In the demo the passenger pays online at once.
+
+---
+
 ## 18 · Team review changes (9 Nov)
 
 Changes from the team's review of the demo.
@@ -61,7 +78,7 @@ Changes from the team's review of the demo.
 Not changed yet:
 
 - **Bus size (2x2, 3x2) defined in Trip Scheduling:** for JM. Ticketing already takes the seat map from Trip Scheduling's capacity when on real data.
-- **Database:** the `ticketing` migrations still use Booked and Issued. To be renamed to Reserved before they are applied.
+- **Database:** the `ticketing` migrations still used Booked and Issued. Renamed to Reserved in entry 19.
 
 Storage key is now `pitx-tms-db-v11`, so the demo loads fresh sample data once in every browser.
 

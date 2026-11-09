@@ -218,7 +218,7 @@ create table if not exists ticketing.tickets (
   tendered         numeric(10, 2),
   payment_ref      text,
   issued_at        timestamptz not null default now(),
-  status           text not null default 'Issued' check (status in ('Booked', 'Issued', 'Boarded', 'Voided')),
+  status           text not null default 'Reserved' check (status in ('Reserved', 'Boarded', 'Voided')),
   printed          boolean not null default false,
   void_reason      text,
   voided_by        text,

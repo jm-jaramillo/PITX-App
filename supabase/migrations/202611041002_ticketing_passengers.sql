@@ -5,11 +5,11 @@
 -- only the functions below, which show trips and free seats (no other
 -- passenger's details) and let them book, see and cancel their own bookings.
 --
--- An online booking is a hold: tickets start as 'Reserved' with hold_until.
--- The passenger pays at a PITX counter before the hold runs out, and the
--- Teller turns it into an 'Issued' ticket. Holds that run out are voided
--- automatically the next time anyone looks at or books that trip. There is
--- no online payment yet.
+-- An online booking is a hold: a 'Reserved' ticket with hold_until and no
+-- payment yet. The passenger pays at a PITX counter before the hold runs out,
+-- and the Teller records the payment (the status stays 'Reserved'). Unpaid
+-- holds that run out are voided automatically the next time anyone looks at
+-- or books that trip. There is no online payment yet.
 
 /* ----------------------------------------------------------------- Settings */
 
@@ -42,16 +42,17 @@ alter table ticketing.tickets
 
 alter table ticketing.tickets drop constraint if exists tickets_status_check;
 alter table ticketing.tickets add constraint tickets_status_check
-  check (status in ('Reserved', 'Booked', 'Issued', 'Boarded', 'Voided'));
+  check (status in ('Reserved', 'Boarded', 'Voided'));
 alter table ticketing.tickets drop constraint if exists tickets_paid_check;
 alter table ticketing.tickets add constraint tickets_paid_check
-  check (status in ('Reserved', 'Voided') or payment_method is not null);
+  check (status = 'Voided' or payment_method is not null or hold_until is not null);
+-- An unpaid ticket must be a hold with an end time (covered by tickets_paid_check).
 alter table ticketing.tickets drop constraint if exists tickets_hold_check;
-alter table ticketing.tickets add constraint tickets_hold_check
-  check (status <> 'Reserved' or hold_until is not null);
 
 create index if not exists tickets_booked_by_idx on ticketing.tickets (booked_by);
-create index if not exists tickets_hold_idx on ticketing.tickets (hold_until) where status = 'Reserved';
+drop index if exists ticketing.tickets_hold_idx;
+create index if not exists tickets_unpaid_hold_idx on ticketing.tickets (hold_until)
+  where status = 'Reserved' and payment_method is null;
 
 -- Online ticket numbers: <company ticket code>W-<number>.
 create sequence if not exists ticketing.online_ticket_seq start 100001;
@@ -77,7 +78,7 @@ declare n int;
 begin
   update ticketing.tickets
      set status = 'Voided', void_reason = 'Hold expired', voided_by = 'System'
-   where status = 'Reserved' and hold_until < now()
+   where status = 'Reserved' and payment_method is null and hold_until < now()
      and (p_trip is null or trip_id = p_trip);
   get diagnostics n = row_count;
   return n;
@@ -103,7 +104,7 @@ as $$
       union all
       select k.seat_no from ticketing.tickets k
        where k.trip_id = p_trip and k.status <> 'Voided'
-         and not (k.status = 'Reserved' and k.hold_until < now())
+         and not (k.status = 'Reserved' and k.payment_method is null and k.hold_until < now())
       union all
       select m.seat_no from ticketing.seat_marks m
        where m.trip_id = p_trip
@@ -334,7 +335,7 @@ begin
   if auth.uid() is null then raise exception 'Sign in first' using errcode = '42501'; end if;
   update ticketing.tickets
      set status = 'Voided', void_reason = 'Cancelled by passenger', voided_by = 'Passenger'
-   where group_id = p_group and booked_by = auth.uid() and status = 'Reserved';
+   where group_id = p_group and booked_by = auth.uid() and status = 'Reserved' and payment_method is null;
   get diagnostics n = row_count;
   if n = 0 then raise exception 'Nothing to cancel. Paid tickets are refunded at a PITX counter.'; end if;
   insert into ticketing.audit_log (by_name, by_id, action, detail)
