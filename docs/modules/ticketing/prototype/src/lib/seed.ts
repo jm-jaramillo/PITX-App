@@ -2,6 +2,7 @@ import { todayManila } from "./format";
 import { SAMPLE_OPERATORS } from "./operator-routes";
 import { getLayout, parseBlockedSeats } from "./seat-layouts";
 import type {
+  ApprovalRequest,
   AuditEntry,
   Bus,
   BusType,
@@ -41,6 +42,8 @@ const BUS_TYPES: [string, string, string, string, string?][] = [
   ["OGW", "SUP26", "Super deluxe", "26"],
   ["SCE", "REG49", "Regular aircon", "49"],
   ["SCE", "HC63", "High capacity", "63"],
+  ["GEN", "REG49", "Regular aircon", "49"],
+  ["GEN", "DLX45", "Deluxe", "45"],
 ];
 
 interface TripPlan {
@@ -72,6 +75,17 @@ const TRIP_PLANS: TripPlan[] = [
   { route: "LOR-QUEZON", type: "REG45", time: "10:00", bay: "B08", sold: 4, day: 1 },
   { route: "OGW-NORTHERN", type: "DLX36", time: "09:00", bay: "B18", sold: 3, day: 1 },
   { route: "SCE-VISMIN", type: "HC63", time: "09:30", bay: "B22", sold: 6, day: 2 },
+  // Genesis: a full day of trips in every state, so its Bus Company account has something
+  // to sell, board, refund and close.
+  { route: "GEN-NORTHERN", type: "REG49", time: "04:30", bay: "B19", sold: 41, status: "Departed" },
+  { route: "GEN-NORTHERN", type: "DLX45", time: "09:00", bay: "B19", sold: 30, status: "Departed" },
+  { route: "GEN-NORTHERN", type: "REG49", time: "21:45", bay: "B20", sold: 38, status: "Boarding" },
+  { route: "GEN-NORTHERN", type: "DLX45", time: "22:30", bay: "B19", sold: 14 },
+  { route: "GEN-NORTHERN", type: "REG49", time: "23:15", bay: "B20", sold: 45, stopSelling: true },
+  { route: "GEN-NORTHERN", time: "23:45", bay: "B20", sold: 2 },
+  { route: "GEN-NORTHERN", type: "REG49", time: "05:30", bay: "B19", sold: 9, day: 1 },
+  { route: "GEN-NORTHERN", type: "DLX45", time: "13:00", bay: "B20", sold: 4, day: 1 },
+  { route: "GEN-NORTHERN", type: "REG49", time: "06:00", bay: "B19", sold: 2, day: 2 },
 ];
 
 export const FIRST_NAMES = ["Ana", "Ben", "Carla", "Dino", "Ella", "Franco", "Gina", "Hector", "Ines", "Jomar", "Kim", "Leo"];
@@ -232,6 +246,23 @@ export function seedDb(): Db {
     }
   });
 
+  // Genesis: one refund and one reprint waiting for the Ticketing Admin, on tickets
+  // still to depart, so Approvals has work to show.
+  const genesisOpen = tickets.filter(
+    (t) => t.ticketNo.startsWith("GEN") && t.source === "Counter" && t.status === "Issued",
+  );
+  const requests: ApprovalRequest[] = genesisOpen.slice(0, 2).map((t, i) => ({
+    id: `req-gen-${i + 1}`,
+    type: i === 0 ? "Refund" : "Reprint",
+    ticketId: t.id,
+    category: i === 0 ? "Passenger changed plans" : "Lost ticket",
+    remark: i === 0 ? "Passenger asked to travel tomorrow instead (demo)." : "Passenger lost the printed pass (demo).",
+    requestedBy: t.soldBy ?? "GEN Teller 1",
+    counterId: t.counterId,
+    requestedAt: new Date(Date.parse(t.issuedAt) + 30 * 60_000).toISOString(),
+    status: "Pending",
+  }));
+
   return {
     provinces: [
       { id: "prov-mm", code: "MM", description: "Metro Manila", status: "Active" },
@@ -278,7 +309,7 @@ export function seedDb(): Db {
       reprintReasons: ["Lost ticket", "Damaged ticket", "Wrong passenger details", "Printer error", "Other"],
       approvalPassword: "demo1234",
     },
-    requests: [],
+    requests,
     closeCodes: [],
     closings: [],
   };

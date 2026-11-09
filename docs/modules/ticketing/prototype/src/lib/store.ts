@@ -28,7 +28,7 @@ import type {
 
 // Prototype data layer: browser localStorage. All reads and writes go through this
 // file so it can be swapped for a real backend without touching the screens.
-const KEY = "pitx-tms-db-v9";
+const KEY = "pitx-tms-db-v10"; // v10: Genesis added to the sample data
 
 let db: Db | null = null;
 const listeners = new Set<() => void>();

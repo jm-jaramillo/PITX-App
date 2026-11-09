@@ -40,7 +40,7 @@ function Icon({ name }: { name: IconName }) {
 }
 
 function initials(name: string): string {
-  const parts = name.trim().split(/s+/).filter(Boolean);
+  const parts = name.trim().split(/\s+/).filter(Boolean);
   return parts.length ? (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase() : "?";
 }
 
@@ -61,13 +61,20 @@ async function refreshLive(setState: (state: LiveState) => void) {
 // company: one role, Bus Company (Teller and PUB Admin together), for its own company only.
 const isOperator = (user: PortalUser | null) => user?.role === "operator";
 
-/** The operator's own company: by operator id (real PITX data), else by name. */
+const letters = (text: string | undefined) => (text ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+
+/**
+ * The operator's own company: by operator id (real PITX data), else by name, else by
+ * the company's first word inside the account name ("genesis-ops" is GENESIS TRANSPORT).
+ */
 function operatorCompanyId(db: Db, user: PortalUser): string | undefined {
   const byId = user.operatorId ? companyIdForOperator(user.operatorId) : "";
-  const name = user.name.trim().toUpperCase();
+  const name = letters(user.name);
+  const firstWord = (c: Db["companies"][number]) => letters(c.name.split(/\s+/).at(0));
   return (
     db.companies.find((c) => c.id === byId) ??
-    db.companies.find((c) => c.name.toUpperCase() === name || c.description?.toUpperCase() === name)
+    db.companies.find((c) => letters(c.name) === name || letters(c.description) === name) ??
+    db.companies.find((c) => firstWord(c).length >= 4 && name.includes(firstWord(c)))
   )?.id;
 }
 

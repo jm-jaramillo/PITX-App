@@ -35,6 +35,33 @@ sections 2 and 3).
 
 ---
 
+## 17 · Sample data for Genesis Transport (9 Nov)
+
+- Genesis Transport Service Inc. is now a sample company in the demo, so the team can
+  explore ticketing as a real operator account (`genesis-ops`). It's on the Northern Routes
+  list from Terminal Ops. Its routes, fares, plates and passengers are made up, like the
+  other sample companies.
+- What it has:
+  - code GEN; no logo yet, so its code shows instead
+  - 2 bus types (49-seat regular, 45-seat deluxe), 2 units each
+  - one route, PITX to Northern Routes
+  - **9 trips**: 6 today (2 departed, 1 boarding, 1 selling, 1 stopped selling, 1 waiting
+    for a unit), 2 tomorrow, 1 the day after
+  - **185 tickets** with cash, card and e-wallet sales, online bookings, refunds and
+    boarded passengers
+  - **2 requests waiting for the Ticketing Admin**: one refund, one reprint
+- Signing in as `genesis-ops` opens the Bus Company role for Genesis only. Operator accounts
+  now also match their company when the company's first word is in the account name
+  ("genesis-ops" is GENESIS), not only on an exact name.
+- The browser storage version went from v9 to v10, so every browser loads the new sample
+  data once. Sales anyone made in the demo before this are cleared.
+- Fixed: the avatar initials and the new name match split names on the letter "s" instead
+  of on spaces, because a regex lost its backslash. "Ronald Victoria" now shows "RV".
+- Checked in the browser as `genesis-ops`: Genesis only, 6 trips today, 165 tickets sold,
+  ₱140,580 sales, and the Bus Company menu.
+
+---
+
 ## 16 · Page headers, tiles and logo exactly as on TS (9 Nov)
 
 Compared with a Trip Scheduling Overview screenshot. The differences were:

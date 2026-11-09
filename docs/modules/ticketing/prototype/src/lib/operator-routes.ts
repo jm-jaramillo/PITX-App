@@ -98,14 +98,17 @@ export const OPERATOR_ROUTES: Record<string, string[]> = {
   ],
 };
 
-// The companies the demo runs on, because their logos are available. Only DLTB is on the
-// list above. The other denominations are placeholders until their real routes are supplied.
-export const SAMPLE_OPERATORS: (OperatorCompany & { logo: string })[] = [
+// The companies the demo runs on: five because their logos are available, plus Genesis so
+// its operator account (genesis-ops) has its own sample company to explore. DLTB and
+// Genesis are on the list above; the other denominations are placeholders until their
+// real routes are supplied.
+export const SAMPLE_OPERATORS: (OperatorCompany & { logo?: string })[] = [
   { code: "DLTB", name: DLTB, denominations: ["BATANGAS", "BICOL"], logo: "/brand/operators/dltb.jpg" },
   { code: "KRS", name: "KERSTEEN", denominations: ["BAGUIO"], logo: "/brand/operators/kersteen.png" },
   { code: "LOR", name: "LORNA EXPRESS", denominations: ["QUEZON"], logo: "/brand/operators/lorna.jpg" },
   { code: "OGW", name: "OGAWA LINER", denominations: ["NORTHERN ROUTES"], logo: "/brand/operators/ogawa.jpg" },
   { code: "SCE", name: "SOUTH CITY EXPRESS INC", denominations: ["VISMIN"], logo: "/brand/operators/south-city.jpg" },
+  { code: "GEN", name: "GENESIS TRANSPORT SERVICE INC", denominations: ["NORTHERN ROUTES"] },
 ];
 
 const FILLER = new Set(["INC", "CORP", "CO", "THE", "AND", "OF", "CORPORATION", "COMPANY"]);
