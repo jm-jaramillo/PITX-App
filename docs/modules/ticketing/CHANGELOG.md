@@ -35,6 +35,30 @@ sections 2 and 3).
 
 ---
 
+## 14 · Made-up sales on the real PITX trips (9 Nov)
+
+- When the demo shows real PITX trips, each trip with no tickets yet now gets made-up sales,
+  so the screens aren't empty: POS, Tickets, Manifest, Availability, Reports and Close Sales
+  ([prototype/src/lib/demo-sales.ts](prototype/src/lib/demo-sales.ts)).
+- Where they come from:
+  - Passengers come from the sample name list (Sample, Tester, Demo and the like).
+  - Ids start with `demo-`, and booking, payment and ID refs with `DEMO-`.
+  - The fare comes from the route's placeholder fare. Student, Senior and PWD are 20% off.
+- How the sales are spread:
+  - Departed trips are 55 to 95% sold and marked Boarded. Later trips are 10 to 70% sold.
+  - Mostly cash at the counter, about one in five sold online, and a few refunds.
+- Seats that are blocked, or that passengers requested through Trip Scheduling, are never
+  used.
+- A bus with no known seat count gets sales for 45 seats. Its trip still shows no seat map
+  in POS.
+- The same trip always gets the same sales. A refresh doesn't double them, and a trip
+  someone already sold on gets none.
+- The banner says passengers and sales are made up.
+- Tested: the live loader test, now 28/28, adds checks for the made-up sales, no doubles on
+  refresh, and seat rules. Not seen with a real staff account.
+
+---
+
 ## 13 · Same look as Trip Scheduling and TOS (9 Nov)
 
 - The demo now uses the PITX App design: the shared stylesheet (`docs/shared/styles.css`)

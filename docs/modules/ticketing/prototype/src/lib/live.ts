@@ -1,3 +1,4 @@
+import { addDemoSales } from "./demo-sales";
 import { todayManila } from "./format";
 import { baseCode, SAMPLE_OPERATORS } from "./operator-routes";
 import { portalAccessToken, SUPABASE_ANON_KEY, SUPABASE_URL } from "./portal";
@@ -12,8 +13,8 @@ import type { Bus, BusType, Company, Db, Route, SeatMark, Trip } from "./types";
 //   list_seat_trips(date)     approved trips whose bus has a seat map (anyone)
 //   get_trip_seats(booking)   seats passengers requested on a trip (anyone)
 // Fares, PTU/TIN and seat maps for buses without one are not in those modules:
-// they get placeholders the Super Admin can fix in Master Data. Sales stay in the
-// browser, like the rest of the demo.
+// they get placeholders the Super Admin can fix in Master Data. Trips with no sales
+// get made-up ones (demo-sales.ts). Sales stay in the browser, like the rest of the demo.
 
 const DAYS = 3; // today and the next two days
 
@@ -249,7 +250,7 @@ export async function loadLive(base: Db): Promise<LiveResult | null> {
   const tripIds = new Set(trips.map((t) => t.id));
   const tickets = base.tickets.filter((t) => tripIds.has(t.tripId));
   const ticketIds = new Set(tickets.map((t) => t.id));
-  const db: Db = {
+  const db: Db = addDemoSales({
     ...base,
     source: "pitx",
     loadedAt: new Date().toISOString(),
@@ -263,6 +264,6 @@ export async function loadLive(base: Db): Promise<LiveResult | null> {
     tickets,
     requests: base.requests.filter((r) => ticketIds.has(r.ticketId)),
     audit: base.audit.filter((a) => !a.tripId || tripIds.has(a.tripId)),
-  };
+  });
   return { db, trips: trips.length, staffFeed };
 }

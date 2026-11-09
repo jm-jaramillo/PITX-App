@@ -333,7 +333,7 @@ function Shell({ children }: { children: ReactNode }) {
         <main className="wrap">
           <p className="hint no-print" style={{ marginTop: 0, marginBottom: 18 }}>
             {db.source === "pitx"
-              ? `Real PITX trips, operators and plates from Trip Scheduling (read ${dateTimeManila(db.loadedAt ?? "")}). Fares are placeholders. Sales are saved in this browser only.`
+              ? `Real PITX trips, operators and plates from Trip Scheduling (read ${dateTimeManila(db.loadedAt ?? "")}). Passengers and sales are made up, and fares are placeholders. Sales are saved in this browser only.`
               : live === "empty"
                 ? "Sample data: no real trips are open to your account. Sales are saved in this browser only."
                 : "Prototype: dummy data saved in this browser only. No real payments yet."}

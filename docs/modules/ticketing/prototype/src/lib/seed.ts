@@ -74,8 +74,8 @@ const TRIP_PLANS: TripPlan[] = [
   { route: "SCE-VISMIN", type: "HC63", time: "09:30", bay: "B22", sold: 6, day: 2 },
 ];
 
-const FIRST_NAMES = ["Ana", "Ben", "Carla", "Dino", "Ella", "Franco", "Gina", "Hector", "Ines", "Jomar", "Kim", "Leo"];
-const LAST_NAMES = ["Sample", "Tester", "Demo", "Placeholder", "Mockup", "Trial", "Example"];
+export const FIRST_NAMES = ["Ana", "Ben", "Carla", "Dino", "Ella", "Franco", "Gina", "Hector", "Ines", "Jomar", "Kim", "Leo"];
+export const LAST_NAMES = ["Sample", "Tester", "Demo", "Placeholder", "Mockup", "Trial", "Example"];
 
 // [province code, province name, town code, town name, denomination]. Placeholder destinations.
 const PLACES: [string, string, string, string, string][] = [
