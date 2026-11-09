@@ -136,9 +136,11 @@ export default function ReportsPage() {
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {stats.map((s) => (
-          <div key={s.label} className="rounded-lg border border-slate-200 border-t-4 border-t-brand bg-white p-4">
-            <div className="text-xs text-slate-500">{s.label}</div>
-            <div className="mt-1 text-2xl font-semibold">{s.value}</div>
+          <div key={s.label} className="kpi">
+            <div className="kpi-label">{s.label}</div>
+            <div className="kpi-value">
+                <strong>{s.value}</strong>
+              </div>
           </div>
         ))}
       </div>

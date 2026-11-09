@@ -1,0 +1,3201 @@
+/* GENERATED from docs/shared/styles.css by scripts/sync-shared.mjs. Do not edit here. */
+/* PITX Trip Scheduling
+   ---------------------------------------------------------------------
+   Visual language follows the Megawide design system (MWIDE Design
+   System.md): quiet grey canvas, white cards on hairline borders, Inter
+   throughout, dark rail, downscale-only button tactility, tinted
+   callouts that always take their background + border + text from one
+   matched row.
+
+   The one deliberate departure: the system's single saturated accent is
+   Megawide red (#ee3124). This app is PITX's, so that accent slot is
+   PITX blue (--blue below). Anywhere the system says "brand", read
+   --blue; nothing here is red unless it means danger.
+
+   Light-theme only. Legacy variable names (--bar, --blue-wash, --amber-*,
+   etc.) are kept and re-pointed at the new values so every page's
+   local <style> block keeps working.
+   --------------------------------------------------------------------- */
+
+:root {
+  /* grounds & surfaces */
+  --ground: #f3f4f6;
+  --ground-alt: #eceef1;
+  --surface: #fff;
+  --inset: #f8f9fb;
+  --border: #e5e7eb;        /* default: fields, ghost buttons, small panels */
+  --border-card: #e6e7ea;   /* the card skin */
+  --border-pop: #e8e9ec;
+  --divider: #eef0f2;
+
+  /* dark rail */
+  --bar: #26282d;
+  --bar-chip: #34373d;
+  --navpill: #231f20;
+  --bar-text: #aeb3bc;
+  --bar-text-dim: #9ca3af;
+  --bar-rule: #3d4046;
+
+  /* type colours */
+  --title: #111827;
+  --title-strong: #000;
+  --text: #111827;
+  --text-2: #374151;
+  --label: #6b7280;
+  --faint: #9ca3af;
+  --placeholder: #c2c7cf;
+
+  /* accent = PITX blue (the system's brand slot) */
+  --blue: oklch(40% 0.16 258);
+  --blue-hover: oklch(34% 0.17 258);
+  --blue-dot: oklch(58% 0.17 258);
+  --blue-wash: oklch(94% 0.02 258);
+  --blue-ink: oklch(32% 0.11 258);
+  --blue-on-dark: oklch(72% 0.13 258);
+  --blue-ring: oklch(40% 0.16 258 / 0.16);
+
+  /* callout triads: background / border / text, always used together */
+  --red-wash: #fef2f1;   --red-br: #f3c8c4;   --red-ink: #c52026;
+  --amber-wash: #fff8ea; --amber-br: #f6e6bf; --amber-ink: #8a5a00;
+  --green-wash: #f0faf3; --green-br: #bbe3c6; --green-ink: #15803d;
+  --info-wash: #f5f9ff;  --info-br: #dbe7fb;  --info-ink: #1d4ed8;
+  --neutral-wash: #f8f9fb; --neutral-br: #eef0f2; --neutral-ink: #6b7280;
+  --red: #e11900;
+  --green: #8cc152;
+
+  --display: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --ui: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* shape */
+  --r-chip: 999px;
+  --r-btn: 10px;
+  --r-field: 11px;
+  --r-card-sm: 14px;
+  --r-card: 16px;
+  --r-modal: 18px;
+
+  /* elevation */
+  --shadow-card: 0 1px 2px rgba(20, 22, 28, 0.05);
+  --shadow-modal: 0 24px 70px rgba(20, 22, 28, 0.35);
+  --shadow-pop: 0 14px 34px rgba(20, 22, 28, 0.18);
+  --shadow-press: inset 0 1.5px 4px rgba(20, 22, 28, 0.22);
+
+  /* motion */
+  --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  /* Week view occupancy heat scale */
+  --heat-0: oklch(98% 0.003 260);
+  --heat-1: oklch(93% 0.05 145);
+  --heat-2: oklch(87% 0.09 110);
+  --heat-3: oklch(82% 0.13 75);
+  --heat-4: oklch(75% 0.17 45);
+  --heat-full: oklch(56% 0.2 25);
+  --heat-full-ink: #fff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--text);
+  font-family: var(--ui);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: oklch(80% 0.01 260);
+  border-radius: 4px;
+}
+
+/* ------------------------------------------------------------- layout */
+.wrap {
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 28px 32px 56px;
+}
+
+.wrap-narrow {
+  max-width: 860px;
+}
+
+@media (max-width: 640px) {
+  .wrap {
+    padding: 24px 16px 48px;
+  }
+}
+
+/* -------------------------------------------------- page header block */
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--label);
+}
+
+h1 {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 28px;
+  line-height: 1.15;
+  color: var(--title);
+  margin: 2px 0 0;
+  letter-spacing: -0.01em;
+}
+
+h2 {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 19px;
+  color: var(--title);
+  margin: 36px 0 0;
+}
+
+.subtle {
+  font-size: 12px;
+  color: var(--label);
+  margin: 4px 0 0;
+}
+
+/* ---------------------------------------------------------- app shell */
+/* Left sidebar + content column, same dark/blue tokens the old top bar
+   used - this only changes the shape of the control surface, not the
+   PITX colour system. */
+.app-shell {
+  display: flex;
+  align-items: stretch;
+  min-height: 100vh;
+}
+
+.app-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* --------------------------------------------------------- sidebar nav */
+.sidebar {
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: 100vh;
+  width: 236px;
+  flex: 0 0 auto;
+  background: var(--bar);
+  box-shadow: 2px 0 12px rgb(0 0 0 / 15%);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  transition: margin-left 0.2s ease;
+}
+
+.sidebar-brand {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 18px 16px;
+}
+
+.sidebar-brand .brand-link { display: flex; }
+.sidebar-brand img {
+  height: 19px;
+  /* the source mark is dark; invert it to sit on the dark sidebar */
+  filter: brightness(0) invert(1);
+}
+
+.sidebar-brand .unit {
+  font-size: 10px;
+  color: var(--bar-text-dim);
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  line-height: 1.3;
+}
+
+.sidebar-links {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 12px;
+}
+
+.sidebar-links a {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--bar-text);
+  text-decoration: none;
+  padding: 9px 12px;
+  border-radius: var(--r-chip);
+  white-space: nowrap;
+}
+
+.sidebar-links a .icon {
+  flex: 0 0 auto;
+  width: 18px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.sidebar-links a:hover {
+  color: #fff;
+  background: var(--bar-chip);
+}
+
+.sidebar-links a[aria-current="page"] {
+  color: #fff;
+  font-weight: 700;
+  background: var(--blue);
+}
+
+.sidebar-foot {
+  flex: 0 0 auto;
+  padding: 12px;
+  border-top: 1px solid var(--bar-rule);
+}
+
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 12px;
+}
+
+.sidebar-user-avatar {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--blue);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-user-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-user-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-user-role {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--bar-text-dim);
+}
+
+/* Single toggled state, slides the sidebar off-canvas rather than
+   resizing it so nothing inside has to reflow. The toggle button flips
+   this same class on any viewport; renderNav() additionally starts a
+   narrow viewport with it already applied. */
+.sidebar.is-collapsed {
+  margin-left: -236px;
+}
+
+@media (max-width: 860px) {
+  .sidebar {
+    position: fixed;
+    left: 0;
+  }
+}
+
+/* ------------------------------------------------------------ top bar */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  flex: 0 0 auto;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 28px;
+}
+
+.sidebar-toggle {
+  flex: 0 0 auto;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  width: 34px;
+  height: 34px;
+  font-size: 15px;
+  cursor: pointer;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-toggle:hover {
+  background: var(--ground-alt);
+}
+
+.topbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.whoami {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--ground-alt);
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--title);
+}
+
+.whoami .role {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--label);
+}
+
+/* ------------------------------------------------------ notifications */
+.notif-wrap {
+  position: relative;
+}
+
+.notif-bell {
+  position: relative;
+  background: var(--bar-chip);
+  border: none;
+  border-radius: 10px;
+  width: 36px;
+  height: 36px;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notif-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: var(--red-ink);
+  color: #fff;
+  border-radius: 999px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
+
+.notif-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 320px;
+  max-height: 420px;
+  overflow-y: auto;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  z-index: 50;
+}
+
+.notif-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.notif-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.notif-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.notif-item:last-child {
+  border-bottom: none;
+}
+
+.notif-item:hover {
+  background: var(--ground-alt);
+}
+
+.notif-item.is-unread {
+  background: var(--blue-wash);
+}
+
+.notif-item.is-unread:hover {
+  background: var(--blue-wash);
+  filter: brightness(0.97);
+}
+
+.notif-title {
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.notif-body {
+  font-size: 11.5px;
+  color: var(--label);
+}
+
+.notif-time {
+  font-size: 10.5px;
+  color: var(--faint);
+  margin-top: 2px;
+}
+
+.notif-empty {
+  padding: 20px 14px;
+  font-size: 12px;
+  color: var(--label);
+  text-align: center;
+}
+
+/* ------------------------------------------------------------- cards */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: 20px;
+  margin-top: 18px;
+}
+
+.card-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: oklch(35% 0.02 260);
+  margin-bottom: 14px;
+}
+
+/* KPI tiles */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.kpi {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card-sm);
+  padding: 16px 18px;
+}
+
+.kpi-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: oklch(52% 0.02 260);
+}
+
+.kpi-value {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.kpi-value strong {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 26px;
+  color: var(--title);
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi-value span {
+  font-size: 12px;
+  color: var(--label);
+}
+
+/* ------------------------------------------------------------- forms */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--label);
+}
+
+input,
+select,
+textarea {
+  color: var(--title);
+  background: var(--surface);
+  border: 1px solid oklch(88% 0.006 260);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-family: var(--ui);
+  font-size: 13px;
+  font-weight: 500;
+  outline: none;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px oklch(40% 0.16 258 / 0.12);
+}
+
+input:disabled,
+select:disabled {
+  background: var(--ground-alt);
+  color: var(--faint);
+}
+
+input::placeholder {
+  color: var(--faint);
+}
+
+.grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+  .grid-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1000px) {
+  .grid-4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .grid-5 {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+.span-all {
+  grid-column: 1 / -1;
+}
+
+/* ----------------------------------------------------------- buttons */
+button {
+  font-family: var(--ui);
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: var(--r-btn);
+  padding: 10px 18px;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--blue);
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--blue-hover);
+}
+
+.btn-approve {
+  background: var(--blue);
+  color: #fff;
+  padding: 8px 14px;
+  font-size: 12px;
+}
+
+.btn-approve:hover:not(:disabled) {
+  background: var(--blue-hover);
+}
+
+.btn-outline {
+  background: var(--surface);
+  border-color: oklch(88% 0.006 260);
+  color: var(--text-2);
+  font-weight: 600;
+}
+
+.btn-outline:hover:not(:disabled) {
+  background: var(--ground);
+  color: var(--title);
+}
+
+.btn-danger-outline {
+  background: var(--surface);
+  border-color: oklch(88% 0.006 260);
+  color: var(--text-2);
+  font-weight: 600;
+  padding: 8px 14px;
+  font-size: 12px;
+}
+
+.btn-danger-outline:hover:not(:disabled) {
+  border-color: oklch(80% 0.08 25);
+  color: var(--red-ink);
+  background: var(--red-wash);
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--blue);
+  cursor: pointer;
+}
+
+.btn-link:hover {
+  color: var(--blue-hover);
+  text-decoration: underline;
+}
+
+.btn-link.danger {
+  color: var(--red-ink);
+}
+
+/* ---------------------------------------------------------- messages */
+.msg {
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-top: 16px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.msg-error {
+  background: var(--red-wash);
+  color: var(--red-ink);
+}
+
+.msg-ok {
+  background: var(--green-wash);
+  color: var(--green-ink);
+}
+
+.inline-error {
+  color: var(--red-ink);
+  font-size: 12px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.inline-ok {
+  color: var(--green-ink);
+  font-size: 12px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+/* ------------------------------------------------------------ tables */
+.table-wrap {
+  margin-top: 16px;
+  overflow-x: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: oklch(52% 0.02 260);
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+/* Sortable column headers (vehicles.html, vehicles-database.html) - a
+   plain <th> click handler, no separate button element, so the arrow
+   suffix (&#9650;/&#9660;) just gets appended to the header's own text. */
+th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+th.sortable:hover {
+  color: var(--blue-ink);
+}
+
+td {
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--text);
+  border-bottom: 1px solid var(--divider);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+/* Click a row to open the read-only details dialog (vehicles.html,
+   vehicles-database.html) - not the same as .btn-link/Edit buttons
+   inside the row, which stop the click from reaching the row. */
+tr.row-clickable {
+  cursor: pointer;
+}
+
+tr.row-clickable:hover td {
+  background: var(--ground-alt);
+}
+
+/* Landed on from a notification (e.g. a CPC/OR-CR expiry alert) -
+   ?vehicle=<id> in the URL scrolls to and highlights this row, and pops
+   its details card. Stays highlighted (not a fade-out) so it's still
+   findable after the card is closed and the reader looks back at the
+   table. */
+tr.row-highlighted td {
+  background: var(--amber-wash);
+}
+
+tr.row-highlighted:hover td {
+  background: var(--amber-wash);
+  filter: brightness(0.97);
+}
+
+td strong,
+.cell-strong {
+  font-weight: 700;
+  color: oklch(28% 0.02 260);
+}
+
+/* Below this width, tables with more than a couple of columns stop
+   fitting - horizontal scroll inside .table-wrap technically works but
+   hides whatever's off to the right (status, actions) with no visual
+   hint there's more. Stack each row into a labeled card instead, using
+   the header text (mirrored into data-label on each cell) as the
+   label. Opt out per-table with .table-plain (e.g. the 2-column bay
+   list reads fine as a compact table even this narrow). */
+@media (max-width: 640px) {
+  .table-wrap:not(.table-plain) table,
+  .table-wrap:not(.table-plain) thead,
+  .table-wrap:not(.table-plain) tbody,
+  .table-wrap:not(.table-plain) tr,
+  .table-wrap:not(.table-plain) td {
+    display: block;
+    width: 100%;
+  }
+
+  .table-wrap:not(.table-plain) thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .table-wrap:not(.table-plain) tr {
+    padding: 12px 16px;
+    border-bottom: 8px solid var(--ground);
+  }
+
+  /* Label stacks above the value rather than sitting beside it, so a
+     cell holding a multi-line list (e.g. Schedule's Bookings column) or
+     a form (approve/reject actions) reads the same way as a plain one. */
+  .table-wrap:not(.table-plain) td {
+    padding: 7px 0;
+    border-bottom: 1px solid var(--divider);
+    white-space: normal;
+    text-align: left;
+  }
+
+  .table-wrap:not(.table-plain) td:last-child {
+    border-bottom: none;
+  }
+
+  .table-wrap:not(.table-plain) td:empty {
+    display: none;
+  }
+
+  .table-wrap:not(.table-plain) td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--label);
+    margin-bottom: 3px;
+  }
+}
+
+/* my-schedule.html's Week view renders both the 48-row x 7-column grid
+   and a condensed per-date agenda list from the same booking data (see
+   renderWeekGrid) - only one shows at a time, picked by viewport width
+   here rather than in JS, so there's a single render path either way.
+   Same breakpoint as the stacked-table rule above: below it a dense
+   grid needing both vertical and horizontal scroll is worse than a
+   grouped list. */
+#week-agenda-wrap {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  #week-grid-wrap {
+    display: none;
+  }
+
+  #week-agenda-wrap {
+    display: block;
+  }
+}
+
+/* ------------------------------------------------------------ badges */
+.badge {
+  display: inline-block;
+  border-radius: var(--r-chip);
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.badge-pending {
+  background: var(--amber-wash);
+  color: var(--amber-ink);
+}
+
+.badge-approved {
+  background: var(--green-wash);
+  color: var(--green-ink);
+}
+
+.badge-rejected {
+  background: var(--red-wash);
+  color: var(--red-ink);
+}
+
+.badge-cancelled {
+  background: var(--ground-alt);
+  color: var(--label);
+}
+
+.badge-active {
+  background: var(--green-wash);
+  color: var(--green-ink);
+}
+
+.badge-inactive {
+  background: var(--ground-alt);
+  color: var(--label);
+}
+
+/* LTFRB status from the masterlist import (docs/vehicles-database.html,
+   docs/vehicles.html) - active/inactive reuse the badges above, these two
+   cover the masterlist's other statuses. */
+.badge-no_record {
+  background: var(--amber-wash);
+  color: var(--amber-ink);
+}
+
+.badge-ltfrb_verified {
+  background: var(--blue-wash);
+  color: var(--blue-ink);
+}
+
+/* CPC/OR-CR validity cells (vehicles.html, vehicle-approvals.html,
+   vehicles-database.html) - same 30-day window as the expiry
+   notifications (migration 0024's sync_expiry_notifications). */
+.expiry-soon {
+  color: var(--amber-ink);
+  font-weight: 700;
+}
+
+.expiry-overdue {
+  color: var(--red-ink);
+  font-weight: 700;
+}
+
+/* flags a booking edited since it was first requested */
+.revised {
+  display: inline-block;
+  margin-left: 6px;
+  border-radius: var(--r-chip);
+  padding: 3px 9px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  background: var(--blue-wash);
+  color: var(--blue-ink);
+}
+
+/* --------------------------------------------------- request cards */
+.request-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: 20px;
+  margin-top: 16px;
+}
+
+.request-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.request-who {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 16px;
+  color: oklch(22% 0.02 260);
+  margin: 0;
+}
+
+.request-when {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+  text-align: right;
+}
+
+.request-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--divider);
+}
+
+.request-actions form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ------------------------------------------------------------- login */
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--ground-alt);
+}
+
+.login-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 36px;
+  box-shadow: 0 30px 60px -24px rgb(20 30 50 / 18%);
+}
+
+.login-head {
+  margin-bottom: 26px;
+}
+
+.login-head img {
+  height: 26px;
+  margin-bottom: 18px;
+}
+
+.login-head h1 {
+  font-size: 22px;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.login-form button {
+  margin-top: 4px;
+}
+
+.fineprint {
+  font-size: 11px;
+  color: var(--label);
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* ------------------------------------------------------------- misc */
+.empty {
+  margin-top: 20px;
+  background: var(--surface);
+  border: 1px dashed oklch(86% 0.006 260);
+  border-radius: var(--r-card);
+  padding: 32px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--label);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Lays out Change/Cancel side by side. This must be a plain <div> INSIDE
+   the <td>, not a class on the <td> itself: setting display:flex directly
+   on a table cell drops it out of the normal table-cell box model, so it
+   stops stretching to the row's full height - align-items:center then has
+   nothing to center within, and the buttons end up pinned above middle
+   instead of centered on the row. Keeping the <td> a plain cell lets the
+   table's own `vertical-align: middle` (see the generic td rule above)
+   center this div as a whole; align-items here only keeps Change and
+   Cancel level with each other. */
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.bookings-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  white-space: normal;
+}
+
+.bookings-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Shows the handed-off-from operator on a transferred booking (schedule
+   page only) - struck through, right before the current operator name. */
+.transferred-from {
+  color: var(--faint);
+  text-decoration: line-through;
+}
+
+.bay-tag {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--blue-ink);
+  background: var(--blue-wash);
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+/* A booking's auto-assigned trip number (route code + 24h time, e.g.
+   "NAG1530") - a distinct color from .bay-tag so the two short codes
+   next to each other (trip number, bay) don't blend together. */
+.trip-tag {
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--green-ink);
+  background: var(--green-wash);
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+/* A booking's trade name (the vehicle's DBA, when different from the
+   operator's own account name) - neutral grey rather than blue/green
+   like .bay-tag/.trip-tag, since it's just descriptive, not a status
+   or an assignment. */
+.trade-tag {
+  font-size: 11px;
+  font-weight: 600;
+  font-style: italic;
+  color: var(--text-2);
+  background: var(--ground-alt);
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+/* The Schedule page's inline "reassign this approved booking's bay"
+   control - a compact select + Save button standing in for the plain
+   .bay-tag on rows staff can edit. */
+.bay-reassign {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bay-reassign select {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--blue-ink);
+  background: var(--blue-wash);
+  border: none;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.muted {
+  color: var(--faint);
+}
+
+/* A whole table row dimmed (e.g. a past date on My schedule) - `td`'s own
+   explicit color would otherwise win over the inherited .muted color on
+   the row, since any explicit rule beats inheritance regardless of
+   specificity. */
+tr.muted td {
+  color: var(--faint);
+}
+
+/* ----------------------------------------------------- My schedule timeline */
+
+.tl-day {
+  margin-bottom: 32px;
+}
+
+.tl-day-heading {
+  font-family: var(--display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--title);
+  margin: 0 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tl-today-tag {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--blue-ink);
+  background: var(--blue-wash);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+/* Past days keep their structure but read as done-and-dusted. */
+.tl-day-past .tl-day-heading {
+  color: var(--faint);
+}
+.tl-day-past .timeline-dot {
+  background: var(--faint);
+}
+.tl-day-past .timeline-time,
+.tl-day-past .timeline-route,
+.tl-day-past .timeline-plate {
+  color: var(--faint);
+}
+.tl-day-past .bay-tag {
+  color: var(--faint);
+  background: var(--ground-alt);
+}
+
+/* Today's row/column in the staff schedule's Week view. */
+.week-today {
+  background: var(--blue-wash);
+}
+
+/* Week view: an occupancy heat grid, not a list of bookings - dates
+   across the top, time slots down the side, same orientation as
+   before. Each cell is a fixed-height fill count coloured by how full
+   the slot is; clicking one expands the actual bookings (with trip
+   numbers) into a detail row inserted right below, so the grid itself
+   never grows taller than 48 (or 24, in Hourly mode) rows regardless of
+   how many buses are booked. */
+.week-grid {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.week-grid th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--surface);
+  text-align: center;
+  white-space: nowrap;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.week-grid th.slot-col-head {
+  left: 0;
+  z-index: 4;
+  text-align: left;
+}
+
+.week-grid th.week-today small {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--blue);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.week-grid td.hour-cell {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 0 12px;
+  height: 34px;
+}
+
+.week-cell {
+  text-align: center;
+  padding: 0;
+  border-bottom: 1px solid var(--divider);
+  height: 34px;
+  width: 100px;
+}
+
+.heat-btn {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 34px;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.heat-btn:hover,
+.heat-btn:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: -2px;
+}
+
+.heat-0 {
+  background: var(--heat-0);
+  color: var(--faint);
+  font-weight: 400;
+}
+.heat-1 {
+  background: var(--heat-1);
+  color: var(--green-ink);
+}
+.heat-2 {
+  background: var(--heat-2);
+  color: oklch(38% 0.11 110);
+}
+.heat-3 {
+  background: var(--heat-3);
+  color: oklch(34% 0.13 60);
+}
+.heat-4 {
+  background: var(--heat-4);
+  color: #fff;
+}
+.heat-full {
+  background: var(--heat-full);
+  color: var(--heat-full-ink);
+  position: relative;
+}
+.heat-full::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border: 1.5px solid oklch(100% 0 0 / 0.55);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.heat-legend {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--faint);
+}
+.heat-legend-scale {
+  display: flex;
+  height: 10px;
+  width: 92px;
+  border-radius: 5px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.heat-legend-scale span {
+  flex: 1;
+}
+
+/* Detail row expanded under a clicked heat cell - spans every date
+   column so the booking list (with trip numbers) reads as one block
+   rather than being squeezed into a single 100px-wide cell. */
+.week-detail-row td {
+  padding: 14px 18px 18px;
+  background: var(--ground);
+  border-bottom: 2px solid var(--border);
+}
+
+.week-detail-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.week-detail-head h4 {
+  font-family: var(--display);
+  font-size: 14px;
+  margin: 0;
+  color: var(--title);
+}
+.week-detail-head .week-detail-meta {
+  font-size: 12px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+.week-detail-head .btn-link {
+  font-size: 12.5px;
+}
+
+.week-detail-bookings {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0;
+}
+.week-detail-bookings li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 0;
+  border-bottom: 1px dashed var(--divider);
+  font-size: 12.5px;
+}
+.week-detail-bookings li:last-child {
+  border-bottom: none;
+}
+.week-detail-bookings .bay-tag,
+.week-detail-bookings .trip-tag {
+  margin-left: 0;
+}
+.week-detail-empty {
+  font-size: 12.5px;
+  color: var(--faint);
+  padding: 6px 0;
+}
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+}
+
+.timeline-item {
+  display: flex;
+  gap: 16px;
+}
+
+/* The dot-and-line rail: a dot per item, with a connecting line down to
+   the next one (omitted on the last item so the timeline doesn't dangle). */
+.timeline-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 12px;
+  flex-shrink: 0;
+}
+
+.timeline-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--blue-dot);
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+
+.timeline-line {
+  flex: 1;
+  width: 2px;
+  background: var(--divider);
+  margin-top: 4px;
+}
+
+.timeline-item:last-child .timeline-line {
+  display: none;
+}
+
+.timeline-card {
+  flex: 1;
+  padding-bottom: 22px;
+}
+
+.timeline-time {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--title);
+  margin-bottom: 6px;
+}
+
+.timeline-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.timeline-route {
+  color: var(--text);
+}
+
+.timeline-plate {
+  color: var(--label);
+  font-variant-numeric: tabular-nums;
+}
+
+/* hour rows on the schedule get a subtle emphasis when occupied */
+.hour-cell {
+  font-weight: 700;
+  color: oklch(28% 0.02 260);
+  font-variant-numeric: tabular-nums;
+}
+
+.capacity {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.capacity-full {
+  color: var(--red-ink);
+}
+
+/* ------------------------------------------------------ edit dialog */
+dialog {
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: 26px;
+  max-width: 560px;
+  width: calc(100% - 32px);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 30px 60px -20px rgb(20 30 50 / 35%);
+}
+
+dialog::backdrop {
+  background: oklch(22% 0.03 258 / 55%);
+}
+
+.dialog-title {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 19px;
+  color: var(--title);
+  margin: 0;
+}
+
+.dialog-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr;
+  margin-top: 20px;
+}
+
+@media (min-width: 560px) {
+  .dialog-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+/* Read-only "click a row to see the full card" dialog (vehicles.html,
+   vehicles-database.html) - wider than the add/edit dialogs above since
+   it shows every field at once rather than a form to fill in. */
+dialog.details-dialog {
+  max-width: 720px;
+}
+
+.details-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px 20px;
+  margin-top: 20px;
+}
+
+@media (min-width: 560px) {
+  .details-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 720px) {
+  .details-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.detail-documents {
+  grid-column: 1 / -1;
+}
+
+.detail-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: oklch(52% 0.02 260);
+}
+
+.detail-value {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.detail-value a {
+  margin-right: 10px;
+}
+
+.warn {
+  background: var(--red-wash);
+  color: var(--red-ink);
+  border-radius: 14px;
+  padding: 12px 16px;
+  margin: 16px 0 0;
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+/* ------------------------------------------------------------ tab panels
+   (operator-overview.html - Overview/My requests/History folded into one
+   page as tabs, #91 follow-up). Reuses .mode-switch/.mode-tab for the tab
+   bar itself, same look as the in-page status filters already used
+   elsewhere - this just adds the show/hide behaviour for the panel each
+   tab controls. */
+.tab-panel {
+  display: none;
+}
+
+.tab-panel.is-active {
+  display: block;
+}
+
+/* ------------------------------------------- clickable record card grid
+   (operator-profiles.html) - a name + a couple of lines of context per
+   card, click one for the full detail dialog. Same shape as the vehicle
+   / booking "details" dialog pattern above, just fronted by cards
+   instead of a table row. */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+}
+
+.record-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card-sm);
+  padding: 14px 16px;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.record-card:hover {
+  border-color: var(--blue);
+  box-shadow: 0 6px 18px -8px rgb(20 30 50 / 20%);
+}
+
+.record-card-avatar {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--blue-wash);
+  color: var(--blue-ink);
+  font-size: 12.5px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.record-card-avatar.has-logo {
+  background: #fff;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+/* Logos run from square to wide banner - contain so none is cropped or
+   stretched, on white so transparent PNGs stay legible. */
+.record-card-avatar img,
+.details-head-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* Details dialog: logo sits top-left, beside the title. */
+.details-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.details-head-text {
+  min-width: 0;
+}
+
+.details-head-logo {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: var(--blue-wash);
+  color: var(--blue-ink);
+  font-size: 17px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* A logo gets a wide box rather than the initials circle - most operator
+   logos are horizontal wordmarks, and a 56px circle renders them as an
+   unreadable sliver. Height stays 56px so the header keeps its rhythm. */
+.details-head-logo.has-logo {
+  width: 132px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.details-head-logo a {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.record-card-body {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.record-card-title {
+  /* Both this and .record-card-sub are <span>s, not block elements -
+     text-overflow only ever clips a block/inline-block box, so without
+     this the overflow/ellipsis rules below were silent no-ops and a
+     long company name (plenty of these are real - "Erjohn and Almark
+     Transit Corporation", "Cavite Batangas Transport Multipurpose
+     Cooperative") spilled straight out of the card instead of
+     truncating. Found on the staff Operator profiles page. */
+  display: block;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--title);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.record-card-sub {
+  display: block;
+  font-size: 12px;
+  color: var(--label);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.record-card-meta {
+  font-size: 11px;
+  color: var(--faint);
+  margin-top: 6px;
+}
+
+/* The time-slot picker on the booking request form and its edit dialog
+   (dashboard.html) - an hour per mini-card, a clickable pill per
+   15-minute tick inside it, instead of one long flat dropdown of 96
+   options. */
+.slot-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 8px;
+  margin-top: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 10px;
+  border: 1px solid var(--border, #d7dbe3);
+  border-radius: var(--r-card-sm, 16px);
+  background: var(--ground, #f4f5f7);
+}
+
+.slot-hour-card {
+  border: 1px solid var(--border, #d7dbe3);
+  border-radius: var(--r-btn, 11px);
+  padding: 8px;
+  background: var(--surface, #fff);
+}
+
+.slot-hour-label {
+  margin: 0 0 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--label, #6b7280);
+}
+
+.slot-hour-ticks {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 5px;
+}
+
+.slot-tick {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  padding: 6px 4px;
+  border: 1px solid var(--border, #d7dbe3);
+  border-radius: 8px;
+  background: var(--ground-alt, #eef0f3);
+  color: var(--text, #1f2430);
+  cursor: pointer;
+}
+
+.slot-tick:hover {
+  border-color: var(--blue, #2f5fd0);
+}
+
+.slot-tick.is-selected {
+  background: var(--blue, #2f5fd0);
+  border-color: var(--blue, #2f5fd0);
+  color: #fff;
+}
+
+/* "Repeat this trip" on the booking form - operators run fixed weekly
+   schedules, so booking a week used to mean seven identical passes
+   through the form. */
+.repeat-box {
+  border: 1px solid var(--border, #d7dbe3);
+  border-radius: var(--r-card-sm, 16px);
+  padding: 12px 14px;
+  background: var(--ground, #f4f5f7);
+}
+
+.repeat-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--title, #14192b);
+  cursor: pointer;
+  margin: 0;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.repeat-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 12px;
+}
+
+.repeat-day {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border: 1px solid var(--border, #d7dbe3);
+  border-radius: 999px;
+  background: var(--surface, #fff);
+  color: var(--text, #1f2430);
+  cursor: pointer;
+}
+
+.repeat-day:hover {
+  border-color: var(--blue, #2f5fd0);
+}
+
+.repeat-day.is-on {
+  background: var(--blue, #2f5fd0);
+  border-color: var(--blue, #2f5fd0);
+  color: #fff;
+}
+
+/* Advisory, not blocking - e.g. "this gate is full, try a different
+   time" on the booking form. Amber rather than .warn's red since the
+   operator can still submit; it's a nudge, not an error. */
+.hint {
+  background: var(--amber-wash);
+  color: var(--amber-ink);
+  border-radius: 14px;
+  padding: 12px 16px;
+  margin: 12px 0 0;
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+.hint .btn-link {
+  color: var(--amber-ink);
+  text-decoration: underline;
+  font-size: 11.5px;
+}
+
+.req {
+  color: var(--red-ink);
+}
+
+/* An approved booking with no plate set yet - easy to miss otherwise,
+   since nothing else about an approved row demands attention. Used on
+   the whole table row (dashboard.html), a "Plate needed" tag in the
+   Plate No. cell, and the "Set plate now" call-to-action button. */
+tr.row-alert td {
+  background: var(--red-wash);
+}
+.plate-needed {
+  color: var(--red-ink);
+  font-weight: 700;
+}
+.btn-alert {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: var(--r-btn, 11px);
+  border: 1px solid var(--red-ink);
+  background: var(--red-ink);
+  color: #fff;
+  cursor: pointer;
+}
+.btn-alert:hover {
+  opacity: 0.9;
+}
+
+/* --------------------------------------------------- vehicle scan UI */
+.mode-switch {
+  display: flex;
+  gap: 6px;
+  background: var(--ground-alt);
+  border-radius: 10px;
+  padding: 4px;
+  margin-top: 18px;
+}
+
+.mode-tab {
+  flex: 1;
+  background: none;
+  border: none;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--label);
+  border-radius: 7px;
+}
+
+.mode-tab.is-active {
+  background: var(--surface);
+  color: var(--title);
+  box-shadow: 0 1px 3px rgb(20 30 50 / 12%);
+}
+
+.upload-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 22px;
+  min-height: 96px;
+  border: 1.5px dashed oklch(80% 0.01 260);
+  border-radius: 14px;
+  background: var(--ground);
+  cursor: pointer;
+  text-align: center;
+}
+
+.upload-drop:hover {
+  border-color: var(--blue);
+  background: var(--blue-wash);
+}
+
+.upload-drop span {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--label);
+}
+
+.upload-drop img {
+  max-width: 100%;
+  max-height: 220px;
+  border-radius: 10px;
+  object-fit: contain;
+}
+
+.scan-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  border-top-color: var(--blue);
+  animation: spin 0.75s linear infinite;
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.raw-text {
+  margin-top: 14px;
+  font-size: 11.5px;
+  color: var(--label);
+}
+
+.raw-text summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.raw-text pre {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  background: var(--ground-alt);
+  border-radius: 8px;
+  max-height: 140px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+/* =====================================================================
+   MWIDE design-system layer
+   Loaded last on purpose: it restyles the components above to the
+   Megawide system's skin (see the header comment for the one departure,
+   accent = PITX blue). Section numbers refer to "MWIDE Design System.md".
+   ===================================================================== */
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 2. type - Inter only; 600 is body, 700 the workhorse, 800 titles/metrics */
+body {
+  font-family: var(--ui);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--ground);
+}
+
+h1 {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--title-strong);
+  margin: 2px 0 0;
+}
+
+h2 {
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+
+.eyebrow,
+label,
+th,
+.kpi-label,
+.section-head,
+.detail-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.subtle,
+.fineprint {
+  font-weight: 600;
+  color: var(--label);
+}
+
+.kpi-value strong {
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+/* wrapping: break-word, never anywhere */
+.record-card-body,
+.detail-value,
+.request-who,
+td {
+  overflow-wrap: break-word;
+}
+
+/* 3. cards: white, hairline border, soft 1px shadow */
+.card,
+.kpi,
+.request-card,
+.table-wrap,
+.record-card,
+.empty {
+  background: var(--surface);
+  border: 1px solid var(--border-card);
+  box-shadow: var(--shadow-card);
+}
+
+.card,
+.request-card,
+.table-wrap {
+  border-radius: var(--r-card);
+}
+
+.kpi,
+.record-card {
+  border-radius: var(--r-card-sm);
+}
+
+.empty {
+  border-style: dashed;
+  border-color: var(--border);
+  box-shadow: none;
+  font-weight: 600;
+}
+
+.record-card:hover {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 2px var(--blue-ring);
+}
+
+.record-card-avatar {
+  border-radius: 999px;
+}
+
+td {
+  font-weight: 600;
+  border-bottom: 1px solid var(--divider);
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+th {
+  border-bottom: 1px solid var(--divider);
+}
+
+/* 4. fields: radius 11, brand focus ring, fill stays white */
+input,
+select,
+textarea {
+  border: 1px solid var(--border);
+  border-radius: var(--r-field);
+  font-weight: 600;
+  background: var(--surface);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--placeholder);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px var(--blue-ring);
+  background: var(--surface);
+}
+
+input:disabled,
+select:disabled {
+  background: var(--inset);
+  color: var(--faint);
+}
+
+/* links */
+a {
+  color: var(--blue);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--blue-hover);
+}
+
+/* 4. buttons - downscale-only tactility.
+   Idle sits at .985, hover returns to exactly 1 (ease-out, no spring, so
+   it never renders above 1:1), press shrinks and gains an inset shadow.
+   `filter` is identical idle vs hover so the label never shimmers. */
+button {
+  font-family: var(--ui);
+  font-weight: 700;
+  transform-origin: center;
+  transform: scale(0.985);
+  transition: filter 0.13s ease, transform 0.13s var(--ease-out),
+    box-shadow 0.08s ease, opacity 0.13s ease, background-color 0.13s ease,
+    color 0.13s ease, border-color 0.13s ease;
+}
+
+button:hover {
+  transform: scale(1);
+}
+
+button:active {
+  transform: scale(0.95);
+  filter: brightness(0.92);
+  box-shadow: var(--shadow-press) !important;
+  transition: transform 0.1s var(--ease-spring), filter 0.1s ease,
+    box-shadow 0.08s ease;
+}
+
+button:disabled {
+  cursor: default;
+  filter: none;
+  transform: scale(0.985);
+  box-shadow: none;
+}
+
+/* Controls that repeat per row, or that are text-like, hold still: the
+   background tint is their whole hover (the system's .quiet / .flat). */
+.btn-link,
+.mode-tab,
+.slot-tick,
+.repeat-day,
+.record-card,
+.kpi-link,
+.notif-item,
+.notif-bell,
+.sidebar-toggle,
+.btn-approve,
+.btn-danger-outline,
+td button,
+.row-actions button {
+  transform: none;
+}
+.btn-link:hover,
+.mode-tab:hover,
+.slot-tick:hover,
+.repeat-day:hover,
+.record-card:hover,
+.kpi-link:hover,
+.notif-item:hover,
+.notif-bell:hover,
+.sidebar-toggle:hover,
+.btn-approve:hover,
+.btn-danger-outline:hover,
+td button:hover,
+.row-actions button:hover {
+  transform: none;
+}
+.btn-link:active,
+.mode-tab:active,
+.slot-tick:active,
+.repeat-day:active,
+.record-card:active,
+.kpi-link:active,
+.notif-item:active,
+.notif-bell:active,
+.sidebar-toggle:active,
+.btn-approve:active,
+.btn-danger-outline:active,
+td button:active,
+.row-actions button:active {
+  transform: scale(0.97);
+  filter: none;
+  box-shadow: none !important;
+}
+.btn-link {
+  transition: opacity 0.13s ease, color 0.13s ease;
+}
+.btn-link:active {
+  transform: none;
+  opacity: 0.7;
+}
+
+@media (hover: hover) {
+  .btn-primary,
+  .btn-outline {
+    will-change: transform;
+  }
+}
+
+@media (hover: none) {
+  button {
+    transform: scale(1);
+  }
+  button:hover {
+    filter: none;
+    transform: scale(1);
+  }
+  button:active {
+    filter: brightness(0.93);
+    transform: scale(0.94);
+  }
+}
+
+.btn-primary,
+.btn-outline {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: var(--r-btn);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: var(--blue);
+  color: #fff;
+  box-shadow: 0 2px 8px var(--blue-ring);
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--blue-hover);
+}
+
+/* ghost: white, hairline border, tint on hover */
+.btn-outline {
+  background: var(--surface);
+  color: var(--text-2);
+  border: 1px solid var(--border);
+}
+.btn-outline:hover:not(:disabled) {
+  background: #f7f8f9;
+  color: var(--title);
+}
+
+/* a ghost button in a tone keeps a WHITE fill and only borrows the tone's
+   border + text - a tinted fill on a small control reads as disabled */
+.btn-danger-outline {
+  background: var(--surface);
+  border: 1px solid var(--red-br);
+  color: var(--red-ink);
+  border-radius: var(--r-btn);
+  font-weight: 600;
+}
+.btn-danger-outline:hover:not(:disabled) {
+  background: var(--red-wash);
+  border-color: var(--red-br);
+  color: var(--red-ink);
+}
+
+.btn-approve {
+  border-radius: var(--r-btn);
+}
+
+.btn-link {
+  color: var(--blue);
+  font-weight: 700;
+}
+.btn-link.danger {
+  color: var(--red-ink);
+}
+
+/* segmented tabs / filters */
+.mode-switch {
+  background: var(--ground-alt);
+  border-radius: 12px;
+}
+.mode-tab {
+  border-radius: 9px;
+  color: var(--label);
+  font-weight: 700;
+}
+.mode-tab:hover:not(.is-active) {
+  background: rgba(255, 255, 255, 0.55);
+}
+.mode-tab.is-active {
+  background: var(--surface);
+  color: var(--title);
+  font-weight: 800;
+  box-shadow: 0 1px 3px rgba(20, 22, 28, 0.1);
+}
+
+/* 1. callouts - background + border + text taken from ONE row */
+.msg,
+.hint,
+.warn,
+.lockout-card {
+  border: 1px solid transparent;
+  border-radius: var(--r-card-sm);
+  font-weight: 600;
+}
+.msg-error,
+.warn {
+  background: var(--red-wash);
+  border-color: var(--red-br);
+  color: var(--red-ink);
+}
+.msg-ok {
+  background: var(--green-wash);
+  border-color: var(--green-br);
+  color: var(--green-ink);
+}
+.hint,
+.lockout-card.is-urgent {
+  background: var(--amber-wash);
+  border-color: var(--amber-br);
+  color: var(--amber-ink);
+}
+.lockout-card.is-calm {
+  background: var(--neutral-wash);
+  border-color: var(--neutral-br);
+  color: var(--neutral-ink);
+  box-shadow: none;
+}
+.inline-error {
+  color: var(--red-ink);
+}
+.inline-ok {
+  color: var(--green-ink);
+}
+
+/* status chips: pill, tinted fill + matching border + ink */
+.badge,
+.revised {
+  border-radius: var(--r-chip);
+  border: 1px solid transparent;
+  padding: 3px 10px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.badge-pending,
+.badge-no_record {
+  background: var(--amber-wash);
+  border-color: var(--amber-br);
+  color: var(--amber-ink);
+}
+.badge-approved,
+.badge-active {
+  background: var(--green-wash);
+  border-color: var(--green-br);
+  color: var(--green-ink);
+}
+.badge-rejected {
+  background: var(--red-wash);
+  border-color: var(--red-br);
+  color: var(--red-ink);
+}
+.badge-cancelled,
+.badge-inactive {
+  background: var(--neutral-wash);
+  border-color: var(--neutral-br);
+  color: var(--neutral-ink);
+}
+.badge-ltfrb_verified,
+.revised {
+  background: var(--info-wash);
+  border-color: var(--info-br);
+  color: var(--info-ink);
+}
+
+/* sidebar: dark rail, active item = #231f20 pill with a brand outline */
+.sidebar-links a {
+  font-weight: 700;
+  color: var(--bar-text);
+  border-radius: 999px;
+  border: 1px solid transparent;
+  transition: background-color 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+    color 0.2s ease, border-color 0.2s ease;
+}
+.sidebar-links a:hover {
+  background: var(--bar-chip);
+  color: #fff;
+}
+.sidebar-links a[aria-current="page"] {
+  background: var(--navpill);
+  color: #fff;
+  font-weight: 800;
+  border-color: var(--blue-dot);
+}
+.sidebar-user-avatar {
+  background: var(--blue);
+}
+.topbar {
+  border-bottom: 1px solid var(--border);
+}
+.whoami {
+  border-radius: 999px;
+  background: var(--ground);
+  font-weight: 700;
+}
+
+/* 6. overlays: solid translucent scrim, never blurred */
+dialog {
+  border: 1px solid var(--border-card);
+  border-radius: var(--r-modal);
+  box-shadow: var(--shadow-modal);
+}
+dialog::backdrop {
+  background: rgba(13, 14, 17, 0.55);
+  backdrop-filter: none;
+}
+.dialog-title {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.login-card {
+  border-radius: var(--r-modal);
+  border-color: var(--border-card);
+  box-shadow: var(--shadow-modal);
+}
+.login-page {
+  background: var(--ground);
+}
+
+/* 10. scrollbars */
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+::-webkit-scrollbar-thumb {
+  background: #d3d7dd;
+  border-radius: 9px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* accessibility contract with the OS: stays regardless of other motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001s !important;
+    transition-duration: 0.001s !important;
+  }
+}
+
+/* ---------------------------------------------------- weekly trip matrix
+   (assets/week-view.js - staff Schedule and operator My schedule). One
+   table for the whole week: a row per departure time, a column per day;
+   each trip a compact chip of bus operator + trip code. */
+.week-scroll {
+  overflow: auto;
+  max-height: 72vh;
+  background: var(--surface);
+  border: 1px solid var(--border-card);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+}
+
+.week-matrix {
+  width: 100%;
+  min-width: 1000px;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+.week-matrix th,
+.week-matrix td {
+  padding: 0;
+  white-space: normal;
+  vertical-align: top;
+  border-bottom: 1px solid var(--divider);
+  border-right: 1px solid var(--divider);
+  text-transform: none;
+  letter-spacing: normal;
+}
+.week-matrix tr:last-child > * {
+  border-bottom: none;
+}
+.week-matrix th:last-child,
+.week-matrix td:last-child {
+  border-right: none;
+}
+
+/* sticky header row + sticky time column */
+.week-matrix thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--inset);
+}
+.week-corner {
+  left: 0;
+  z-index: 4 !important;
+  width: 84px;
+  padding: 10px 12px !important;
+  text-align: left;
+}
+.week-time {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  width: 84px;
+  padding: 8px 12px !important;
+  background: var(--blue-wash);
+  color: var(--blue-ink);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: left;
+  white-space: nowrap !important;
+}
+
+.week-col-head.is-today {
+  background: var(--blue-wash);
+}
+
+.week-day-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  text-align: left;
+  cursor: pointer;
+  transform: none;
+}
+.week-day-head:hover {
+  background: var(--blue-wash);
+  transform: none;
+}
+.week-day-head:active {
+  transform: none;
+  box-shadow: none !important;
+}
+.week-day-name {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.week-day-num {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--title-strong);
+}
+.week-col-head.is-today .week-day-num {
+  color: var(--blue);
+}
+.week-day-count {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--label);
+}
+
+.week-cell {
+  padding: 5px !important;
+}
+.week-cell.is-today {
+  background: color-mix(in oklch, var(--blue-wash) 45%, white);
+}
+.week-cell .week-trip + .week-trip {
+  margin-top: 4px;
+}
+
+.week-empty {
+  padding: 28px 16px !important;
+  text-align: center;
+  color: var(--faint);
+  font-size: 13px;
+}
+
+.week-trip {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--divider);
+  border-left: 3px solid var(--blue-dot);
+  background: var(--surface);
+  line-height: 1.25;
+}
+.week-trip-op {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--title);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.week-trip-code {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--label);
+  font-variant-numeric: tabular-nums;
+}
+.week-trip.is-mine {
+  background: var(--blue-wash);
+  border-color: var(--blue-ring);
+  border-left-color: var(--blue);
+}
+.week-trip.is-cancelled {
+  border-left-color: var(--neutral-br);
+}
+.week-trip.is-cancelled .week-trip-op,
+.week-trip.is-cancelled .week-trip-code {
+  color: var(--faint);
+  text-decoration: line-through;
+}
+.week-trip-dest {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.week-trip.is-cancelled .week-trip-dest {
+  text-decoration: line-through;
+}
+
+/* =====================================================================
+   Minimal pass (9 Oct): less chrome, tighter spacing, actions tucked into
+   menus. Appended last so it wins over the layers above.
+   ===================================================================== */
+
+/* no small-caps label above every title */
+.page-head .eyebrow {
+  display: none;
+}
+
+.page-head {
+  margin-bottom: 14px;
+}
+
+.help-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 4px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--label);
+  font-size: 11px;
+  font-weight: 800;
+  vertical-align: middle;
+  transform: none;
+}
+.help-dot:hover {
+  color: var(--blue);
+  border-color: var(--blue);
+  transform: none;
+}
+.page-help {
+  max-width: 62ch;
+  margin: 6px 0 0;
+}
+
+/* sidebar icons are SVG now */
+.sidebar-links a .icon {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+}
+.sidebar-links a .icon svg {
+  width: 18px;
+  height: 18px;
+}
+.notif-bell svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* tighter rhythm: cards, tiles, rows, page gutters */
+.wrap {
+  padding-top: 20px;
+}
+.card,
+.request-card {
+  padding: 16px;
+}
+.kpis {
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.kpi {
+  padding: 12px 14px;
+}
+.kpi-value {
+  margin-top: 2px;
+}
+.kpi-value strong {
+  font-size: 26px;
+}
+td {
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+th {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+.section-head {
+  margin: 20px 0 8px;
+}
+
+/* "..." menu: <details class="row-menu"> */
+.row-menu {
+  position: relative;
+  display: inline-block;
+}
+.row-menu > summary {
+  list-style: none;
+  cursor: pointer;
+}
+.row-menu > summary::-webkit-details-marker {
+  display: none;
+}
+.menu-btn,
+.avatar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+  user-select: none;
+}
+.menu-btn:hover,
+.avatar-btn:hover {
+  background: #f7f8f9;
+}
+.avatar-btn {
+  width: 34px;
+  border-radius: 999px;
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+  font-size: 12px;
+}
+.avatar-btn:hover {
+  background: var(--blue-hover);
+}
+.row-menu-pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 40;
+  min-width: 190px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border-pop);
+  border-radius: 12px;
+  box-shadow: var(--shadow-pop);
+  text-align: left;
+}
+.row-menu-pop > button,
+.row-menu-pop .btn-link {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  text-align: left;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-2);
+  transform: none;
+}
+.row-menu-pop > button:hover,
+.row-menu-pop .btn-link:hover {
+  background: var(--inset);
+  color: var(--title);
+  text-decoration: none;
+}
+.row-menu-pop .danger {
+  color: var(--red-ink);
+}
+.row-menu-pop form {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+}
+.row-menu-pop form input {
+  min-width: 0;
+  flex: 1;
+}
+.account-pop {
+  min-width: 200px;
+  padding: 12px;
+}
+.account-name {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--title);
+}
+.account-role {
+  margin: 0 0 10px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+/* table row: actions column stays narrow */
+td.row-actions-cell {
+  width: 1%;
+  text-align: right;
+}
+.cell-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--faint);
+  white-space: normal;
+  max-width: 220px;
+}
+
+/* schedule toolbars: filter sits inline, label hidden */
+.field:has(> #board-search) {
+  max-width: 320px;
+  margin: 0 0 12px;
+}
+.field:has(> #board-search) > label {
+  display: none;
+}
+
+/* quiet empty "calm" states disappear entirely */
+.is-calm-hidden {
+  display: none !important;
+}
+
+.notif-bell {
+  color: #fff;
+}
+.toolbar .row-menu-pop {
+  min-width: 150px;
+}
+.notif-bell {
+  padding: 0;
+}
+.notif-bell svg,
+.sidebar-links a .icon svg {
+  flex-shrink: 0;
+}
+
+/* Operator profiles: five cards across when the page is wide enough, four
+   when it isn't. The column floor is the larger of 190px and a fifth of the
+   row, so >= ~1000px of content gives 5, ~800-1000px gives 4, and below that
+   it steps down to 3/2/1 on its own. */
+.card-grid {
+  grid-template-columns: repeat(auto-fit, minmax(max(190px, calc((100% - 48px) / 5)), 1fr));
+}
+.card-grid .record-card {
+  padding: 12px 14px;
+  gap: 10px;
+}
+
+/* .app-content is a column flexbox, and a flex item with `margin: 0 auto`
+   shrinks to its content instead of stretching - so every page's .wrap was
+   collapsing to however wide its content happened to be (visible on Operator
+   profiles as a ~550px strip with two cards across). Fill the column; the
+   max-width on .wrap still caps it. */
+.app-content > .wrap {
+  width: 100%;
+}
+
+/* ------------------------------------------------------------ seat map */
+/* Shared by the passenger seat picker (seats.html) and the Ticketing
+   Admin queue (ticketing.html) - see assets/seat-map.js. */
+.seatmap {
+  --seat: 44px;
+  --aisle: 28px;
+  --gap: 6px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 14px 16px 12px;
+  background: var(--inset);
+  border: 1px solid var(--border);
+  border-radius: 28px 28px 14px 14px;
+  max-width: 100%;
+}
+.seatmap-front,
+.seatmap-back {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.seatmap-front { padding: 0 2px 8px; border-bottom: 2px solid var(--border); }
+.seatmap-back { justify-content: center; padding-top: 8px; border-top: 2px solid var(--border); }
+.seatmap-wheel { display: inline-flex; color: var(--label); }
+.seatmap-grid {
+  display: grid;
+  gap: var(--gap);
+  justify-content: center;
+}
+.seat-aisle { width: var(--aisle); }
+.seat {
+  width: var(--seat);
+  height: var(--seat);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: 600 13px/1 Inter, system-ui, sans-serif;
+  color: var(--text-2);
+  background: var(--surface);
+  border: 1.5px solid var(--blue-dot);
+  border-radius: 9px 9px 6px 6px;
+  cursor: pointer;
+  transition: transform 0.08s ease, background 0.12s ease;
+}
+.seat:active:not(:disabled) { transform: scale(0.94); }
+.seat:focus-visible { outline: 3px solid var(--blue-ring); outline-offset: 1px; }
+.seat-none { border: 0; background: none; cursor: default; }
+.seat-available:hover { background: var(--blue-wash); }
+.seat-selected {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+}
+.seat-held {
+  background: var(--amber-wash);
+  border-color: var(--amber-br);
+  color: var(--amber-ink);
+  cursor: not-allowed;
+}
+.seat-blocked {
+  background: var(--ground-alt);
+  border-color: var(--border);
+  color: var(--faint);
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+.seat:disabled { cursor: not-allowed; }
+
+.seat-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--label);
+}
+.seat-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.seat-legend .seat { width: 18px; height: 18px; border-radius: 5px; cursor: default; font-size: 0; }
+
+/* Seat picker layout: trip list / map + booking form side by side on a
+   wide screen, stacked on a phone. */
+.seat-picker { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 900px) {
+  .seat-picker { grid-template-columns: auto minmax(280px, 1fr); align-items: start; }
+}
+.seat-picker-map { display: flex; justify-content: center; overflow-x: auto; }
+.seat-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 30px;
+  margin: 0 0 12px;
+}
+.seat-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--blue-wash);
+  color: var(--blue-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+.trip-list { display: flex; flex-direction: column; gap: 10px; }
+.trip-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--border-card);
+  border-radius: var(--r-card-sm, 14px);
+  cursor: pointer;
+}
+.trip-option:hover:not(:disabled) { border-color: var(--blue-dot); }
+.trip-option:disabled { opacity: 0.55; cursor: not-allowed; }
+.trip-option strong { display: block; font-size: 15px; color: var(--title); }
+.trip-option small { color: var(--label); }
+.trip-option .trip-seats { text-align: right; white-space: nowrap; font-weight: 700; color: var(--title); }
+.trip-option .trip-seats small { display: block; font-weight: 500; }
+.public-wrap { max-width: 960px; margin: 0 auto; padding: 20px 16px 48px; }
+.public-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+.public-brand img { height: 30px; width: auto; max-width: 100%; }
+.public-brand span { font-weight: 800; color: var(--title); }

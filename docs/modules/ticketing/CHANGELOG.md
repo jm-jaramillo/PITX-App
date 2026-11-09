@@ -35,6 +35,33 @@ sections 2 and 3).
 
 ---
 
+## 13 · Same look as Trip Scheduling and TOS (9 Nov)
+
+- The demo now uses the PITX App design: the shared stylesheet (`docs/shared/styles.css`)
+  and the same sidebar and topbar markup as `renderNav`. That means the dark rail with the
+  same icons, Inter, grey background, white cards, PITX blue, and the avatar menu top right.
+- Kept as a single source: `prototype/scripts/sync-shared.mjs` copies `styles.css` and the
+  `ICONS` from `platform.js` into the demo before every dev run and build. The copies
+  (`src/app/pitx-shared.css`, `src/lib/pitx-icons.json`) are committed so the demo also
+  builds outside the repo; don't edit them by hand.
+- The shared styles sit in their own CSS layer, between Tailwind's reset and its utilities.
+  Tailwind's colours, corners and font now point at the shared tokens (slate greys, brand
+  and accent are PITX blue, 10px buttons, 16px cards). So the 16 screens follow the same
+  palette without being rewritten one by one.
+- Page titles, section headings and table headers follow the shared h1, h2 and th styles.
+  The summary tiles on the Dashboard and Reports now use the shared `.kpi` tiles.
+- The account menu (avatar, top right) holds the name, role, company and counter, plus:
+  - "View as"
+  - "Refresh from PITX" and "Reset demo data" (Super Admin)
+  - "All modules"
+
+  The bus company's logo shows in the topbar.
+- Checked in the browser against a Trip Scheduling page, at 1366 px wide: Dashboard,
+  Master Data, POS (seat map) and Tickets, plus the account menu. Not checked: every
+  screen at phone width.
+
+---
+
 ## 12 · Real PITX data in the demo, and a Bus Company role for operators (6 Nov)
 
 **Real data from the other modules** (`prototype/src/lib/live.ts`)
