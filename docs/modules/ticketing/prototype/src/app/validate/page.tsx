@@ -25,11 +25,16 @@ export default function GateTestPage() {
   return (
     <div className="mx-auto max-w-lg space-y-4">
       <div>
-        <PageTitle>Automated Gate Test</PageTitle>
-        <p className="subtle">
+        <PageTitle
+          sub={
+            <>
           Boarding passes are validated by the automated gate, not by staff. This screen stands in for the gate until the
           hardware is connected, using the same rules the gate will follow.
-        </p>
+        </>
+          }
+        >
+          Automated Gate Test
+        </PageTitle>
       </div>
       <form onSubmit={submit} className="flex items-end gap-2 rounded-lg border border-slate-200 bg-white p-4">
         <label className="flex-1">

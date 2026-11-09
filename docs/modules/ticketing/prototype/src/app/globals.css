@@ -49,6 +49,11 @@
     margin: 0 0.375rem 0 0;
   }
 
+  /* The logo keeps its full size, as on TS pages; the module name takes what is left. */
+  .sidebar-brand .brand-link {
+    flex-shrink: 0;
+  }
+
   /* Shared rows highlight on hover. */
   .wrap tbody tr:hover {
     background: var(--inset);
@@ -67,13 +72,7 @@
     box-shadow: var(--shadow-card);
   }
 
-  /* Page titles and section heads like the shared h1/h2. */
-  .wrap h1 {
-    font-size: 28px;
-    font-weight: 800;
-    letter-spacing: -0.01em;
-    color: var(--title);
-  }
+  /* Section heads: the shared h2 spacing is for plain pages. */
   .wrap h2 {
     margin-top: 0;
     font-weight: 800;

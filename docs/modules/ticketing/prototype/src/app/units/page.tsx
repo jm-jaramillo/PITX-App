@@ -27,11 +27,16 @@ export default function UnitAssignmentPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3">
         <div className="mr-auto">
-          <PageTitle>Unit Assignment</PageTitle>
-          <p className="subtle">
+          <PageTitle
+          sub={
+            <>
             Set the vehicle for each trip. Its seat arrangement becomes the seat map at the counter.
             {waiting > 0 && <span className="font-semibold text-amber-800"> {waiting} waiting for a unit.</span>}
-          </p>
+          </>
+          }
+        >
+          Unit Assignment
+        </PageTitle>
         </div>
         <label>
           Date

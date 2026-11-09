@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { CompanyLogo } from "@/components/company-logo";
+import { DemoNotice } from "@/components/page-title";
 import { dateTimeManila } from "@/lib/format";
 import { companyIdForOperator, loadLive } from "@/lib/live";
 import { asset } from "@/lib/paths";
@@ -244,6 +245,13 @@ function Shell({ children }: { children: ReactNode }) {
   }
 
   const avatar = initials(session.name);
+  // Shown under each page title (PageTitle), where TS pages put their callouts.
+  const notice =
+    db.source === "pitx"
+      ? `Real PITX trips, operators and plates from Trip Scheduling (read ${dateTimeManila(db.loadedAt ?? "")}). Passengers and sales are made up, and fares are placeholders. Sales are saved in this browser only.`
+      : live === "empty"
+        ? "Sample data: no real trips are open to your account. Sales are saved in this browser only."
+        : "Prototype: dummy data saved in this browser only. No real payments yet.";
   return (
     <div className="app-shell">
       <aside className={`sidebar no-print${navCollapsed ? " is-collapsed" : ""}`} id="nav">
@@ -331,15 +339,8 @@ function Shell({ children }: { children: ReactNode }) {
           </div>
         </div>
         <main className="wrap">
-          <p className="hint no-print" style={{ marginTop: 0, marginBottom: 18 }}>
-            {db.source === "pitx"
-              ? `Real PITX trips, operators and plates from Trip Scheduling (read ${dateTimeManila(db.loadedAt ?? "")}). Passengers and sales are made up, and fares are placeholders. Sales are saved in this browser only.`
-              : live === "empty"
-                ? "Sample data: no real trips are open to your account. Sales are saved in this browser only."
-                : "Prototype: dummy data saved in this browser only. No real payments yet."}
-          </p>
           {canAccess(session.role, pathname) ? (
-            children
+            <DemoNotice.Provider value={notice}>{children}</DemoNotice.Provider>
           ) : (
             <p className="text-sm text-slate-600">
               Your role can&apos;t open this page.{" "}

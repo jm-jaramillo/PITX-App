@@ -20,7 +20,7 @@ export default function ApprovalsPage() {
       <PageTitle>Approvals</PageTitle>
 
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-slate-600">Waiting for you · {pending.length}</h2>
+        <p className="section-head">Waiting for you · {pending.length}</p>
         {error && (
           <p role="alert" className="text-sm text-red-700">
             {error}
@@ -108,7 +108,7 @@ export default function ApprovalsPage() {
 
       {decided.length > 0 && (
         <section className="space-y-2">
-          <h2 className="text-sm font-semibold text-slate-600">Recently decided</h2>
+          <p className="section-head">Recently decided</p>
           <ul className="space-y-1 text-xs text-slate-600">
             {decided.map((r) => (
               <li key={r.id}>

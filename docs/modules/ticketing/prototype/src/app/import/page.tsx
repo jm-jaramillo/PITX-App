@@ -58,11 +58,16 @@ export default function ImportPage() {
 
   return (
     <div className="space-y-4">
-      <PageTitle>Import from scheduling and booking app</PageTitle>
-      <p className="subtle">
+      <PageTitle
+          sub={
+            <>
         Import trips first, then bookings. Re-importing updates matching trips, so a changed plate or cancelled trip
         shows on the Overview with the passengers affected.
-      </p>
+      </>
+          }
+        >
+          Import from scheduling and booking app
+        </PageTitle>
       <div className="flex gap-1 border-b border-slate-200">
         {TABS.map((t) => (
           <button

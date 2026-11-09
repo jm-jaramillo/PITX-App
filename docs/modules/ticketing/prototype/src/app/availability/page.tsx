@@ -37,8 +37,13 @@ export default function AvailabilityPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3">
         <div className="mr-auto">
-          <PageTitle>Ticket Availability</PageTitle>
-          <p className="subtle">Live seats left for upcoming trips. This is the data the PIDS screens need.</p>
+          <PageTitle
+          sub={
+            <>Live seats left for upcoming trips. This is the data the PIDS screens need.</>
+          }
+        >
+          Ticket Availability
+        </PageTitle>
         </div>
         <label>
           Date

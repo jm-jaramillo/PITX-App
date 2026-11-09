@@ -35,6 +35,28 @@ sections 2 and 3).
 
 ---
 
+## 16 · Page headers, tiles and logo exactly as on TS (9 Nov)
+
+Compared with a Trip Scheduling Overview screenshot. The differences were:
+- **Page header:** TS hides the small grey label above the title. It puts a "?" next to the
+  title, and the page description shows only when you click it (`tidyPageHead()` in
+  `platform.js`). `PageTitle` now builds the same `.page-head`, `.help-dot` and
+  `.page-help` markup.
+- **Title size:** the demo forced a 28px title; it now uses the shared h1 as is.
+- **Section heads:** grey sub-heads (Tickets, Trips, Waiting for you, Recently decided, To
+  count, Reconciled) now use the shared `.section-head`, the small grey caps TS uses for
+  "Utilization" and "By gate".
+- **Tiles:** Overview tiles show a unit after the number, like TS's "20 requests": "200
+  tickets", "25 passes", "84 passengers", "5 tickets".
+- **Notice:** the yellow demo-data notice moved from above the title to under it, where TS
+  puts its own callouts.
+- **Sidebar logo:** it keeps its full size like on TS. Before, it shrank to make room for
+  "Ticketing & Booking".
+- A browser that still shows "Dashboard" has the old copy cached. GitHub Pages caches for
+  10 minutes, and Ctrl+F5 reloads it.
+
+---
+
 ## 15 · Overview, Inter and page headers like the other modules (9 Nov)
 
 - "Dashboard" is now **Overview**, like Trip Scheduling and TOS. The page is titled Overview,

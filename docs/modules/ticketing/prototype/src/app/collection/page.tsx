@@ -22,14 +22,19 @@ export default function DailyCollectionPage() {
   return (
     <div className="space-y-6">
       <div>
-        <PageTitle>Daily Sales Collection</PageTitle>
-        <p className="subtle">
+        <PageTitle
+          sub={
+            <>
           Count each Teller&apos;s cash and enter it. The Teller&apos;s count and the system total only appear after you submit.
-        </p>
+        </>
+          }
+        >
+          Daily Sales Collection
+        </PageTitle>
       </div>
 
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-slate-600">To count · {waiting.length}</h2>
+        <p className="section-head">To count · {waiting.length}</p>
         {error && (
           <p role="alert" className="text-sm text-red-700">
             {error}
@@ -83,7 +88,7 @@ export default function DailyCollectionPage() {
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-slate-600">Reconciled · {done.length}</h2>
+        <p className="section-head">Reconciled · {done.length}</p>
         <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
           <table className="w-full text-sm">
             <thead className="text-left text-xs">

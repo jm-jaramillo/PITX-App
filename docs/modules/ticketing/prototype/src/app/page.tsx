@@ -20,7 +20,7 @@ import {
 } from "@/lib/store";
 import { PageTitle } from "@/components/page-title";
 
-export default function DashboardPage() {
+export default function OverviewPage() {
   const db = useDb();
   const [filter, setFilter] = useState<TripGroup | "All">("All");
   const today = todayManila();
@@ -35,12 +35,12 @@ export default function DashboardPage() {
   const company = db.companies.find((c) => c.id === db.session?.companyId);
 
   const ticketGroups = [
-    { label: "Tickets sold", value: String(sold.length) },
-    { label: "Passes to issue", value: String(tickets.filter((t) => t.status === "Booked").length) },
-    { label: "Boarded", value: String(tickets.filter((t) => t.status === "Boarded").length) },
-    { label: "Voided", value: String(tickets.length - sold.length) },
+    { label: "Tickets sold", value: String(sold.length), unit: "tickets" },
+    { label: "Passes to issue", value: String(tickets.filter((t) => t.status === "Booked").length), unit: "passes" },
+    { label: "Boarded", value: String(tickets.filter((t) => t.status === "Boarded").length), unit: "passengers" },
+    { label: "Voided", value: String(tickets.length - sold.length), unit: "tickets" },
     // Tellers count their cash blind at Close Sales, so they don't see the sales total.
-    ...(db.session?.role === "Teller" ? [] : [{ label: "Sales", value: peso(sold.reduce((sum, t) => sum + t.fare, 0)) }]),
+    ...(db.session?.role === "Teller" ? [] : [{ label: "Sales", value: peso(sold.reduce((sum, t) => sum + t.fare, 0)), unit: "" }]),
   ];
   const visible = filter === "All" ? trips : trips.filter((t) => tripGroup(db, t) === filter);
 
@@ -51,13 +51,14 @@ export default function DashboardPage() {
       </PageTitle>
 
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-slate-600">Tickets</h2>
+        <p className="section-head">Tickets</p>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
           {ticketGroups.map((s) => (
             <div key={s.label} className="kpi">
               <div className="kpi-label">{s.label}</div>
               <div className="kpi-value">
                 <strong>{s.value}</strong>
+                {s.unit && <span>{s.unit}</span>}
               </div>
             </div>
           ))}
@@ -83,7 +84,7 @@ export default function DashboardPage() {
       )}
 
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-slate-600">Trips</h2>
+        <p className="section-head">Trips</p>
         <div className="flex flex-wrap gap-2">
           {(["All", ...TRIP_GROUPS] as const).map((group) => {
             const count = group === "All" ? trips.length : trips.filter((t) => tripGroup(db, t) === group).length;
