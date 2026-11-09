@@ -3,6 +3,7 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { saveSettings, useDb } from "@/lib/store";
 import type { ApprovalMode, SystemParams } from "@/lib/types";
+import { PageTitle } from "@/components/page-title";
 
 const MODES: { value: ApprovalMode; label: string }[] = [
   { value: "None", label: "No approval needed" },
@@ -56,7 +57,7 @@ export default function SystemParametersPage() {
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      <h1 className="text-xl font-semibold">System Parameters</h1>
+      <PageTitle>System Parameters</PageTitle>
 
       <Group title="Selling">
         <label>

@@ -12,6 +12,7 @@ import {
   tripCompanyId,
   useDb,
 } from "@/lib/store";
+import { PageTitle } from "@/components/page-title";
 
 const STATUS_STYLE: Record<string, string> = {
   Available: "bg-green-100 text-green-900",
@@ -36,8 +37,8 @@ export default function AvailabilityPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3">
         <div className="mr-auto">
-          <h1 className="text-xl font-semibold">Ticket Availability</h1>
-          <p className="text-sm text-slate-600">Live seats left for upcoming trips. This is the data the PIDS screens need.</p>
+          <PageTitle>Ticket Availability</PageTitle>
+          <p className="subtle">Live seats left for upcoming trips. This is the data the PIDS screens need.</p>
         </div>
         <label>
           Date

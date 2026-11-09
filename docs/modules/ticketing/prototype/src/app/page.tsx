@@ -18,6 +18,7 @@ import {
   useDb,
   type TripGroup,
 } from "@/lib/store";
+import { PageTitle } from "@/components/page-title";
 
 export default function DashboardPage() {
   const db = useDb();
@@ -45,9 +46,9 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold">
-        {company ? `${company.name} · ` : ""}Summary · {today}
-      </h1>
+      <PageTitle sub={`${company ? `${company.name} · ` : ""}${today}: ticket sales, passengers who need attention, and every trip on the board.`}>
+        Overview
+      </PageTitle>
 
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-slate-600">Tickets</h2>

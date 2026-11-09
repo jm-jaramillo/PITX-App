@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { peso } from "@/lib/format";
 import { submitCollection, useDb } from "@/lib/store";
+import { PageTitle } from "@/components/page-title";
 
 export default function DailyCollectionPage() {
   const db = useDb();
@@ -21,8 +22,8 @@ export default function DailyCollectionPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold">Daily Sales Collection</h1>
-        <p className="text-sm text-slate-600">
+        <PageTitle>Daily Sales Collection</PageTitle>
+        <p className="subtle">
           Count each Teller&apos;s cash and enter it. The Teller&apos;s count and the system total only appear after you submit.
         </p>
       </div>

@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { dateTimeManila, todayManila } from "@/lib/format";
 import { closeSales, useDb } from "@/lib/store";
+import { PageTitle } from "@/components/page-title";
 
 export default function CloseSalesPage() {
   const db = useDb();
@@ -29,7 +30,7 @@ export default function CloseSalesPage() {
 
   return (
     <div className="mx-auto max-w-md space-y-4">
-      <h1 className="text-xl font-semibold">Close Sales · {today}</h1>
+      <PageTitle>Close Sales · {today}</PageTitle>
       {closing ? (
         <div role="status" className="rounded-lg border border-green-300 bg-green-50 p-5 text-sm text-green-900">
           <p className="font-semibold">Your sales are closed.</p>

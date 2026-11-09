@@ -5,6 +5,7 @@ import { useState } from "react";
 import { dateTimeManila, peso } from "@/lib/format";
 import { ticketHref } from "@/lib/paths";
 import { decideRequest, generateCloseCode, refundAmountFor, useDb } from "@/lib/store";
+import { PageTitle } from "@/components/page-title";
 
 export default function ApprovalsPage() {
   const db = useDb();
@@ -16,7 +17,7 @@ export default function ApprovalsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold">Approvals</h1>
+      <PageTitle>Approvals</PageTitle>
 
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-slate-600">Waiting for you · {pending.length}</h2>

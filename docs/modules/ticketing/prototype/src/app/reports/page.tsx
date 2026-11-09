@@ -5,6 +5,7 @@ import { peso, todayManila } from "@/lib/format";
 import { downloadTicketingReport, shiftRemittance } from "@/lib/reports";
 import { TRIP_GROUPS, tripGroup, useDb } from "@/lib/store";
 import type { Ticket } from "@/lib/types";
+import { PageTitle } from "@/components/page-title";
 
 function Breakdown({ title, tickets, groupBy }: { title: string; tickets: Ticket[]; groupBy: (t: Ticket) => string }) {
   const groups = new Map<string, { count: number; total: number }>();
@@ -88,7 +89,7 @@ export default function ReportsPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3">
-        <h1 className="mr-auto text-xl font-semibold">Ticketing and Boarding Report · {date}</h1>
+        <PageTitle className="mr-auto">Ticketing and Boarding Report · {date}</PageTitle>
         <label className="no-print">
           Trip date
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />

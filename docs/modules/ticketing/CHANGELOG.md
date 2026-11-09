@@ -35,6 +35,25 @@ sections 2 and 3).
 
 ---
 
+## 15 · Overview, Inter and page headers like the other modules (9 Nov)
+
+- "Dashboard" is now **Overview**, like Trip Scheduling and TOS. The page is titled Overview,
+  with the date (and company, for operators) in the line under it.
+- **Font:** the demo now loads Inter from Google Fonts, the same link and weights (500 to
+  800) as the other modules' pages. Before this it fell back to the system font, because the
+  shared stylesheet names Inter but doesn't load it.
+- **Page headers:** every page now opens with the same block as Trip Scheduling and TOS:
+  - a small grey eyebrow, "Ticketing & Booking · <page>"
+  - the large title
+  - the grey one-line description where the page has one
+
+  It's done by a new `PageTitle` component (`prototype/src/components/page-title.tsx`) used
+  by all 14 pages.
+- Checked in the browser: Inter is loaded and used for the titles, and the sidebar, eyebrow
+  and Overview page look right.
+
+---
+
 ## 14 · Made-up sales on the real PITX trips (9 Nov)
 
 - When the demo shows real PITX trips, each trip with no tickets yet now gets made-up sales,

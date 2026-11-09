@@ -19,6 +19,7 @@ import {
   type PassengerInput,
 } from "@/lib/store";
 import { FARE_TYPES, PAYMENT_METHODS, type FareType, type PaymentMethod } from "@/lib/types";
+import { PageTitle } from "@/components/page-title";
 
 const TIME_RANGES = {
   All: () => true,
@@ -103,7 +104,7 @@ function Pos() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">POS Ticketing</h1>
+      <PageTitle>POS Ticketing</PageTitle>
       {!canCharge && (
         <p className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
           Sign in with a counter to sell tickets.

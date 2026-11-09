@@ -5,6 +5,7 @@ import { useState } from "react";
 import { peso } from "@/lib/format";
 import { ticketHref } from "@/lib/paths";
 import { scopedTickets, useDb } from "@/lib/store";
+import { PageTitle } from "@/components/page-title";
 
 const STATUSES = ["All", "Booked", "Issued", "Boarded", "Voided"];
 
@@ -31,7 +32,7 @@ export default function TicketsPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3">
-        <h1 className="mr-auto text-xl font-semibold">Tickets and Bookings</h1>
+        <PageTitle className="mr-auto">Tickets and Bookings</PageTitle>
         <label>
           Search name, ticket no. or booking ref
           <input autoFocus value={search} onChange={(e) => setSearch(e.target.value)} />

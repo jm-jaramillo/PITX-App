@@ -14,6 +14,7 @@ import {
   useDb,
 } from "@/lib/store";
 import { SEAT_MARK_TYPES, TRIP_STATUSES, type SeatMarkType, type Trip, type TripStatus } from "@/lib/types";
+import { PageTitle } from "@/components/page-title";
 
 const EMPTY_FORM = { time: "", routeId: "", busId: "", bay: "", remark: "" };
 
@@ -141,7 +142,7 @@ export default function TripsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end gap-3">
-        <h1 className="mr-auto text-xl font-semibold">Daily Trip Management</h1>
+        <PageTitle className="mr-auto">Daily Trip Management</PageTitle>
         <label>
           Destination
           <select value={destination} onChange={(e) => setDestination(e.target.value)}>

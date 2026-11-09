@@ -1,7 +1,7 @@
 import type { Role } from "./types";
 
 export const NAV: { href: string; label: string; roles: Role[] }[] = [
-  { href: "/", label: "Dashboard", roles: ["Bus Company", "Teller", "PUB Admin", "Super Admin"] },
+  { href: "/", label: "Overview", roles: ["Bus Company", "Teller", "PUB Admin", "Super Admin"] },
   { href: "/pos", label: "POS Ticketing", roles: ["Bus Company", "Teller"] },
   { href: "/tickets", label: "Tickets", roles: ["Bus Company", "Teller", "Super Admin"] },
   { href: "/availability", label: "Ticket Availability", roles: ["Bus Company", "Teller", "PUB Admin", "Super Admin"] },

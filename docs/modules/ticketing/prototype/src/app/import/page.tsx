@@ -10,6 +10,7 @@ import {
   type PlanLine,
 } from "@/lib/import";
 import { applyBookingPlan, applyTripPlan, useDb } from "@/lib/store";
+import { PageTitle } from "@/components/page-title";
 
 type Kind = "trips" | "bookings";
 
@@ -57,10 +58,10 @@ export default function ImportPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Import from scheduling and booking app</h1>
-      <p className="text-sm text-slate-600">
+      <PageTitle>Import from scheduling and booking app</PageTitle>
+      <p className="subtle">
         Import trips first, then bookings. Re-importing updates matching trips, so a changed plate or cancelled trip
-        shows on the Dashboard with the passengers affected.
+        shows on the Overview with the passengers affected.
       </p>
       <div className="flex gap-1 border-b border-slate-200">
         {TABS.map((t) => (

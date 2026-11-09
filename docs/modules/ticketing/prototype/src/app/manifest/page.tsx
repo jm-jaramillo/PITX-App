@@ -5,6 +5,7 @@ import { useState } from "react";
 import { peso, todayManila } from "@/lib/format";
 import { ticketHref } from "@/lib/paths";
 import { scopedTrips, setBoarded, useDb } from "@/lib/store";
+import { PageTitle } from "@/components/page-title";
 
 export default function ManifestPage() {
   const db = useDb();
@@ -22,7 +23,7 @@ export default function ManifestPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Passenger Manifest and Boarding Report</h1>
+      <PageTitle>Passenger Manifest and Boarding Report</PageTitle>
       <div className="no-print grid gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-3">
         <label>
           Date

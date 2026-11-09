@@ -3,6 +3,7 @@
 import { useRef, useState, type FormEvent } from "react";
 import { todayManila } from "@/lib/format";
 import { useDb, validateTicket, type ValidationResult } from "@/lib/store";
+import { PageTitle } from "@/components/page-title";
 
 export default function GateTestPage() {
   const db = useDb();
@@ -24,8 +25,8 @@ export default function GateTestPage() {
   return (
     <div className="mx-auto max-w-lg space-y-4">
       <div>
-        <h1 className="text-xl font-semibold">Automated Gate Test</h1>
-        <p className="text-sm text-slate-600">
+        <PageTitle>Automated Gate Test</PageTitle>
+        <p className="subtle">
           Boarding passes are validated by the automated gate, not by staff. This screen stands in for the gate until the
           hardware is connected, using the same rules the gate will follow.
         </p>

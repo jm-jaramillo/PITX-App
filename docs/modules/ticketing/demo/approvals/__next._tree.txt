@@ -1,4 +1,5 @@
-:HL["/PITX-App/modules/ticketing/demo/_next/static/chunks/0-0rxt6aeug2m.css","style"]
+:HL["/PITX-App/modules/ticketing/demo/_next/static/chunks/0f0iooj50cmnw.css","style"]
+:HL["https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap","style"]
 2:[["children",{"s":"__PAGE__","h":160}]]
 1:[["children",{"s":"approvals","h":96,"c":"$Q2"}]]
-0:{"b":"3KcwVJP7eEGCsPj1GA9bM","t":{"t":{"s":"","h":80,"c":"$Q1"}}}
+0:{"b":"yYlgIszOxNPGjPHedp6ze","t":{"t":{"s":"","h":80,"c":"$Q1"}}}
