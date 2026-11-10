@@ -23,7 +23,7 @@ export function PageTitle({ children, sub, className = "" }: { children: ReactNo
     <div className={className}>
       <div className="page-head">
         <div>
-          <p className="eyebrow">Ticketing &amp; Booking{section ? ` · ${section}` : ""}</p>
+          <p className="eyebrow">Ticketing &amp; Boarding{section ? ` · ${section}` : ""}</p>
           <h1>
             {children}
             {sub && (

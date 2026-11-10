@@ -268,7 +268,7 @@ function Shell({ children }: { children: ReactNode }) {
           <span className="unit">
             Ticketing
             <br />
-            &amp;&nbsp;Booking
+            &amp;&nbsp;Boarding
           </span>
         </div>
         <nav className="sidebar-links">

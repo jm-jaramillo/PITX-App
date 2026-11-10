@@ -1,4 +1,4 @@
-# Ticketing and Booking: build plan
+# Ticketing and Boarding: build plan
 
 Owner: @victoriaronald. Status: **approved 6 Nov 2026 (@jm-jaramillo, @Jcbllanto16 changes are auto-approved).** Build the pages next.
 **Database decision (6 Nov):** Ticketing runs in the shared PITX project, in its own

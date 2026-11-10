@@ -32,7 +32,7 @@ export const MODULES = [
   },
   {
     id: "ticketing",
-    name: "Ticketing and Booking",
+    name: "Ticketing and Boarding",
     description: "Counter sales, boarding passes, refunds and daily sales collection.",
     path: "modules/ticketing/",
     // index.html opens the demo (prototype on sample data) until the Supabase

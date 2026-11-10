@@ -1,6 +1,6 @@
 # Project log
 
-Build history of the Ticketing and Booking module of PITX App.
+Build history of the Ticketing and Boarding module of PITX App.
 Owner: @victoriaronald
 Repo: <https://github.com/jm-jaramillo/PITX-App>
 Plan: [PLAN.md](PLAN.md)
@@ -34,6 +34,20 @@ newest first. Migrations are listed with the entry that added them.
 Still to agree with the other owners: the trip feed functions, the new `teller` and
 `account` roles, and how passenger seat requests hand over to Ticketing (PLAN.md
 sections 2 and 3).
+
+---
+
+## 20 · Module renamed Ticketing and Boarding (10 Nov)
+
+The module is now called **Ticketing and Boarding** (was Ticketing and Booking). Older entries below keep the old name.
+
+| Where | Change |
+|---|---|
+| Demo | Sidebar label and the grey header line on every page ("Ticketing & Boarding · Overview") |
+| Portal | Module card name (`docs/shared/modules.js`, logged in the shared changelog) |
+| Docs | README, CONTRIBUTING, PLAN.md title, `index.html` title, this log's header, the comment at the top of `202611041000_ticketing_init.sql` |
+
+No change to the folder (`docs/modules/ticketing/`), the `ticketing` schema, roles or links.
 
 ---
 

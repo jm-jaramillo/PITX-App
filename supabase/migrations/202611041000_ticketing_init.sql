@@ -1,4 +1,4 @@
--- Ticketing and Booking: tables for counter selling, passes, refunds, reprints,
+-- Ticketing and Boarding: tables for counter selling, passes, refunds, reprints,
 -- Close Sales and Daily Sales Collection (docs/modules/ticketing/PLAN.md).
 --
 -- Runs on the shared PITX project, before the core master-data migration

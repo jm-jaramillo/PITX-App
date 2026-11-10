@@ -3,6 +3,10 @@
 Changes to `docs/shared/`, `supabase/functions/` and `core` migrations.
 Newest first. Owners: @jm-jaramillo @Jcbllanto16 @victoriaronald
 
+## 2026-11-10 - Ticketing card renamed Ticketing and Boarding (@victoriaronald)
+- `modules.js`: the Ticketing card's name is now "Ticketing and Boarding" (was Ticketing and
+  Booking). Same id, path and roles (Ticketing CHANGELOG entry 20).
+
 ## 2026-11-06 - Operators can open Ticketing and Booking (@victoriaronald)
 - `modules.js`: the Ticketing card now also shows for `operator`, which opens as that operator's
   bus company only (Ticketing CHANGELOG entry 12). Operators now land on the module list with two

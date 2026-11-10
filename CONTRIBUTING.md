@@ -1,7 +1,7 @@
 # Modules and contributing
 
 PITX Terminal Ops is one site made of modules. **Trip Scheduling** is the first;
-**Ticketing and Booking** is next. All modules share one repo, one Supabase
+**Ticketing and Boarding** is next. All modules share one repo, one Supabase
 project and one login.
 
 ```
@@ -13,7 +13,7 @@ docs/
     config.js, styles.css, pitx-logo.webp
   modules/
     trip-scheduling/                  owner: Trip Scheduling
-    ticketing/                        owner: Ticketing and Booking
+    ticketing/                        owner: Ticketing and Boarding
 supabase/
   migrations/                         see "Database" below
   functions/                          shared functions, plus <module>-prefixed ones
