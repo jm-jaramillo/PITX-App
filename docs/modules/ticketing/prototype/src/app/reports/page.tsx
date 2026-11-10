@@ -182,7 +182,7 @@ export default function ReportsPage() {
             </tbody>
           </table>
         </div>
-        <Breakdown title="Denomination" tickets={sold} groupBy={denominationOf} />
+        <Breakdown title="Gate" tickets={sold} groupBy={denominationOf} />
         <Breakdown title="Bus company" tickets={sold} groupBy={companyOf} />
         <Breakdown title="Route" tickets={sold} groupBy={routeOf} />
         <Breakdown

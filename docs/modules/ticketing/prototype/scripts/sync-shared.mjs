@@ -28,3 +28,22 @@ if (!match) throw new Error("sync-shared: ICONS not found in platform.js");
 writeFileSync(path.join(app, "src/lib/pitx-icons.json"), JSON.stringify(JSON.parse(match[1]), null, 2) + "\n");
 
 console.log("sync-shared: copied styles.css and ICONS from", shared);
+
+// Trip Scheduling's destinations and gates (its assets/app.js), so Ticketing's routes and
+// trip-number codes are the same ones (src/lib/trip-routes.ts).
+const tsApp = process.env.PITX_TRIP_SCHEDULING_APP ?? path.resolve(app, "../../trip-scheduling/assets/app.js");
+if (existsSync(tsApp)) {
+  const source = readFileSync(tsApp, "utf8");
+  const literal = (name) => {
+    const found = source.match(new RegExp(`export const ${name} = ([\\[{][\\s\\S]*?\\n[\\]}]);`));
+    if (!found) throw new Error(`sync-shared: ${name} not found in ${tsApp}`);
+    return new Function(`return ${found[1]}`)();
+  };
+  writeFileSync(
+    path.join(app, "src/lib/trip-routes.json"),
+    JSON.stringify({ source: "docs/modules/trip-scheduling/assets/app.js", routes: literal("ROUTES"), gates: literal("ROUTE_GATES") }, null, 2) + "\n",
+  );
+  console.log("sync-shared: copied ROUTES and ROUTE_GATES from", tsApp);
+} else {
+  console.log(`sync-shared: ${tsApp} not found, using the committed trip-routes.json`);
+}

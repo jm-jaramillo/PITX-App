@@ -37,6 +37,31 @@ sections 2 and 3).
 
 ---
 
+## 22 · Routes and trip numbers from Trip Scheduling (10 Nov)
+
+Ticketing routes are now the specific Trip Scheduling destinations, keyed by the trip number. A Trip Scheduling trip number is the destination's 3-letter code plus the departure time (NAG1530 = NAGA CITY at 15:30), so the code tells Ticketing exactly which route a trip is.
+
+| Where | Before | Now |
+|---|---|---|
+| Real trips (`live.ts`) | One route per company and route text, coded like `DLTB-NAGA-CITY` | One route per company and destination. Code = the trip number's code (`NAG`), name "PITX to NAGA CITY". A trip without a number gets its code from the destination list |
+| Route group (denomination) | Region (BICOL, NORTHERN ROUTES) | The destination's Trip Scheduling gate (Gate 2, 4, 5). Labelled "Gate" in Master Data and Reports |
+| Destination filter | Real data had no towns, so the POS town filter was empty | Each destination is a town, so POS can filter by it. Daily Trips filters by the specific route |
+| Sample data | "PITX to BICOL", trip numbers T-0001 | Real destinations (NAGA CITY, BATANGAS CITY, BAGUIO CITY, LUCENA CITY, DAGUPAN CITY, TACLOBAN CITY, BALANGA, BATAAN) and Trip Scheduling style trip numbers (NAG0530, BA20630). Which operator runs which destination is still made up |
+| Placeholder fares | By region word | By destination, then by gate (Gate 2 PHP 250, Gate 4 PHP 1,200, Gate 5 PHP 800), else PHP 500 |
+
+How the list stays the same as Trip Scheduling's:
+
+- `scripts/sync-shared.mjs` now also copies `ROUTES` and `ROUTE_GATES` from `docs/modules/trip-scheduling/assets/app.js` into `src/lib/trip-routes.json` before every build (committed, so the demo still builds outside the repo).
+- `src/lib/trip-routes.ts` makes the codes with the same rule as Trip Scheduling's `import-vehicle-masterlist.mjs` (first 3 letters, a digit when two clash), e.g. BAGUIO CITY is BA2 because BAGAMANOC took BAG.
+
+Checks: lint and build clean. Live-data test 36 of 36, with 8 new checks (route code from the trip number, specific destination, gate, town, no-number fallback, trip number back to destination, sample trip numbers and routes). In the browser, Daily Trips lists the 7 destinations and trip numbers like NAG0530 and BAL2145.
+
+Not checked: real trips, since that needs a PITX staff sign-in. If Trip Scheduling's `route_trip_codes` table ever differs from the rule, the trip number still wins for real trips.
+
+Storage key is now `pitx-tms-db-v13`, so the demo loads fresh sample data once in every browser.
+
+---
+
 ## 21 · Steps from the Ops process map (10 Nov)
 
 Checked the demo against the Ticketing and Boarding parts of the Terminal Ops process map ("PTX. EXE. Process Map. 2026 05 22": OPS, OPS v1 and v2 sheets, and Annex A functions 2.3.1.2 to 2.3.1.4). Added the steps that were missing.

@@ -93,7 +93,7 @@ export default function AvailabilityPage() {
                   </td>
                   <td className="px-3 py-2">{trip.tripNo}</td>
                   <td className="px-3 py-2">{bus ? (bus.aircon ? "Y" : "N") : "-"}</td>
-                  <td className="px-3 py-2">{route?.denomination ?? route?.description}</td>
+                  <td className="px-3 py-2">{route?.description}</td>
                   <td className="px-3 py-2 text-right">{route ? peso(computeFare(route, "Adult")) : "-"}</td>
                   <td className="px-3 py-2 text-right font-semibold">{trip.busId ? left : "-"}</td>
                   <td className="px-3 py-2">

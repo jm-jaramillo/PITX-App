@@ -102,13 +102,14 @@ export const OPERATOR_ROUTES: Record<string, string[]> = {
 // its operator account (genesis-ops) has its own sample company to explore. DLTB and
 // Genesis are on the list above; the other denominations are placeholders until their
 // real routes are supplied.
-export const SAMPLE_OPERATORS: (OperatorCompany & { logo?: string })[] = [
-  { code: "DLTB", name: DLTB, denominations: ["BATANGAS", "BICOL"], logo: "/brand/operators/dltb.jpg" },
-  { code: "KRS", name: "KERSTEEN", denominations: ["BAGUIO"], logo: "/brand/operators/kersteen.png" },
-  { code: "LOR", name: "LORNA EXPRESS", denominations: ["QUEZON"], logo: "/brand/operators/lorna.jpg" },
-  { code: "OGW", name: "OGAWA LINER", denominations: ["NORTHERN ROUTES"], logo: "/brand/operators/ogawa.jpg" },
-  { code: "SCE", name: "SOUTH CITY EXPRESS INC", denominations: ["VISMIN"], logo: "/brand/operators/south-city.jpg" },
-  { code: "GEN", name: "GENESIS TRANSPORT SERVICE INC", denominations: ["NORTHERN ROUTES"] },
+// destinations: the Trip Scheduling destinations each runs in the sample data (made up).
+export const SAMPLE_OPERATORS: (OperatorCompany & { logo?: string; destinations: string[] })[] = [
+  { code: "DLTB", name: DLTB, denominations: ["BATANGAS", "BICOL"], destinations: ["BATANGAS CITY", "NAGA CITY"], logo: "/brand/operators/dltb.jpg" },
+  { code: "KRS", name: "KERSTEEN", denominations: ["BAGUIO"], destinations: ["BAGUIO CITY"], logo: "/brand/operators/kersteen.png" },
+  { code: "LOR", name: "LORNA EXPRESS", denominations: ["QUEZON"], destinations: ["LUCENA CITY"], logo: "/brand/operators/lorna.jpg" },
+  { code: "OGW", name: "OGAWA LINER", denominations: ["NORTHERN ROUTES"], destinations: ["DAGUPAN CITY"], logo: "/brand/operators/ogawa.jpg" },
+  { code: "SCE", name: "SOUTH CITY EXPRESS INC", denominations: ["VISMIN"], destinations: ["TACLOBAN CITY"], logo: "/brand/operators/south-city.jpg" },
+  { code: "GEN", name: "GENESIS TRANSPORT SERVICE INC", denominations: ["NORTHERN ROUTES"], destinations: ["BALANGA, BATAAN"] },
 ];
 
 const FILLER = new Set(["INC", "CORP", "CO", "THE", "AND", "OF", "CORPORATION", "COMPANY"]);

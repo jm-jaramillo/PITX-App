@@ -1,6 +1,7 @@
 import { todayManila } from "./format";
 import { SAMPLE_OPERATORS } from "./operator-routes";
 import { getLayout, parseBlockedSeats } from "./seat-layouts";
+import { gateOf, tripCode, tripNumber } from "./trip-routes";
 import type {
   ApprovalRequest,
   AuditEntry,
@@ -16,19 +17,21 @@ import type {
   TripStatus,
 } from "./types";
 
-// Operator names and logos are real. DLTB's denominations are from the supplied list.
-// Everything else here, including the other operators' routes, fares, plates, units,
-// trips and passengers, is dummy data for testing.
-const SLUG = (denomination: string) => denomination.split(" ")[0];
+// Operator names and logos are real. Destinations and trip numbers follow Trip Scheduling
+// (trip-routes.ts): each route is one of its destinations, and a trip number is the
+// destination's code plus the departure time (NAG0530). Which operator runs which
+// destination, the fares, plates, units, trips and passengers are dummy data for testing.
 export const PLACEHOLDER_FARE: Record<string, number> = {
-  BAGUIO: 750,
-  BATANGAS: 250,
-  BICOL: 1200,
-  MINDORO: 800,
-  "NORTHERN ROUTES": 900,
-  QUEZON: 450,
-  VISMIN: 2500,
+  "BATANGAS CITY": 250,
+  "NAGA CITY": 1100,
+  "BAGUIO CITY": 750,
+  "LUCENA CITY": 450,
+  "DAGUPAN CITY": 600,
+  "TACLOBAN CITY": 2500,
+  "BALANGA, BATAAN": 350,
 };
+// Fallback by Trip Scheduling gate for real destinations without a sample fare.
+export const PLACEHOLDER_GATE_FARE: Record<string, number> = { "Gate 2": 250, "Gate 4": 1200, "Gate 5": 800 };
 
 // [company code, bus type code, description, seat layout, blocked seats]
 const BUS_TYPES: [string, string, string, string, string?][] = [
@@ -58,48 +61,53 @@ interface TripPlan {
   noVoids?: boolean;
 }
 
+// route: <company code>-<Trip Scheduling destination>
 const TRIP_PLANS: TripPlan[] = [
-  { route: "DLTB-BICOL", type: "REG45", time: "05:30", bay: "B12", sold: 34, status: "Departed" },
-  { route: "DLTB-BATANGAS", type: "HC61", time: "21:15", bay: "B07", sold: 18 },
-  { route: "DLTB-BICOL", time: "23:00", bay: "B12", sold: 3 },
-  { route: "KRS-BAGUIO", type: "REG53", time: "06:30", bay: "B15", sold: 28, status: "Departed" },
-  { route: "KRS-BAGUIO", type: "CR49", time: "22:00", bay: "B03", sold: 43, status: "Boarding", noVoids: true },
-  { route: "LOR-QUEZON", type: "REG45", time: "12:00", bay: "B08", sold: 6, status: "Cancelled" },
-  { route: "LOR-QUEZON", type: "HC66", time: "21:30", bay: "B04", sold: 25, stopSelling: true },
-  { route: "OGW-NORTHERN", type: "SUP26", time: "20:30", bay: "B18", sold: 26, noVoids: true },
-  { route: "OGW-NORTHERN", type: "DLX36", time: "22:30", bay: "B18", sold: 10 },
-  { route: "SCE-VISMIN", type: "REG49", time: "20:00", bay: "B21", sold: 12 },
-  { route: "SCE-VISMIN", time: "23:30", bay: "B22", sold: 0 },
-  { route: "DLTB-BICOL", type: "HC61", time: "08:00", bay: "B12", sold: 8, day: 1 },
-  { route: "KRS-BAGUIO", type: "REG53", time: "07:00", bay: "B15", sold: 5, day: 1 },
-  { route: "LOR-QUEZON", type: "REG45", time: "10:00", bay: "B08", sold: 4, day: 1 },
-  { route: "OGW-NORTHERN", type: "DLX36", time: "09:00", bay: "B18", sold: 3, day: 1 },
-  { route: "SCE-VISMIN", type: "HC63", time: "09:30", bay: "B22", sold: 6, day: 2 },
+  { route: "DLTB-NAGA CITY", type: "REG45", time: "05:30", bay: "B12", sold: 34, status: "Departed" },
+  { route: "DLTB-BATANGAS CITY", type: "HC61", time: "21:15", bay: "B07", sold: 18 },
+  { route: "DLTB-NAGA CITY", time: "23:00", bay: "B12", sold: 3 },
+  { route: "KRS-BAGUIO CITY", type: "REG53", time: "06:30", bay: "B15", sold: 28, status: "Departed" },
+  { route: "KRS-BAGUIO CITY", type: "CR49", time: "22:00", bay: "B03", sold: 43, status: "Boarding", noVoids: true },
+  { route: "LOR-LUCENA CITY", type: "REG45", time: "12:00", bay: "B08", sold: 6, status: "Cancelled" },
+  { route: "LOR-LUCENA CITY", type: "HC66", time: "21:30", bay: "B04", sold: 25, stopSelling: true },
+  { route: "OGW-DAGUPAN CITY", type: "SUP26", time: "20:30", bay: "B18", sold: 26, noVoids: true },
+  { route: "OGW-DAGUPAN CITY", type: "DLX36", time: "22:30", bay: "B18", sold: 10 },
+  { route: "SCE-TACLOBAN CITY", type: "REG49", time: "20:00", bay: "B21", sold: 12 },
+  { route: "SCE-TACLOBAN CITY", time: "23:30", bay: "B22", sold: 0 },
+  { route: "DLTB-NAGA CITY", type: "HC61", time: "08:00", bay: "B12", sold: 8, day: 1 },
+  { route: "KRS-BAGUIO CITY", type: "REG53", time: "07:00", bay: "B15", sold: 5, day: 1 },
+  { route: "LOR-LUCENA CITY", type: "REG45", time: "10:00", bay: "B08", sold: 4, day: 1 },
+  { route: "OGW-DAGUPAN CITY", type: "DLX36", time: "09:00", bay: "B18", sold: 3, day: 1 },
+  { route: "SCE-TACLOBAN CITY", type: "HC63", time: "09:30", bay: "B22", sold: 6, day: 2 },
   // Genesis: a full day of trips in every state, so its Operator Admin account has something
   // to sell, board, refund and close.
-  { route: "GEN-NORTHERN", type: "REG49", time: "04:30", bay: "B19", sold: 41, status: "Departed" },
-  { route: "GEN-NORTHERN", type: "DLX45", time: "09:00", bay: "B19", sold: 30, status: "Departed" },
-  { route: "GEN-NORTHERN", type: "REG49", time: "21:45", bay: "B20", sold: 38, status: "Boarding" },
-  { route: "GEN-NORTHERN", type: "DLX45", time: "22:30", bay: "B19", sold: 14 },
-  { route: "GEN-NORTHERN", type: "REG49", time: "23:15", bay: "B20", sold: 45, stopSelling: true },
-  { route: "GEN-NORTHERN", time: "23:45", bay: "B20", sold: 2 },
-  { route: "GEN-NORTHERN", type: "REG49", time: "05:30", bay: "B19", sold: 9, day: 1 },
-  { route: "GEN-NORTHERN", type: "DLX45", time: "13:00", bay: "B20", sold: 4, day: 1 },
-  { route: "GEN-NORTHERN", type: "REG49", time: "06:00", bay: "B19", sold: 2, day: 2 },
+  { route: "GEN-BALANGA, BATAAN", type: "REG49", time: "04:30", bay: "B19", sold: 41, status: "Departed" },
+  { route: "GEN-BALANGA, BATAAN", type: "DLX45", time: "09:00", bay: "B19", sold: 30, status: "Departed" },
+  { route: "GEN-BALANGA, BATAAN", type: "REG49", time: "21:45", bay: "B20", sold: 38, status: "Boarding" },
+  { route: "GEN-BALANGA, BATAAN", type: "DLX45", time: "22:30", bay: "B19", sold: 14 },
+  { route: "GEN-BALANGA, BATAAN", type: "REG49", time: "23:15", bay: "B20", sold: 45, stopSelling: true },
+  { route: "GEN-BALANGA, BATAAN", time: "23:45", bay: "B20", sold: 2 },
+  { route: "GEN-BALANGA, BATAAN", type: "REG49", time: "05:30", bay: "B19", sold: 9, day: 1 },
+  { route: "GEN-BALANGA, BATAAN", type: "DLX45", time: "13:00", bay: "B20", sold: 4, day: 1 },
+  { route: "GEN-BALANGA, BATAAN", type: "REG49", time: "06:00", bay: "B19", sold: 2, day: 2 },
 ];
 
 export const FIRST_NAMES = ["Ana", "Ben", "Carla", "Dino", "Ella", "Franco", "Gina", "Hector", "Ines", "Jomar", "Kim", "Leo"];
 export const LAST_NAMES = ["Sample", "Tester", "Demo", "Placeholder", "Mockup", "Trial", "Example"];
 
-// [province code, province name, town code, town name, denomination]. Placeholder destinations.
-const PLACES: [string, string, string, string, string][] = [
-  ["BAT", "Batangas", "BATC", "Batangas City", "BATANGAS"],
-  ["ALB", "Albay", "LEG", "Legazpi", "BICOL"],
-  ["BEN", "Benguet", "BAG", "Baguio", "BAGUIO"],
-  ["QUE", "Quezon", "LUC", "Lucena", "QUEZON"],
-  ["PAN", "Pangasinan", "DAG", "Dagupan", "NORTHERN ROUTES"],
-  ["CEB", "Cebu", "CEBC", "Cebu City", "VISMIN"],
+// [province code, province name, Trip Scheduling destination]. The destination is the town,
+// and its trip-number code is the town code.
+const PLACES: [string, string, string][] = [
+  ["BTG", "Batangas", "BATANGAS CITY"],
+  ["CSR", "Camarines Sur", "NAGA CITY"],
+  ["BEN", "Benguet", "BAGUIO CITY"],
+  ["QZN", "Quezon", "LUCENA CITY"],
+  ["PAN", "Pangasinan", "DAGUPAN CITY"],
+  ["LEY", "Leyte", "TACLOBAN CITY"],
+  ["BTN", "Bataan", "BALANGA, BATAAN"],
 ];
+const placeOf = (destination: string) => PLACES.find((p) => p[2] === destination);
+const codeOf = (destination: string) => tripCode(destination) ?? destination.slice(0, 3);
 
 function addDays(date: string, days: number): string {
   return new Date(Date.parse(date) + days * 86_400_000).toISOString().slice(0, 10);
@@ -127,17 +135,17 @@ export function seedDb(): Db {
     status: "Active",
   }));
   const routes: Route[] = operators.flatMap((o) =>
-    o.denominations.map((denomination) => ({
-      id: `rt-${o.code}-${SLUG(denomination)}`,
+    o.destinations.map((destination) => ({
+      id: `rt-${o.code}-${destination}`,
       companyId: `co-${o.code}`,
-      operatorRouteId: `${o.code}-${SLUG(denomination)}`,
-      code: `${o.code}-${SLUG(denomination)}`,
-      description: `PITX to ${denomination}`,
-      denomination,
-      provinceId: `prov-${PLACES.find((p) => p[4] === denomination)?.[0]}`,
-      townId: `town-${PLACES.find((p) => p[4] === denomination)?.[2]}`,
+      operatorRouteId: `${o.code}-${codeOf(destination)}`,
+      code: codeOf(destination),
+      description: `PITX to ${destination}`,
+      denomination: gateOf(destination),
+      provinceId: `prov-${placeOf(destination)?.[0]}`,
+      townId: `town-${codeOf(destination)}`,
       mileage: 0,
-      price: PLACEHOLDER_FARE[denomination] ?? 500,
+      price: PLACEHOLDER_FARE[destination] ?? 500,
       message: "Be at the gate 30 minutes before departure.",
       authorizedAgent: `${o.code} Demo Agent`,
       seatConfirm: true,
@@ -172,12 +180,12 @@ export function seedDb(): Db {
   let sequence = 0;
 
   TRIP_PLANS.forEach((plan, tripIndex) => {
-    const company = plan.route.split("-")[0];
+    const [company, destination] = [plan.route.slice(0, plan.route.indexOf("-")), plan.route.slice(plan.route.indexOf("-") + 1)];
     const busId = plan.type ? `bus-${company}-${plan.type}-1` : "";
     const status = plan.status ?? "Scheduled";
     const trip: Trip = {
       id: `trip-${tripIndex + 1}`,
-      tripNo: `T-${String(tripIndex + 1).padStart(4, "0")}`,
+      tripNo: tripNumber(destination, plan.time),
       date: addDays(today, plan.day ?? 0),
       time: plan.time,
       routeId: `rt-${plan.route}`,
@@ -271,10 +279,10 @@ export function seedDb(): Db {
     ],
     towns: [
       { id: "town-pque", code: "PQUE", description: "Parañaque", provinceId: "prov-mm", status: "Active" },
-      ...PLACES.map(([province, , code, description]) => ({
-        id: `town-${code}`,
-        code,
-        description,
+      ...PLACES.map(([province, , destination]) => ({
+        id: `town-${codeOf(destination)}`,
+        code: codeOf(destination),
+        description: destination,
         provinceId: `prov-${province}`,
         status: "Active" as const,
       })),

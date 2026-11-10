@@ -94,7 +94,7 @@ export interface Route {
   operatorRouteId: string;
   code: string;
   description: string;
-  denomination?: string; // Route group, e.g. BICOL or NORTHERN ROUTES
+  denomination?: string; // Route group: the Trip Scheduling gate of the destination, e.g. Gate 4
   provinceId: string;
   townId?: string; // Destination town
   mileage: number;

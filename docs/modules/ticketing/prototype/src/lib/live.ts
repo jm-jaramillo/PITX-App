@@ -3,8 +3,9 @@ import { todayManila } from "./format";
 import { baseCode, SAMPLE_OPERATORS } from "./operator-routes";
 import { portalAccessToken, SUPABASE_ANON_KEY, SUPABASE_URL } from "./portal";
 import { getLayout } from "./seat-layouts";
-import { PLACEHOLDER_FARE } from "./seed";
-import type { Bus, BusType, Company, Db, Route, SeatMark, Trip } from "./types";
+import { PLACEHOLDER_FARE, PLACEHOLDER_GATE_FARE } from "./seed";
+import { codeOfTripNo, gateOf, routeOfTripNo, tripCode } from "./trip-routes";
+import type { Bus, BusType, Company, Db, Route, SeatMark, Town, Trip } from "./types";
 
 // Real PITX data for the demo on the site, read as the portal user through the
 // functions the other modules expose (never their tables):
@@ -69,10 +70,9 @@ function slotTime(slot: number): string {
 const plateKey = (plate: string | null | undefined) => (plate ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 const slug = (text: string) => text.toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "ROUTE";
 
-function placeholderFare(route: string): number {
-  const upper = route.toUpperCase();
-  const hit = Object.entries(PLACEHOLDER_FARE).find(([place]) => upper.includes(place.split(" ")[0]));
-  return hit?.[1] ?? 500;
+function placeholderFare(destination: string): number {
+  const gate = gateOf(destination);
+  return PLACEHOLDER_FARE[destination] ?? (gate ? PLACEHOLDER_GATE_FARE[gate] : undefined) ?? 500;
 }
 
 /** The demo company id for a Trip Scheduling operator (profiles.id). */
@@ -189,21 +189,34 @@ export async function loadLive(base: Db): Promise<LiveResult | null> {
     if (v.plate_no) busFor(companyFor(v.operator_id, v.operator_name, v.trade_name), v.plate_no, null, v.body_number);
   }
 
+  // One route per company and Trip Scheduling destination. The booking's route is the
+  // destination ("NAGA CITY"); its trip number starts with the destination's code
+  // ("NAG1530"), which becomes the route code. Each destination is also a town, so the
+  // POS destination filter works.
   const routes = new Map<string, Route>();
-  const routeFor = (company: Company, text: string): Route => {
-    const description = text.trim() || "Route not set";
-    const id = `rt-${company.id}-${slug(description)}`;
+  const towns = new Map<string, Town>();
+  const routeFor = (company: Company, text: string, tripNo: string | null): Route => {
+    const destination = (text.trim() || routeOfTripNo(tripNo) || "Route not set").toUpperCase();
+    const code = codeOfTripNo(tripNo) ?? tripCode(destination) ?? slug(destination);
+    const id = `rt-${company.id}-${code}`;
     let route = routes.get(id);
     if (!route) {
+      const townId = `town-${code}`;
+      if (!towns.has(townId)) {
+        towns.set(townId, { id: townId, code, description: destination, provinceId: "prov-NS", status: "Active" });
+      }
+      const gate = gateOf(destination);
       route = {
         id,
         companyId: company.id,
-        operatorRouteId: `${company.code}-${slug(description)}`,
-        code: `${company.code}-${slug(description)}`,
-        description,
+        operatorRouteId: `${company.code}-${code}`,
+        code,
+        description: `PITX to ${destination}`,
+        denomination: gate,
         provinceId: "prov-NS",
+        townId,
         mileage: 0,
-        price: placeholderFare(description),
+        price: placeholderFare(destination),
         message: "Placeholder fare: set the real fare in Master Data.",
         seatConfirm: true,
         status: "Active",
@@ -225,7 +238,7 @@ export async function loadLive(base: Db): Promise<LiveResult | null> {
       tripNo: r.trip_number || `BK-${r.booking_id.slice(0, 8).toUpperCase()}`,
       date: r.booking_date,
       time,
-      routeId: routeFor(company, r.route).id,
+      routeId: routeFor(company, r.route, r.trip_number).id,
       busId: bus?.id ?? "",
       bay: r.bay_name ?? "",
       status: departs < now ? "Departed" : "Scheduled",
@@ -255,7 +268,7 @@ export async function loadLive(base: Db): Promise<LiveResult | null> {
     source: "pitx",
     loadedAt: new Date().toISOString(),
     provinces: [{ id: "prov-NS", code: "NS", description: "Not set", status: "Active" }],
-    towns: [],
+    towns: [...towns.values()].sort((a, b) => a.description.localeCompare(b.description)),
     companies: [...companies.values()].sort((a, b) => a.name.localeCompare(b.name)),
     busTypes: [...busTypes.values()],
     buses: [...buses.values()],

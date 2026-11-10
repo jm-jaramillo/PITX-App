@@ -54,7 +54,7 @@ export default function MasterDataPage() {
       { key: "operatorRouteId", label: "Operator Route ID", required: true, column: true },
       { key: "code", label: "Route", required: true, column: true },
       { key: "description", label: "Description", required: true, column: true },
-      { key: "denomination", label: "Denomination", column: true },
+      { key: "denomination", label: "Gate (from Trip Scheduling)", column: true },
       { key: "authorizedAgent", label: "Authorized Agent" },
       { key: "seatConfirm", label: "Seat Confirm", type: "checkbox" },
       { key: "provinceId", label: "Province", type: "select", options: provinceOptions, column: true },

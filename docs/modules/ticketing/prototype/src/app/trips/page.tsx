@@ -82,10 +82,10 @@ export default function TripsPage() {
   const [destination, setDestination] = useState("");
   const [openLog, setOpenLog] = useState("");
 
-  const destinations = [...new Set(db.routes.map((r) => r.denomination).filter(Boolean))] as string[];
+  const destinations = [...new Set(db.routes.map((r) => r.description))].sort();
   const trips = db.trips
     .filter((t) => t.date === date)
-    .filter((t) => !destination || db.routes.find((r) => r.id === t.routeId)?.denomination === destination)
+    .filter((t) => !destination || db.routes.find((r) => r.id === t.routeId)?.description === destination)
     .sort((a, b) => a.time.localeCompare(b.time));
 
   return (
