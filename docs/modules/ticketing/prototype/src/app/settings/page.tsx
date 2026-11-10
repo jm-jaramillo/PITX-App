@@ -25,6 +25,7 @@ export default function SystemParametersPage() {
   const [form, setForm] = useState<SystemParams>(db.settings);
   const [refundReasons, setRefundReasons] = useState(db.settings.refundReasons.join(", "));
   const [reprintReasons, setReprintReasons] = useState(db.settings.reprintReasons.join(", "));
+  const [openingChecks, setOpeningChecks] = useState(db.settings.openingChecks.join("\n"));
   const [saved, setSaved] = useState(false);
 
   function set<K extends keyof SystemParams>(key: K, value: SystemParams[K]) {
@@ -51,7 +52,12 @@ export default function SystemParametersPage() {
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    saveSettings({ ...form, refundReasons: toList(refundReasons), reprintReasons: toList(reprintReasons) });
+    saveSettings({
+      ...form,
+      refundReasons: toList(refundReasons),
+      reprintReasons: toList(reprintReasons),
+      openingChecks: openingChecks.split("\n").map((c) => c.trim()).filter(Boolean),
+    });
     setSaved(true);
   }
 
@@ -74,6 +80,14 @@ export default function SystemParametersPage() {
         {number("counterCutoffMinutes", "Stop showing trips at counters (minutes before departure)")}
         {number("kioskCutoffMinutes", "Stop showing trips at kiosks (minutes before departure)")}
         {number("seatHoldMinutes", "Seat hold (minutes a picked seat stays held before payment)")}
+      </Group>
+
+      <Group title="Counter opening and KPI 11">
+        <label className="sm:col-span-2">
+          Opening checks a Teller ticks before the first sale of the day (one per line)
+          <textarea rows={5} value={openingChecks} onChange={(e) => { setOpeningChecks(e.target.value); setSaved(false); }} />
+        </label>
+        {number("issueTargetSeconds", "KPI 11 target: seconds per counter sale, first seat picked to payment")}
       </Group>
 
       <Group title="Check-in at the gate">

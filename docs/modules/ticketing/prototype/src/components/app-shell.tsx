@@ -28,6 +28,7 @@ const NAV_ICONS: Record<string, IconName> = {
   "/manifest": "users",
   "/approvals": "check",
   "/validate": "bays",
+  "/queue": "users",
   "/trips": "calendar",
   "/reports": "chart",
   "/master": "building",
@@ -81,18 +82,27 @@ function operatorCompanyId(db: Db, user: PortalUser): string | undefined {
 function portalSession(db: Db, user: PortalUser, role: Role): Session {
   const operator = isOperator(user);
   const sessionRole: Role = operator && !isCompanyRole(role) ? "Operator Admin" : role;
+  const companyId = operator
+    ? operatorCompanyId(db, user)
+    : isCompanyRole(sessionRole)
+      ? db.companies.find((c) => c.status === "Active")?.id
+      : undefined;
+  const counters = countersFor(db, companyId);
   return {
     name: user.name,
     role: sessionRole,
     counterId: sells(sessionRole)
-      ? db.settings.defaultCounterId || db.counters.find((c) => c.status === "Active")?.id
+      ? (counters.find((c) => c.id === db.settings.defaultCounterId) ?? counters[0])?.id
       : undefined,
-    companyId: operator
-      ? operatorCompanyId(db, user)
-      : isCompanyRole(sessionRole)
-        ? db.companies.find((c) => c.status === "Active")?.id
-        : undefined,
+    companyId,
   };
+}
+
+/** Active counters a company's Teller may use: those assigned to it, or open to any company. */
+function countersFor(db: Db, companyId?: string) {
+  return db.counters.filter(
+    (c) => c.status === "Active" && (!c.companyIds?.length || !companyId || c.companyIds.includes(companyId)),
+  );
 }
 
 /** An operator with no company yet in this data gets one, so it never sees other companies. */
@@ -135,12 +145,13 @@ function SignIn() {
   const db = useDb();
   const [name, setName] = useState("");
   const [role, setRole] = useState<Role>("Teller");
-  const counters = db.counters.filter((c) => c.status === "Active");
-  const [counterId, setCounterId] = useState(db.settings.defaultCounterId || counters[0]?.id || "");
   const needsCounter = sells(role);
   const needsCompany = isCompanyRole(role);
   const companies = db.companies.filter((c) => c.status === "Active");
   const [companyId, setCompanyId] = useState("");
+  const counters = countersFor(db, companyId || undefined);
+  const [picked, setCounterId] = useState(db.settings.defaultCounterId);
+  const counterId = counters.some((c) => c.id === picked) ? picked : (counters[0]?.id ?? "");
 
   function submit(event: FormEvent) {
     event.preventDefault();

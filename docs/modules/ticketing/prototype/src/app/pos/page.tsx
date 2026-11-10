@@ -2,11 +2,13 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState, type FormEvent } from "react";
+import { OpenCounter } from "@/components/open-counter";
 import { SeatMap } from "@/components/seat-map";
 import { peso, todayManila } from "@/lib/format";
 import { groupHref } from "@/lib/paths";
 import {
   computeFare,
+  counterOpenedToday,
   heldByOthers,
   holdSeat,
   issueTickets,
@@ -48,6 +50,8 @@ function Pos() {
   const [tendered, setTendered] = useState("");
   const [paymentRef, setPaymentRef] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // KPI 11: the transaction starts when the Teller picks the first seat.
+  const [startedAt, setStartedAt] = useState<string | undefined>();
   const [provinceId, setProvinceId] = useState("");
   const [townId, setTownId] = useState("");
   const [letter, setLetter] = useState("");
@@ -98,6 +102,7 @@ function Pos() {
       setError(problem);
       return;
     }
+    if (passengers.length === 0) setStartedAt(new Date().toISOString());
     setPassengers((current) => [...current, { seatNo, passengerName: "", contactNo: "", email: "", fareType: "Adult", idNo: "" }]);
   }
 
@@ -105,6 +110,7 @@ function Pos() {
     if (tripId) releaseSeats(tripId);
     setTripId(next);
     setPassengers([]);
+    setStartedAt(undefined);
     setError(null);
   }
 
@@ -114,7 +120,7 @@ function Pos() {
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    const result = issueTickets({ tripId, passengers, paymentMethod, tendered: received, paymentRef }, today);
+    const result = issueTickets({ tripId, passengers, paymentMethod, tendered: received, paymentRef, startedAt }, today);
     if (result.error) {
       setError(result.error);
       return;
@@ -130,6 +136,9 @@ function Pos() {
           Sign in with a counter to sell tickets.
         </p>
       )}
+      {canCharge && !counterOpenedToday(db, today) ? (
+        <OpenCounter today={today} />
+      ) : (
       <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_24rem]">
         <div className="min-w-0 space-y-4">
           <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-3">
@@ -362,6 +371,7 @@ function Pos() {
           </button>
         </form>
       </div>
+      )}
     </div>
   );
 }

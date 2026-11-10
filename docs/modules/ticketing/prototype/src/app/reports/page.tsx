@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { peso, todayManila } from "@/lib/format";
-import { downloadTicketingReport, shiftRemittance } from "@/lib/reports";
-import { TRIP_GROUPS, tripGroup, useDb } from "@/lib/store";
+import { dateTimeManila, peso, todayManila } from "@/lib/format";
+import { downloadTicketingReport, issueKpi, minSec, shiftRemittance } from "@/lib/reports";
+import { routeDemand, TRIP_GROUPS, tripGroup, useDb } from "@/lib/store";
 import type { Ticket } from "@/lib/types";
 import { PageTitle } from "@/components/page-title";
 
@@ -68,6 +68,15 @@ export default function ReportsPage() {
   const companyOf = (t: Ticket) =>
     db.companies.find((c) => c.id === ticketRoute(t)?.companyId)?.code ?? "Unknown";
   const remittance = shiftRemittance(db, date, date);
+  const target = db.settings.issueTargetSeconds;
+  const kpi = issueKpi(db, date, date, target);
+  const demand = routeDemand(db, date);
+  const manilaDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" });
+  const queues = db.queueCounts.filter((q) => manilaDate.format(new Date(q.at)) === date);
+  const openings = db.openings.filter((o) => o.date === date);
+  const th = "px-3 py-2";
+  const thr = "px-3 py-2 text-right";
+  const num = "px-3 py-2 text-right tabular-nums";
 
   async function exportExcel() {
     setExportNote("Preparing the file…");
@@ -186,9 +195,10 @@ export default function ReportsPage() {
       </div>
 
       <div className="space-y-2">
-        <h2 className="text-lg font-semibold">Shift Remittance · sales made on {date}</h2>
+        <h2 className="text-lg font-semibold">Shift Remittance (Sales vs Issued Tickets) · sales made on {date}</h2>
         <p className="text-xs text-slate-500">
-          Counter sales by teller, based on the sale date rather than the trip date. Online payments are not included.
+          The end-of-day booth report: counter sales by teller, based on the sale date rather than the trip date. Online
+          payments are not included.
         </p>
         <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
           <table className="w-full text-sm">
@@ -228,6 +238,147 @@ export default function ReportsPage() {
               )}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <h2 className="text-lg font-semibold">KPI 11 · Ticket issuance time · sales made on {date}</h2>
+        <p className="text-xs text-slate-500">
+          Per counter sale, from the first seat picked to payment. One payment counts once, whatever the number of seats.
+          Target {minSec(target)} (System Parameters).
+        </p>
+        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-left text-xs text-slate-500">
+              <tr>
+                <th className={th}>Teller</th>
+                <th className={th}>Counter</th>
+                <th className={thr}>Sales</th>
+                <th className={thr}>Average time</th>
+                <th className={thr}>Within target</th>
+              </tr>
+            </thead>
+            <tbody>
+              {kpi.map((r) => (
+                <tr key={r.key} className="border-t border-slate-100">
+                  <td className={th}>{r.teller}</td>
+                  <td className={th}>{r.counter}</td>
+                  <td className={num}>{r.sales}</td>
+                  <td className={r.avgSeconds > target ? `${num} font-semibold text-red-700` : num}>{minSec(r.avgSeconds)}</td>
+                  <td className={num}>{Math.round((r.withinTarget / r.sales) * 100)}%</td>
+                </tr>
+              ))}
+              {kpi.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-3 py-4 text-center text-slate-500">
+                    No timed counter sales on this date.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <h2 className="text-lg font-semibold">Passenger Demand Report · trips on {date}</h2>
+        <p className="text-xs text-slate-500">
+          Passengers served per route against trips dispatched and seats offered, then the queue counts at booths and gates.
+        </p>
+        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-left text-xs text-slate-500">
+              <tr>
+                <th className={th}>Route</th>
+                <th className={th}>Company</th>
+                <th className={thr}>Trips</th>
+                <th className={thr}>Dispatched</th>
+                <th className={thr}>Seats</th>
+                <th className={thr}>Ticketed</th>
+                <th className={thr}>Boarded</th>
+                <th className={thr}>Load factor</th>
+              </tr>
+            </thead>
+            <tbody>
+              {demand.map((r) => (
+                <tr key={r.routeId} className="border-t border-slate-100">
+                  <td className={th}>{r.route}</td>
+                  <td className={th}>{r.company}</td>
+                  <td className={num}>{r.trips}</td>
+                  <td className={num}>{r.dispatched}</td>
+                  <td className={num}>{r.seats}</td>
+                  <td className={num}>{r.ticketed}</td>
+                  <td className={num}>{r.boarded}</td>
+                  <td className={num}>{r.seats ? `${Math.round((r.ticketed / r.seats) * 100)}%` : "-"}</td>
+                </tr>
+              ))}
+              {demand.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-3 py-4 text-center text-slate-500">
+                    No trips on this date.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-left text-xs text-slate-500">
+                <tr>
+                  <th className={th}>Queue count</th>
+                  <th className={th}>Booth or gate</th>
+                  <th className={thr}>In line</th>
+                </tr>
+              </thead>
+              <tbody>
+                {queues.map((q) => (
+                  <tr key={q.id} className="border-t border-slate-100">
+                    <td className={th}>{dateTimeManila(q.at)}</td>
+                    <td className={th}>
+                      {q.spot} · {q.place}
+                    </td>
+                    <td className={num}>{q.count}</td>
+                  </tr>
+                ))}
+                {queues.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="px-3 py-4 text-center text-slate-500">
+                      No queue counts on this date.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-left text-xs text-slate-500">
+                <tr>
+                  <th className={th}>Counter opened</th>
+                  <th className={th}>Teller</th>
+                  <th className={th}>Counter</th>
+                </tr>
+              </thead>
+              <tbody>
+                {openings.map((o) => (
+                  <tr key={o.id} className="border-t border-slate-100">
+                    <td className={th}>{dateTimeManila(o.openedAt)}</td>
+                    <td className={th}>{o.teller}</td>
+                    <td className={th}>{db.counters.find((c) => c.id === o.counterId)?.code ?? "-"}</td>
+                  </tr>
+                ))}
+                {openings.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="px-3 py-4 text-center text-slate-500">
+                      No counters opened on this date.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

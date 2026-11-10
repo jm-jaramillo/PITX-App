@@ -19,6 +19,7 @@ export const NAV: { href: string; label: string; roles: Role[] }[] = [
   { href: "/units", label: "Unit Assignment", roles: ["Operator Admin"] },
   { href: "/manifest", label: "Manifest", roles: [...OPS, "PITX Admin"] },
   { href: "/approvals", label: "Approvals", roles: ["PITX Admin"] },
+  { href: "/queue", label: "Queue Count", roles: ["PITX Admin"] },
   { href: "/validate", label: "Gate Test", roles: ["PITX Admin"] },
   { href: "/trips", label: "Daily Trips", roles: ["PITX Admin"] },
   { href: "/reports", label: "Reports", roles: ["PITX Admin"] },

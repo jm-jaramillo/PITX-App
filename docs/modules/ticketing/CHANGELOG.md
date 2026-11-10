@@ -37,6 +37,35 @@ sections 2 and 3).
 
 ---
 
+## 21 · Steps from the Ops process map (10 Nov)
+
+Checked the demo against the Ticketing and Boarding parts of the Terminal Ops process map ("PTX. EXE. Process Map. 2026 05 22": OPS, OPS v1 and v2 sheets, and Annex A functions 2.3.1.2 to 2.3.1.4). Added the steps that were missing.
+
+| Process map step | What the demo now does |
+|---|---|
+| Ticket Booth and Counter Assignment (operator-counter designation record) | New **Counter Assignment** tab in Master Data: tick which bus companies sell at each counter (none ticked = open to all). Tellers only get their company's counters at sign-in, and selling at another company's counter is refused. Changes are in the log |
+| Ticket / Boarding Pass Issuance: login, equipment, printer, QR scanner and network checks | **Open counter** checklist in POS before a Teller's first sale of the day at that counter. Selling stays blocked until every check is ticked. The checks are editable in System Parameters. Each opening is saved with name and time |
+| KPI 11: boarding passes issued within the average booking time | Each counter sale is timed from the first seat picked to payment. Target in System Parameters (default 2 minutes). Overview shows the average time and % within target (a Teller sees their own), and Reports has KPI 11 by teller and counter |
+| Passenger Demand Data Gathering: passengers served per route, people in line at booths and gates | New **Queue Count** page (PITX Admin) to record people in line at a booth or gate. Overview and Reports show **passengers served by route**: trips, dispatched, seats, ticketed, boarded, load factor |
+| Booth Deactivation: "Sales vs Issued Tickets" report | Already there as Shift Remittance, now labelled so. Close Sales tells the Teller to hand the cash to the PITX Cashier, then sign out and lock the booth |
+| Daily Operations Dashboard: passengers served vs dispatches | Overview tile "Trips dispatched" next to the route table |
+
+Also fixed the old "Account" wording on Close Sales and Daily Collection (now PITX Cashier).
+
+Roles: the process map's Ticketing and Boarding Supervisor, Specialist and Agents are PITX staff, which is the **PITX Admin** role in the demo. Booth tellers are the operators' employees (**Teller**).
+
+Not done (outside Ticketing or needs other modules):
+
+- Ticketed vs non-ticketed ridership and the Transport Engineering analytics: Trip Scheduling and TOS data.
+- Manual boarding check when CTS or TOS is down (process 4.1): needs an offline mode, to plan with JM.
+- Booth personnel training records (process 1.4): not a ticketing screen.
+
+Checks: lint and build clean, live-data test 28 of 28. Tested in the browser: the counter opens only after all 5 checks, a sale was timed (3 seconds), a counter assigned to GEN moved the DLTB Teller to C02 (which asked for its own opening), queue counts save and a negative count is refused, and Reports shows the new sections.
+
+Storage key is now `pitx-tms-db-v12`, so the demo loads fresh sample data once in every browser.
+
+---
+
 ## 20 · Module renamed Ticketing and Boarding (10 Nov)
 
 The module is now called **Ticketing and Boarding** (was Ticketing and Booking). Older entries below keep the old name.

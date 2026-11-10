@@ -47,6 +47,9 @@ export interface Counter {
   counterDisplay?: boolean;
   kioskDisplay?: boolean;
   remark?: string;
+  // Operators designated to sell at this booth (process map: booth and counter assignment).
+  // Empty or missing means any operator.
+  companyIds?: string[];
   status: Status;
 }
 
@@ -177,6 +180,7 @@ export interface Ticket {
   printed?: boolean;
   reprints?: TicketReprint[];
   bookedBy?: string; // Passenger account that bought it online
+  serviceSeconds?: number; // Counter sale: first seat picked to payment, for KPI 11
 }
 
 export interface TicketReprint {
@@ -208,6 +212,8 @@ export interface SystemParams {
   reprintApproval: ApprovalMode;
   reprintReasons: string[];
   seatHoldMinutes: number; // How long a picked, unpaid seat stays held
+  issueTargetSeconds: number; // KPI 11: one counter sale should take at most this long
+  openingChecks: string[]; // Booth activation checks a Teller ticks before the first sale of the day
   approvalPassword: string; // Demo only: real accounts must replace this
 }
 
@@ -247,6 +253,29 @@ export interface SalesClosing {
   accountBy?: string;
   systemCash?: number;
   reconciledAt?: string;
+}
+
+/** Booth activation: the Teller ran the opening checks at this counter today. */
+export interface CounterOpening {
+  id: string;
+  date: string;
+  teller: string;
+  counterId: string;
+  openedAt: string;
+  checks: string[];
+}
+
+export const QUEUE_PLACES = ["Ticket booth", "Boarding gate"] as const;
+export type QueuePlace = (typeof QUEUE_PLACES)[number];
+
+/** Passengers counted waiting in line, for the Passenger Demand Report. */
+export interface QueueCount {
+  id: string;
+  at: string;
+  by: string;
+  place: QueuePlace;
+  spot: string; // Counter code or gate name
+  count: number;
 }
 
 export const SEAT_MARK_TYPES = ["Permanent Block", "Temporary Block", "Temporary Release"] as const;
@@ -297,6 +326,8 @@ export interface Db {
   requests: ApprovalRequest[];
   closeCodes: CloseCode[];
   closings: SalesClosing[];
+  openings: CounterOpening[];
+  queueCounts: QueueCount[];
   source?: "sample" | "pitx"; // pitx: masterfiles and trips read from the other modules (live.ts)
   loadedAt?: string; // ISO timestamp of the last read from PITX
 }

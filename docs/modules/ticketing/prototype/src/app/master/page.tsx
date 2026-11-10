@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CounterAssignment } from "@/components/counter-assignment";
 import { CounterFares } from "@/components/counter-fares";
 import { CrudTable, type Field } from "@/components/crud-table";
 import { SEAT_LAYOUTS } from "@/lib/seat-layouts";
@@ -9,20 +10,23 @@ import { CHARTER_TYPES } from "@/lib/types";
 
 type Tab = "companies" | "routes" | "busTypes" | "buses" | "counters" | "provinces" | "towns";
 
-const TABS: { key: Tab | "counterFares"; label: string }[] = [
+type Extra = "counterFares" | "counterAssignment";
+
+const TABS: { key: Tab | Extra; label: string }[] = [
   { key: "companies", label: "Company Info" },
   { key: "routes", label: "Route Info" },
   { key: "counterFares", label: "Counter Fares" },
   { key: "busTypes", label: "Bus Type Info" },
   { key: "buses", label: "Bus Info" },
   { key: "counters", label: "Counter Info" },
+  { key: "counterAssignment", label: "Counter Assignment" },
   { key: "provinces", label: "System Province" },
   { key: "towns", label: "System Town" },
 ];
 
 export default function MasterDataPage() {
   const db = useDb();
-  const [tab, setTab] = useState<Tab | "counterFares">("companies");
+  const [tab, setTab] = useState<Tab | Extra>("companies");
 
   const companyOptions = db.companies.map((c) => ({ value: c.id, label: c.code }));
   const provinceOptions = db.provinces.map((p) => ({ value: p.id, label: p.description }));
@@ -131,6 +135,8 @@ export default function MasterDataPage() {
       </div>
       {tab === "counterFares" ? (
         <CounterFares />
+      ) : tab === "counterAssignment" ? (
+        <CounterAssignment />
       ) : (
         <CrudTable
           key={tab}

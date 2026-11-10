@@ -5,8 +5,10 @@ import { useState } from "react";
 import { CompanyLogo } from "@/components/company-logo";
 import { peso, todayManila } from "@/lib/format";
 import { ticketHref } from "@/lib/paths";
+import { issueKpi, minSec } from "@/lib/reports";
 import { canAccess } from "@/lib/roles";
 import {
+  routeDemand,
   scopedTickets,
   scopedTrips,
   seatCapacity,
@@ -47,6 +49,17 @@ export default function OverviewPage() {
   const visible = filter === "All" ? trips : trips.filter((t) => tripGroup(db, t) === filter);
   const isTeller = db.session?.role === "Teller";
   const isAdmin = db.session?.role === "PITX Admin";
+
+  // KPI 11 (process map): counter sale time, first seat picked to payment. Tellers see their own.
+  const target = db.settings.issueTargetSeconds;
+  const kpiRows = issueKpi(db, today, today, target, db.session?.companyId ?? "").filter(
+    (r) => !isTeller || r.teller === db.session?.name,
+  );
+  const timed = kpiRows.reduce((n, r) => n + r.sales, 0);
+  const avg = timed ? Math.round(kpiRows.reduce((n, r) => n + r.avgSeconds * r.sales, 0) / timed) : 0;
+  const within = kpiRows.reduce((n, r) => n + r.withinTarget, 0);
+  const demand = isTeller ? [] : routeDemand(db, today);
+  const lastQueue = db.queueCounts.at(-1);
 
   // Graphs: seats sold by departure hour, how people paid, and (PITX Admin) by company.
   const hours = new Map<number, number>();
@@ -92,6 +105,46 @@ export default function OverviewPage() {
         </div>
       </section>
 
+      <section className="space-y-2">
+        <p className="section-head">Ticketing and Boarding KPIs</p>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="kpi" title="KPI 11: from the first seat picked to payment, per counter sale">
+            <div className="kpi-label">{isTeller ? "Your average ticket time" : "Average ticket time"}</div>
+            <div className="kpi-value">
+              <strong>{timed ? minSec(avg) : "-"}</strong>
+              <span>target {minSec(target)}</span>
+            </div>
+          </div>
+          <div className="kpi">
+            <div className="kpi-label">Sales within target</div>
+            <div className="kpi-value">
+              <strong>{timed ? `${Math.round((within / timed) * 100)}%` : "-"}</strong>
+              <span>
+                {within} of {timed}
+              </span>
+            </div>
+          </div>
+          {!isTeller && (
+            <div className="kpi">
+              <div className="kpi-label">Trips dispatched</div>
+              <div className="kpi-value">
+                <strong>{demand.reduce((n, r) => n + r.dispatched, 0)}</strong>
+                <span>of {demand.reduce((n, r) => n + r.trips, 0)}</span>
+              </div>
+            </div>
+          )}
+          {isAdmin && (
+            <div className="kpi">
+              <div className="kpi-label">Last queue count</div>
+              <div className="kpi-value">
+                <strong>{lastQueue?.count ?? "-"}</strong>
+                <span>{lastQueue ? `at ${lastQueue.spot}` : <Link className="text-brand underline" href="/queue">count now</Link>}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
       <section className="grid gap-3 lg:grid-cols-3">
         <div className="rounded-lg border border-slate-200 bg-white p-4 lg:col-span-2">
           <p className="section-head mb-3">Seats sold by departure hour</p>
@@ -108,6 +161,45 @@ export default function OverviewPage() {
           </div>
         )}
       </section>
+
+      {demand.length > 0 && (
+        <section className="space-y-2">
+          <p className="section-head">Passengers served by route</p>
+          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-left text-xs text-slate-500">
+                <tr>
+                  <th className="px-3 py-2">Route</th>
+                  {isAdmin && <th className="px-3 py-2">Company</th>}
+                  <th className="px-3 py-2 text-right">Trips</th>
+                  <th className="px-3 py-2 text-right">Dispatched</th>
+                  <th className="px-3 py-2 text-right">Seats</th>
+                  <th className="px-3 py-2 text-right">Ticketed</th>
+                  <th className="px-3 py-2 text-right">Boarded</th>
+                  <th className="px-3 py-2 text-right" title="Ticketed passengers over seats on buses assigned so far">
+                    Load factor
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {demand.slice(0, 10).map((r) => (
+                  <tr key={r.routeId} className="border-t border-slate-100">
+                    <td className="px-3 py-2">{r.route}</td>
+                    {isAdmin && <td className="px-3 py-2">{r.company}</td>}
+                    <td className="px-3 py-2 text-right tabular-nums">{r.trips}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{r.dispatched}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{r.seats}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{r.ticketed}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{r.boarded}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{r.seats ? `${Math.round((r.ticketed / r.seats) * 100)}%` : "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {demand.length > 10 && <p className="text-xs text-slate-500">Top 10 routes by passengers. All routes are in Reports.</p>}
+        </section>
+      )}
 
       {problems.length > 0 && (
         <div className="rounded-lg border border-red-300 bg-red-50 p-4">

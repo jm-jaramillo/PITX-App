@@ -165,3 +165,51 @@ export async function downloadTicketingReport(db: Db, options: ExportOptions): P
   URL.revokeObjectURL(url);
   return tickets.length;
 }
+
+export interface IssueKpi {
+  key: string;
+  teller: string;
+  counter: string;
+  sales: number; // Timed counter transactions (one payment, any number of seats)
+  avgSeconds: number;
+  withinTarget: number; // Transactions done within the target
+}
+
+/**
+ * KPI 11 (process map: Ticket / Boarding Pass Issuance): how long each counter sale took,
+ * from the first seat picked to payment, by teller and counter. One payment counts once.
+ */
+export function issueKpi(db: Db, from: string, to: string, target: number, companyId = ""): IssueKpi[] {
+  const groups = new Map<string, { teller: string; counter: string; seconds: number }>();
+  for (const ticket of db.tickets) {
+    if (ticket.source !== "Counter" || ticket.serviceSeconds === undefined) continue;
+    const sold = saleDate(ticket);
+    if (sold < from || sold > to) continue;
+    const trip = db.trips.find((t) => t.id === ticket.tripId);
+    if (companyId && db.routes.find((r) => r.id === trip?.routeId)?.companyId !== companyId) continue;
+    groups.set(ticket.groupId ?? ticket.id, {
+      teller: ticket.soldBy ?? "Unknown",
+      counter: db.counters.find((c) => c.id === ticket.counterId)?.code ?? "-",
+      seconds: ticket.serviceSeconds,
+    });
+  }
+  const rows = new Map<string, IssueKpi & { total: number }>();
+  for (const g of groups.values()) {
+    const key = `${g.teller}|${g.counter}`;
+    const row = rows.get(key) ?? { key, teller: g.teller, counter: g.counter, sales: 0, avgSeconds: 0, withinTarget: 0, total: 0 };
+    row.sales++;
+    row.total += g.seconds;
+    if (g.seconds <= target) row.withinTarget++;
+    rows.set(key, row);
+  }
+  return [...rows.values()]
+    .map(({ total, ...row }) => ({ ...row, avgSeconds: Math.round(total / row.sales) }))
+    .sort((a, b) => a.teller.localeCompare(b.teller));
+}
+
+/** 95 -> "1m 35s". */
+export function minSec(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return m ? `${m}m ${String(s).padStart(2, "0")}s` : `${s}s`;
+}

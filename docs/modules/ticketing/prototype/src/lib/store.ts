@@ -13,6 +13,7 @@ import type {
   Db,
   FareType,
   PaymentMethod,
+  QueueCount,
   Route,
   SalesClosing,
   SeatMark,
@@ -27,7 +28,7 @@ import type {
 
 // Prototype data layer: browser localStorage. All reads and writes go through this
 // file so it can be swapped for a real backend without touching the screens.
-const KEY = "pitx-tms-db-v11"; // v11: 9 Nov review (Reserved status, seat holds, new roles)
+const KEY = "pitx-tms-db-v12"; // v12: 10 Nov process map (counter opening, KPI 11, queue counts)
 
 let db: Db | null = null;
 const listeners = new Set<() => void>();
@@ -272,6 +273,46 @@ export function seatCapacity(data: Db, trip: Trip): number {
   return (layout?.seats ?? 0) - blocked.size;
 }
 
+export interface RouteDemand {
+  routeId: string;
+  route: string;
+  company: string;
+  trips: number;
+  dispatched: number; // Trips that left (Departed)
+  seats: number; // Seats on buses assigned so far
+  ticketed: number; // Tickets sold, not voided
+  boarded: number;
+}
+
+/**
+ * Passenger Demand Report (process map: passenger demand data gathering): passengers
+ * served per route against trips dispatched and seats offered, for one trip date.
+ */
+export function routeDemand(data: Db, date: string): RouteDemand[] {
+  const rows = new Map<string, RouteDemand>();
+  for (const trip of scopedTrips(data).filter((t) => t.date === date && t.status !== "Cancelled")) {
+    const route = data.routes.find((r) => r.id === trip.routeId);
+    const row = rows.get(trip.routeId) ?? {
+      routeId: trip.routeId,
+      route: route?.description ?? "-",
+      company: data.companies.find((c) => c.id === route?.companyId)?.code ?? "-",
+      trips: 0,
+      dispatched: 0,
+      seats: 0,
+      ticketed: 0,
+      boarded: 0,
+    };
+    const tickets = data.tickets.filter((t) => t.tripId === trip.id && t.status !== "Voided");
+    row.trips++;
+    if (trip.status === "Departed") row.dispatched++;
+    if (trip.busId) row.seats += seatCapacity(data, trip);
+    row.ticketed += tickets.length;
+    row.boarded += tickets.filter((t) => t.status === "Boarded").length;
+    rows.set(trip.routeId, row);
+  }
+  return [...rows.values()].sort((a, b) => b.ticketed - a.ticketed);
+}
+
 export function takenSeats(data: Db, tripId: string): Set<number> {
   return new Set(
     data.tickets.filter((t) => t.tripId === tripId && t.status !== "Voided").map((t) => t.seatNo),
@@ -414,6 +455,60 @@ export function sellingClosed(data: Db, trip: Trip): boolean {
   return departureTime(trip) - cutoffMinutes(data) * 60_000 <= Date.now();
 }
 
+/** Booth activation: has this Teller run the opening checks at this counter today? */
+export function counterOpenedToday(data: Db, today: string): boolean {
+  const session = data.session;
+  return data.openings.some((o) => o.date === today && o.teller === session?.name && o.counterId === session?.counterId);
+}
+
+/** Records the opening checks. Every check in System Parameters must be ticked. */
+export function openCounter(checks: string[], today: string): string | null {
+  const current = load();
+  const session = current.session;
+  if (!sells(session?.role) || !session?.counterId) return "Sign in as a Teller with a counter.";
+  const missing = current.settings.openingChecks.filter((c) => !checks.includes(c));
+  if (missing.length) return `Not done yet: ${missing.join(", ")}.`;
+  if (counterOpenedToday(current, today)) return null;
+  const counter = current.counters.find((c) => c.id === session.counterId);
+  commit({
+    ...current,
+    openings: [
+      ...current.openings,
+      { id: crypto.randomUUID(), date: today, teller: session.name, counterId: session.counterId, openedAt: new Date().toISOString(), checks },
+    ],
+    audit: [...current.audit, entry(current, "Counter opened", `${counter?.code ?? ""}: ${checks.length} checks done`)],
+  });
+  return null;
+}
+
+/** Sets which bus companies sell at a counter. An empty list means any company. */
+export function assignCounter(counterId: string, companyIds: string[]) {
+  const current = load();
+  const counter = current.counters.find((c) => c.id === counterId);
+  if (!counter) return;
+  const names = companyIds.map((id) => current.companies.find((c) => c.id === id)?.code ?? id);
+  commit({
+    ...current,
+    counters: current.counters.map((c) => (c.id === counterId ? { ...c, companyIds } : c)),
+    audit: [...current.audit, entry(current, "Counter assigned", `${counter.code}: ${names.length ? names.join(", ") : "any company"}`)],
+  });
+}
+
+/** Passengers counted waiting at a booth or gate (Passenger Demand Report). */
+export function recordQueueCount(place: QueueCount["place"], spot: string, count: number): string | null {
+  const current = load();
+  if (!spot.trim()) return "Enter the counter or gate.";
+  if (!Number.isInteger(count) || count < 0) return "Enter the number of people in line.";
+  commit({
+    ...current,
+    queueCounts: [
+      ...current.queueCounts,
+      { id: crypto.randomUUID(), at: new Date().toISOString(), by: current.session?.name ?? "", place, spot: spot.trim(), count },
+    ],
+  });
+  return null;
+}
+
 export function salesClosedToday(data: Db, today: string): boolean {
   const session = data.session;
   return data.closings.some(
@@ -429,6 +524,14 @@ export function sellingBlock(data: Db, trip: Trip, today: string): string | null
   if (trip.stopSelling) return "Selling is stopped for this trip.";
   if (departurePassed(trip)) return "This trip's departure time has passed.";
   if (salesClosedToday(data, today)) return "Your sales for today are closed at this counter.";
+  if (sells(data.session?.role) && !counterOpenedToday(data, today)) {
+    return "Open your counter first: run the opening checks in POS.";
+  }
+  const counter = data.counters.find((c) => c.id === data.session?.counterId);
+  const tripCompany = tripCompanyId(data, trip);
+  if (counter?.companyIds?.length && tripCompany && !counter.companyIds.includes(tripCompany)) {
+    return `${counter.code} isn't assigned to this bus company. See Master Data, Counter Assignment.`;
+  }
   if (sellingClosed(data, trip)) {
     return `Selling closed ${cutoffMinutes(data)} minutes before departure.`;
   }
@@ -460,6 +563,7 @@ export interface IssueInput {
   paymentMethod: PaymentMethod;
   tendered: number;
   paymentRef: string;
+  startedAt?: string; // When the Teller picked the first seat, for KPI 11
 }
 
 /** Sells every seat in one payment, or none of them if anything is wrong. */
@@ -503,6 +607,10 @@ export function issueTickets(input: IssueInput, today: string): { tickets?: Tick
 
   const groupId = crypto.randomUUID();
   const issuedAt = new Date().toISOString();
+  // One transaction time for the whole payment (KPI 11), ignoring a start more than an hour back.
+  const started = input.startedAt ? Date.parse(input.startedAt) : NaN;
+  const elapsed = Math.round((Date.parse(issuedAt) - started) / 1000);
+  const serviceSeconds = elapsed >= 0 && elapsed <= 3600 ? elapsed : undefined;
   const tickets: Ticket[] = input.passengers.map((p, index) => ({
     id: crypto.randomUUID(),
     ticketNo: `${company.ticketCode}${counter.ticketCode}-${String(current.tickets.length + index + 1).padStart(6, "0")}`,
@@ -523,6 +631,7 @@ export function issueTickets(input: IssueInput, today: string): { tickets?: Tick
     tendered: input.paymentMethod === "Cash" ? input.tendered : undefined,
     paymentRef: input.paymentRef.trim() || undefined,
     issuedAt,
+    serviceSeconds,
     status: "Reserved",
   }));
   commit({
@@ -905,7 +1014,7 @@ export function closeSales(code: string, tellerCount: number, today: string): st
   return null;
 }
 
-/** Account's own blind count. Only after this do the counts and the system cash become visible. */
+/** The PITX Cashier's own blind count. Only after this do the counts and the system cash become visible. */
 export function submitCollection(id: string, accountCount: number): string | null {
   const current = load();
   if (current.session?.role !== "PITX Cashier") return "Only the PITX Cashier can enter the collection.";

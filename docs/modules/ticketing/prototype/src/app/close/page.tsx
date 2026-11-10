@@ -34,12 +34,13 @@ export default function CloseSalesPage() {
       {closing ? (
         <div role="status" className="rounded-lg border border-green-300 bg-green-50 p-5 text-sm text-green-900">
           <p className="font-semibold">Your sales are closed.</p>
-          <p className="mt-1">Submitted {dateTimeManila(closing.closedAt)}. Hand your cash to Account for counting.</p>
+          <p className="mt-1">Submitted {dateTimeManila(closing.closedAt)}. Hand your cash to the PITX Cashier for counting.</p>
+          <p className="mt-1">Then sign out, switch off the printer and scanner, and lock the booth.</p>
         </div>
       ) : (
         <form onSubmit={submit} className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
           <p className="text-sm text-slate-600">
-            Count your cash and enter the amount. The system total stays hidden until Account has counted too.
+            Count your cash and enter the amount. The system total stays hidden until the PITX Cashier has counted too.
           </p>
           <label>
             Approval code from the PITX Admin

@@ -97,7 +97,7 @@ export default function DailyCollectionPage() {
                 <th className="px-3 py-2">Teller</th>
                 <th className="px-3 py-2">Counter</th>
                 <th className="px-3 py-2 text-right">Teller count</th>
-                <th className="px-3 py-2 text-right">Account count</th>
+                <th className="px-3 py-2 text-right">Cashier count</th>
                 <th className="px-3 py-2 text-right">System cash</th>
                 <th className="px-3 py-2 text-right">Over / short</th>
                 <th className="px-3 py-2">Counted by</th>

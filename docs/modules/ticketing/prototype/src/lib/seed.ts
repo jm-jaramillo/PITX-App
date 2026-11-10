@@ -224,6 +224,7 @@ export function seedDb(): Db {
         tendered: paymentMethod === "Cash" ? Math.ceil(fare / 100) * 100 : undefined,
         paymentRef: paymentMethod === "Cash" ? undefined : `DEMO-REF-${sequence}`,
         issuedAt: new Date(saleStart + sequence * 60_000).toISOString(),
+        serviceSeconds: online ? undefined : 45 + ((sequence * 37) % 150),
         status: voided ? "Voided" : boarded ? "Boarded" : "Reserved",
         voidReason: voided ? "Passenger changed plans (demo)" : undefined,
         voidedBy: voided ? `${company} Teller ${counterNo + 1}` : undefined,
@@ -308,10 +309,20 @@ export function seedDb(): Db {
       reprintApproval: "Password",
       reprintReasons: ["Lost ticket", "Damaged ticket", "Wrong passenger details", "Printer error", "Other"],
       seatHoldMinutes: 10,
+      issueTargetSeconds: 120,
+      openingChecks: [
+        "Signed in with my own account",
+        "Ticket printer prints a test page",
+        "QR scanner reads a test code",
+        "Network is up (no offline warning)",
+        "Change fund counted",
+      ],
       approvalPassword: "demo1234",
     },
     requests,
     closeCodes: [],
     closings: [],
+    openings: [],
+    queueCounts: [],
   };
 }
