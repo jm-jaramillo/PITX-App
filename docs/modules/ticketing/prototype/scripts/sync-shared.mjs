@@ -47,3 +47,24 @@ if (existsSync(tsApp)) {
 } else {
   console.log(`sync-shared: ${tsApp} not found, using the committed trip-routes.json`);
 }
+
+// Trip Scheduling's demo week (scripts/trip-scheduling/seed-demo-week.mjs): which operator
+// runs which destination, at what time and on which weekdays, and which trips it leaves
+// pending, rejected or cancelled. Ticketing's sample trips are the same ones (seed.ts).
+const tsWeek = process.env.PITX_TRIP_SCHEDULING_WEEK ?? path.resolve(app, "../../../../scripts/trip-scheduling/seed-demo-week.mjs");
+if (existsSync(tsWeek)) {
+  const source = readFileSync(tsWeek, "utf8");
+  const start = source.indexOf("const ALL =");
+  const end = source.indexOf("/* ---", source.indexOf("const OVERRIDES"));
+  if (start < 0 || end < 0) throw new Error(`sync-shared: trip list not found in ${tsWeek}`);
+  const week = new Function(
+    `${source.slice(start, end)}; return { trips: TRIPS, pendingAll: [...PENDING_ALL], pendingDays: PENDING_DAYS, overrides: OVERRIDES };`,
+  )();
+  writeFileSync(
+    path.join(app, "src/lib/ts-demo-week.json"),
+    JSON.stringify({ source: "scripts/trip-scheduling/seed-demo-week.mjs", ...week }) + "\n",
+  );
+  console.log("sync-shared: copied the demo week from", tsWeek);
+} else {
+  console.log(`sync-shared: ${tsWeek} not found, using the committed ts-demo-week.json`);
+}

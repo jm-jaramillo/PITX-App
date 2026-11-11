@@ -37,6 +37,36 @@ sections 2 and 3).
 
 ---
 
+## 23 · Sample data from Trip Scheduling's trips, for every user (11 Nov)
+
+The demo's sample data is now cross-checked with Trip Scheduling. Its demo week (`scripts/trip-scheduling/seed-demo-week.mjs`) lists which operator runs which destination, at what time and on which weekdays. Ticketing's sample trips are those same trips, and every kind of user gets bookings and passengers to work with.
+
+| Where | Before | Now |
+|---|---|---|
+| Companies | 6 made-up pairings (Kersteen, Lorna, Ogawa, South City, DLTB, Genesis) | The 27 operator accounts in Trip Scheduling's demo week |
+| Trips | 25 hand-made trips | The trips Trip Scheduling approves for today and the next two days (about 50 a day): same operator, destination, time and trip number. Pending and rejected requests are left out, and its cancelled trip (DLTB to Daet on Fridays) is Cancelled here too. |
+| Trip status | Fixed | From the time the data is made: past departures are Departed, the next 45 minutes Boarding |
+| Units | Set per trip by hand | Today's trips have units, most of tomorrow's do, and the day after still needs the Operator Admin (Unit Assignment) |
+| Bookings and passengers | About 460 tickets | About 1,900: counter sales at 8 booths, online bookings, discounts, refunds, boarded passengers on departed trips, and refunds on the cancelled trip |
+| Counter work | None | Opening checks for every teller with sales, 4 closed shifts (2 for the PITX Cashier to count, 2 counted, one ₱100 short), 3 reprints waiting for approval, and queue counts every 2 hours |
+| Fares | 7 destinations | A placeholder fare for each of the 47 destinations the demo week uses |
+
+**Every user gets their own sample data at sign-in**
+
+| User | What they get when they have none |
+|---|---|
+| Teller, Operator Admin | Up to 8 of their company's counter sales today, under their name and counter, so Tickets and Close Sales show their own |
+| Company with no approved trips (LLI, whose week is all pending in Trip Scheduling) or a portal operator not in the sample | Units, routes on its Trip Scheduling destinations, and 4 sample trips with sales, marked as sample in the remark |
+| Passenger | 3 online bookings: one today, one later, one already boarded |
+| PITX Admin, PITX Cashier | The shared data above |
+
+Only sample tickets (ids starting `demo-`) are ever reassigned. Portal operator accounts now also match their company by Trip Scheduling username (`dltb.ops` is DLTB) and by the distinctive words in the name.
+
+- `scripts/sync-shared.mjs` copies the demo week into `src/lib/ts-demo-week.json` on every build. New: `ts-week.ts`, `user-samples.ts`.
+- Real PITX data (live.ts) works as before: real trips still get made-up sales, now spread over the same booths.
+- Not checked against the live database: the demo week is the script Trip Scheduling uses to seed it, but which week was loaded there needs a staff sign-in to see.
+- Demo data resets once (storage key v14).
+
 ## 22 · Routes and trip numbers from Trip Scheduling (10 Nov)
 
 Ticketing routes are now the specific Trip Scheduling destinations, keyed by the trip number. A Trip Scheduling trip number is the destination's 3-letter code plus the departure time (NAG1530 = NAGA CITY at 15:30), so the code tells Ticketing exactly which route a trip is.

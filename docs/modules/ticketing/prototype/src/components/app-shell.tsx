@@ -9,6 +9,7 @@ import { DemoNotice } from "@/components/page-title";
 import { dateTimeManila } from "@/lib/format";
 import { companyIdForOperator, loadLive } from "@/lib/live";
 import { asset } from "@/lib/paths";
+import { SAMPLE_OPERATORS } from "@/lib/operator-routes";
 import { moduleHomeUrl, onPortalSite, portalUrl, portalUser, type PortalUser } from "@/lib/portal";
 import { canAccess, homeFor, isCompanyRole, NAV, sells } from "@/lib/roles";
 import { getDb, replaceData, resetDemoData, saveRecord, signIn, signOut, useDb, useHydrated } from "@/lib/store";
@@ -64,18 +65,35 @@ const isOperator = (user: PortalUser | null) => user?.role === "operator";
 const letters = (text: string | undefined) => (text ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 
 /**
- * The operator's own company: by operator id (real PITX data), else by name, else by
- * the company's first word inside the account name ("genesis-ops" is GENESIS TRANSPORT).
+ * The operator's own company: by operator id (real PITX data), else by name, else by the
+ * Trip Scheduling account ("dltb.ops" is DLTB), else by the distinctive words in the name.
  */
 function operatorCompanyId(db: Db, user: PortalUser): string | undefined {
   const byId = user.operatorId ? companyIdForOperator(user.operatorId) : "";
   const name = letters(user.name);
-  const firstWord = (c: Db["companies"][number]) => letters(c.name.split(/\s+/).at(0));
+  const account = SAMPLE_OPERATORS.find(
+    (o) => letters(o.name) === name || letters(o.username.replace(/\.ops$/, "")) === name.replace(/OPS$/, ""),
+  );
   return (
     db.companies.find((c) => c.id === byId) ??
     db.companies.find((c) => letters(c.name) === name || letters(c.description) === name) ??
-    db.companies.find((c) => firstWord(c).length >= 4 && name.includes(firstWord(c)))
+    db.companies.find((c) => !!account && c.id === `co-${account.code}`) ??
+    bestNameMatch(db.companies, user.name)
   )?.id;
+}
+
+const GENERIC = new Set(["INC", "CORP", "CORPORATION", "COMPANY", "TRANSPORT", "TRANSPORTATION", "TRANSIT", "LINER", "LINES", "LINE", "BUS", "TOURS", "TRAVEL", "EXPRESS", "SERVICE", "SERVICES", "PHILS", "AUTO", "THE", "AND"]);
+const words = (text: string | undefined) =>
+  new Set((text ?? "").toUpperCase().split(/[^A-Z0-9]+/).filter((w) => w.length >= 4 && !GENERIC.has(w)));
+
+/** The one company sharing the most distinctive words with the name, if there is exactly one. */
+function bestNameMatch(companies: Db["companies"], name: string) {
+  const mine = words(name);
+  const scored = companies
+    .map((c) => ({ c, score: [...words(c.name)].filter((w) => mine.has(w)).length }))
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score);
+  return scored.length && (scored.length === 1 || scored[0].score > scored[1].score) ? scored[0].c : undefined;
 }
 
 /** A session for the portal user in the given demo role, with the first active counter/company. */

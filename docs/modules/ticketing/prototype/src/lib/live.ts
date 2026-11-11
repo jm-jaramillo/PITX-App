@@ -3,7 +3,7 @@ import { todayManila } from "./format";
 import { baseCode, SAMPLE_OPERATORS } from "./operator-routes";
 import { portalAccessToken, SUPABASE_ANON_KEY, SUPABASE_URL } from "./portal";
 import { getLayout } from "./seat-layouts";
-import { PLACEHOLDER_FARE, PLACEHOLDER_GATE_FARE } from "./seed";
+import { fareFor } from "./seed";
 import { codeOfTripNo, gateOf, routeOfTripNo, tripCode } from "./trip-routes";
 import type { Bus, BusType, Company, Db, Route, SeatMark, Town, Trip } from "./types";
 
@@ -70,10 +70,7 @@ function slotTime(slot: number): string {
 const plateKey = (plate: string | null | undefined) => (plate ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 const slug = (text: string) => text.toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "ROUTE";
 
-function placeholderFare(destination: string): number {
-  const gate = gateOf(destination);
-  return PLACEHOLDER_FARE[destination] ?? (gate ? PLACEHOLDER_GATE_FARE[gate] : undefined) ?? 500;
-}
+const placeholderFare = fareFor;
 
 /** The demo company id for a Trip Scheduling operator (profiles.id). */
 export function companyIdForOperator(operatorId: string): string {

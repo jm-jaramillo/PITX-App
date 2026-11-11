@@ -1,3 +1,5 @@
+import { destinationsOf, TS_OPERATORS } from "./ts-week";
+
 // Operator list per denomination, from the sample supplied by Terminal Operations.
 // Duplicates are removed, joint entries ("A/ B") are split so each company gets access,
 // and obvious spelling variants are merged (DLTB, JAM Liner, CUL Transport, Erjohn & Almark).
@@ -98,19 +100,10 @@ export const OPERATOR_ROUTES: Record<string, string[]> = {
   ],
 };
 
-// The companies the demo runs on: five because their logos are available, plus Genesis so
-// its operator account (genesis-ops) has its own sample company to explore. DLTB and
-// Genesis are on the list above; the other denominations are placeholders until their
-// real routes are supplied.
-// destinations: the Trip Scheduling destinations each runs in the sample data (made up).
-export const SAMPLE_OPERATORS: (OperatorCompany & { logo?: string; destinations: string[] })[] = [
-  { code: "DLTB", name: DLTB, denominations: ["BATANGAS", "BICOL"], destinations: ["BATANGAS CITY", "NAGA CITY"], logo: "/brand/operators/dltb.jpg" },
-  { code: "KRS", name: "KERSTEEN", denominations: ["BAGUIO"], destinations: ["BAGUIO CITY"], logo: "/brand/operators/kersteen.png" },
-  { code: "LOR", name: "LORNA EXPRESS", denominations: ["QUEZON"], destinations: ["LUCENA CITY"], logo: "/brand/operators/lorna.jpg" },
-  { code: "OGW", name: "OGAWA LINER", denominations: ["NORTHERN ROUTES"], destinations: ["DAGUPAN CITY"], logo: "/brand/operators/ogawa.jpg" },
-  { code: "SCE", name: "SOUTH CITY EXPRESS INC", denominations: ["VISMIN"], destinations: ["TACLOBAN CITY"], logo: "/brand/operators/south-city.jpg" },
-  { code: "GEN", name: "GENESIS TRANSPORT SERVICE INC", denominations: ["NORTHERN ROUTES"], destinations: ["BALANGA, BATAAN"] },
-];
+// The companies the demo runs on: the operator accounts in Trip Scheduling's demo week
+// (ts-week.ts), each with the destinations it runs there. Only DLTB has a logo so far.
+export const SAMPLE_OPERATORS: (OperatorCompany & { logo?: string; username: string; destinations: string[] })[] =
+  TS_OPERATORS.map((o) => ({ ...o, denominations: [], destinations: destinationsOf(o.username) }));
 
 const FILLER = new Set(["INC", "CORP", "CO", "THE", "AND", "OF", "CORPORATION", "COMPANY"]);
 

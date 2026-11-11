@@ -5,6 +5,7 @@ import { shiftRemittance } from "./reports";
 import { sells, setsUnits } from "./roles";
 import { getLayout, parseBlockedSeats } from "./seat-layouts";
 import { seedDb } from "./seed";
+import { withUserSamples } from "./user-samples";
 import type {
   ApprovalMode,
   ApprovalRequest,
@@ -28,7 +29,7 @@ import type {
 
 // Prototype data layer: browser localStorage. All reads and writes go through this
 // file so it can be swapped for a real backend without touching the screens.
-const KEY = "pitx-tms-db-v13"; // v13: 10 Nov routes and trip numbers from Trip Scheduling
+const KEY = "pitx-tms-db-v14"; // v14: 11 Nov sample trips from Trip Scheduling's demo week
 
 let db: Db | null = null;
 const listeners = new Set<() => void>();
@@ -100,7 +101,7 @@ function entry(data: Db, action: string, detail: string, ids: { ticketId?: strin
 }
 
 export function signIn(session: Session) {
-  const current = load();
+  const current = withUserSamples(load(), session);
   const next = { ...current, session };
   commit({ ...next, audit: [...current.audit, entry(next, "Sign in", session.role)] });
 }
