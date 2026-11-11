@@ -4553,3 +4553,24 @@ The staff Schedule board is unchanged. Checked as genesis.ops: 6 columns, no bad
   Terminal Operating System CHANGELOG, entry 12.
 
 ---
+### 122. TOS moves a late bus's trip to a vacant bay (migration 202611111300, by @Jcbllanto16, 11 Nov)
+
+- When a bus reaches the gate past the grace period, TOS suggests a vacant bay
+  in this order: the same bay at a later 15-minute slot, then the same gate,
+  then the same floor. Staff confirm it with one click.
+- That click runs `tos_move_late_trip()`, which updates the booking's
+  **`assigned_bay_id` and `slot`** in `public.bookings`. Trip Scheduling has
+  no staff function for this yet. The booking's own triggers still run
+  (trip number, pending proposals re-picked), as does the
+  `bookings_unique_approved_bay_slot` index. Each move is logged in
+  `tos.trip_moves` (from and to bay and slot, who moved it, when). Status,
+  operator, plate and route are never touched.
+- It only runs for a late bus waiting at the gate, and only to a bay and slot
+  that TOS's search found free a moment earlier. Test reads roll the change
+  back.
+- **@jm-jaramillo:** if you'd rather own this, a
+  `staff_move_booking(booking, bay, slot)` in Trip Scheduling could replace
+  the direct update. Details are in the Terminal Operating System CHANGELOG,
+  entry 15.
+
+---
