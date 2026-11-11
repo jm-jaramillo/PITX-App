@@ -37,6 +37,35 @@ sections 2 and 3).
 
 ---
 
+## 24 · Passenger booking like a cinema, with sample history (11 Nov)
+
+Book a Trip (Passenger view) is now a 5-step flow, like buying a cinema ticket. A passenger also starts with a booking history of their own.
+
+| Step | What the passenger does |
+|---|---|
+| 1 Route | Picks the date from a strip of the next 7 days (days with no open trips are greyed out), then the destination. Each destination card shows the number of trips and operators, the first departure and the lowest fare. Destinations can be searched |
+| 2 Trip | Picks the departure. Each card shows the time, trip number, operator logo, aircon or ordinary, bus type, bay, how full it is and the fare. Filters for time of day (Morning, Afternoon, Evening) and operator |
+| 3 Seats | Picks seats on a bus seat plan seen from above: front at the top, driver on the left, door on the right. Available, your pick, taken, being booked by someone else, and not for sale (CR) each have their own look |
+| 4 Passengers | Name per seat, and a fare per seat: Regular, Student, Senior citizen or PWD, each showing its price and the saving. A discount asks for the ID number (RA 11314, RA 9994, RA 10754), checked at boarding. Mobile number (required, for trip updates) and email, filled in from the passenger's last booking |
+| 5 Payment | GCash, Maya or credit/debit card, and an order summary: fare per seat, discount lines, insurance, total discount and total to pay |
+
+- A basket bar stays at the bottom from step 3: seats picked, total, savings, the seat hold countdown, Back and Continue or Pay. When the hold runs out, it says so and asks to pick seats again.
+- Paying is simulated: it waits a moment as if the passenger went to GCash, Maya or the bank, then makes a `DEMO-` payment reference. No reference number to type any more.
+- Going back to step 1 or 2, or leaving the page, lets go of seats held but not paid for.
+- My trips is its own tab, with e-ticket cards split into Upcoming and Past and cancelled. A refund shows how much went back and where. The passenger sees "Refunded" instead of Voided.
+- New component `bus-seat-plan.tsx`. Counter POS keeps its own seat map.
+
+**Sample history per passenger** (`user-samples.ts`). A passenger with no bookings gets 5 tickets taken over from the sample online bookings, so the seats match the seat plans everyone else sees:
+
+| Booking | Status |
+|---|---|
+| A trip today, still to board | Reserved |
+| A trip tomorrow for 2: the passenger and a senior companion, one booking ref, the senior at the discounted fare | Reserved |
+| A trip today they already boarded | Boarded |
+| A trip the operator cancelled | Refunded (Trip cancelled), back to the e-wallet |
+
+The passenger's own seats are regular fare. Their contact details are made up (`0917 000 0000`, `name@example.com`). Demo data resets once (storage key v15).
+
 ## 23 · Sample data from Trip Scheduling's trips, for every user (11 Nov)
 
 The demo's sample data is now cross-checked with Trip Scheduling. Its demo week (`scripts/trip-scheduling/seed-demo-week.mjs`) lists which operator runs which destination, at what time and on which weekdays. Ticketing's sample trips are those same trips, and every kind of user gets bookings and passengers to work with.

@@ -2,8 +2,9 @@ import { addDemoSales, seeded } from "./demo-sales";
 import { todayManila } from "./format";
 import { SAMPLE_OPERATORS } from "./operator-routes";
 import { addDays, routeIdOf, sampleFleet, sampleRoute, sampleTown, statusAt } from "./seed";
+import { computeFare } from "./store";
 import { TS_ROUTES, tripNumber } from "./trip-routes";
-import type { Db, Session, Trip } from "./types";
+import type { Db, Session, Ticket, Trip } from "./types";
 
 // Sample data for whoever signs in, so every user has something to work with:
 //   a bus company with no trips gets a few (on its Trip Scheduling destinations if it has any)
@@ -123,30 +124,81 @@ export function withUserSamples(db: Db, session: Session): Db {
   }
 
   if (session.role === "Passenger" && !next.tickets.some((t) => t.bookedBy === session.name)) {
-    const online = next.tickets.filter((t) => isSample(t.id) && t.source === "Online" && t.status !== "Voided");
-    const upcoming = online.filter((t) => {
-      const trip = tripOf(t.tripId);
-      return t.status === "Reserved" && trip?.status === "Scheduled" && trip.busId;
-    });
-    const usedTrips = new Set<string>();
-    const pickOne = (list: typeof online) => {
-      const found = list.find((t) => !usedTrips.has(t.tripId));
-      if (found) usedTrips.add(found.tripId);
-      return found;
-    };
-    const picks = [
-      pickOne(upcoming.filter((t) => tripOf(t.tripId)?.date === today)),
-      pickOne(upcoming.filter((t) => tripOf(t.tripId)?.date !== today)),
-      pickOne(online.filter((t) => t.status === "Boarded")),
-    ].flatMap((t) => t ?? []);
-    const take = new Set(picks.map((t) => t.id));
-    if (take.size) {
-      next = {
-        ...next,
-        tickets: next.tickets.map((t) => (take.has(t.id) ? { ...t, bookedBy: session.name, passengerName: session.name } : t)),
-      };
-    }
+    next = passengerHistory(next, session.name, today);
   }
 
   return next;
+}
+
+/** The passenger's contact details on their sample bookings (made up, never a real number). */
+export function sampleContact(name: string) {
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, ".").replace(/^\.|\.$/g, "") || "passenger";
+  return { contactNo: "0917 000 0000", email: `${slug}@example.com` };
+}
+
+/**
+ * A passenger's booking history, taken over from sample online bookings so the seats stay
+ * consistent with the seat plans everyone else sees:
+ *   a trip today, still to board            a trip tomorrow for 2: them and a senior companion
+ *   a trip today they already boarded       a trip the operator cancelled, refunded
+ * Their own seats are regular fare. The contact details are made up (sampleContact).
+ */
+function passengerHistory(db: Db, name: string, today: string): Db {
+  const tripOf = (id: string) => db.trips.find((t) => t.id === id);
+  const routeOf = (tripId: string) => db.routes.find((r) => r.id === tripOf(tripId)?.routeId);
+  const online = db.tickets.filter((t) => t.id.startsWith("demo-") && t.source === "Online");
+  const usedTrips = new Set<string>();
+  const first = (list: typeof online) => {
+    const found = list.find((t) => !usedTrips.has(t.tripId));
+    if (found) usedTrips.add(found.tripId);
+    return found;
+  };
+  const upcoming = (t: (typeof online)[number]) => {
+    const trip = tripOf(t.tripId);
+    return t.status === "Reserved" && trip?.status === "Scheduled" && !!trip.busId;
+  };
+
+  const todayTrip = first(online.filter((t) => upcoming(t) && tripOf(t.tripId)?.date === today));
+  const boarded = first(online.filter((t) => t.status === "Boarded"));
+  const refunded = first(online.filter((t) => t.status === "Voided" && t.refundCategory === "Trip cancelled"));
+  // Tomorrow, two seats on one booking.
+  const tomorrow = addDays(today, 1);
+  const pairTrip = db.trips.find(
+    (trip) =>
+      trip.date === tomorrow &&
+      !usedTrips.has(trip.id) &&
+      online.filter((t) => t.tripId === trip.id && upcoming(t)).length >= 2,
+  );
+  const pair = pairTrip ? online.filter((t) => t.tripId === pairTrip.id && upcoming(t)).slice(0, 2) : [];
+
+  const contact = sampleContact(name);
+  const changes = new Map<string, Partial<Ticket>>();
+  // Their own seats are regular fare.
+  const regular = (t: Ticket): Partial<Ticket> => {
+    const fare = routeOf(t.tripId)?.price ?? t.fare;
+    return { fareType: "Adult", fare, idNo: undefined, ...(t.status === "Voided" ? { refundAmount: fare } : {}) };
+  };
+  for (const t of [todayTrip, boarded, refunded].flatMap((x) => x ?? [])) {
+    changes.set(t.id, { bookedBy: name, passengerName: name, ...contact, groupId: `demo-group-${t.id}`, ...regular(t) });
+  }
+  if (pair.length === 2) {
+    const [mine, companion] = pair;
+    const route = routeOf(companion.tripId);
+    const groupId = `demo-group-${mine.id}`;
+    changes.set(mine.id, { bookedBy: name, passengerName: name, ...contact, groupId, ...regular(mine) });
+    changes.set(companion.id, {
+      bookedBy: name,
+      ...contact,
+      groupId,
+      bookingRef: mine.bookingRef,
+      paymentRef: mine.paymentRef,
+      paymentMethod: mine.paymentMethod,
+      issuedAt: mine.issuedAt,
+      fareType: "Senior",
+      fare: route ? computeFare(route, "Senior") : companion.fare,
+      idNo: "DEMO-OSCA-0001",
+    });
+  }
+  if (!changes.size) return db;
+  return { ...db, tickets: db.tickets.map((t) => (changes.has(t.id) ? { ...t, ...changes.get(t.id) } : t)) };
 }
