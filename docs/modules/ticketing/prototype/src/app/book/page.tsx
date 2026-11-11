@@ -8,6 +8,7 @@ import { CompanyLogo } from "@/components/company-logo";
 import { PageTitle } from "@/components/page-title";
 import { peso, todayManila } from "@/lib/format";
 import { groupHref, ticketHref } from "@/lib/paths";
+import { provinceOf, regionOf, REGIONS, type Region } from "@/lib/places";
 import {
   bookOnline,
   computeFare,
@@ -90,6 +91,8 @@ export default function BookPage() {
   const [date, setDate] = useState(today);
   const [search, setSearch] = useState("");
   const [destination, setDestination] = useState("");
+  const [province, setProvince] = useState("");
+  const [region, setRegion] = useState<Region | "All">("All");
   const [when, setWhen] = useState<TimeOfDay>("Any time");
   const [operator, setOperator] = useState("");
   const [tripId, setTripId] = useState("");
@@ -138,10 +141,29 @@ export default function BookPage() {
         from: Math.min(...trips.map((t) => routeOf(t.routeId)?.price ?? Infinity)),
         operators: new Set(trips.map((t) => tripCompanyId(db, t))).size,
         first: trips[0].time,
+        province: provinceOf(place),
       };
     })
-    .filter((p) => p.place.toLowerCase().includes(search.trim().toLowerCase()))
     .sort((a, b) => a.place.localeCompare(b.place));
+  // Provinces first, grouped by region, so the passenger isn't faced with every town at once.
+  const provinces = [...new Set(places.map((p) => p.province))]
+    .map((name) => {
+      const inside = places.filter((p) => p.province === name);
+      return {
+        name,
+        region: regionOf(name),
+        places: inside,
+        trips: inside.reduce((sum, p) => sum + p.trips, 0),
+        from: Math.min(...inside.map((p) => p.from)),
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const regions = REGIONS.filter((r) => provinces.some((p) => p.region === r));
+  const query = search.trim().toLowerCase();
+  const found = query
+    ? places.filter((p) => p.place.toLowerCase().includes(query) || p.province.toLowerCase().includes(query))
+    : [];
+  const openProvince = provinces.find((p) => p.name === province);
 
   // Step 2: departures to the destination.
   const toPlace = dayTrips.filter((t) => placeOf(routeOf(t.routeId)?.description) === destination);
@@ -170,6 +192,13 @@ export default function BookPage() {
     setError(null);
     setStep(next);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function pickPlace(place: string) {
+    setDestination(place);
+    setWhen("Any time");
+    setOperator("");
+    go(1);
   }
 
   function pickDate(next: string) {
@@ -324,39 +353,81 @@ export default function BookPage() {
                   </div>
                   <label className="w-full sm:w-64">
                     <span className="sr-only">Search destination</span>
-                    <input placeholder="Search a town or city" value={search} onChange={(e) => setSearch(e.target.value)} />
+                    <input placeholder="Search a town, city or province" value={search} onChange={(e) => setSearch(e.target.value)} />
                   </label>
                 </div>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                  {places.map((p) => (
-                    <button
-                      key={p.place}
-                      type="button"
-                      onClick={() => {
-                        setDestination(p.place);
-                        setWhen("Any time");
-                        setOperator("");
-                        go(1);
-                      }}
-                      className="group flex items-center justify-between gap-3 rounded-lg border border-slate-200 p-3 text-left hover:border-brand hover:bg-brand-tint"
-                    >
-                      <span>
-                        <span className="block font-semibold text-slate-900">{p.place}</span>
-                        <span className="block text-xs text-slate-600">
-                          {p.trips} trip{p.trips === 1 ? "" : "s"} · {p.operators} operator{p.operators === 1 ? "" : "s"} · first {time12(p.first)}
-                        </span>
-                      </span>
-                      <span className="shrink-0 text-right">
-                        <span className="block text-[11px] text-slate-500">from</span>
-                        <span className="block font-bold text-brand">{peso(p.from)}</span>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-                {places.length === 0 && (
-                  <p className="text-sm text-slate-500">
-                    {search ? `No destination matches "${search}" on this date.` : "No trips open for booking on this date. Try another day."}
-                  </p>
+
+                {query ? (
+                  // Searching skips the provinces and lists the matching towns.
+                  <>
+                    <PlaceGrid places={found} showProvince onPick={pickPlace} />
+                    {found.length === 0 && <p className="text-sm text-slate-500">No destination matches &quot;{search}&quot; on this date.</p>}
+                  </>
+                ) : province ? (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setProvince("")}
+                        className="rounded-full border border-slate-300 px-3 py-1 text-sm font-semibold hover:border-brand"
+                      >
+                        <span aria-hidden>←</span> All provinces
+                      </button>
+                      <p className="font-semibold">
+                        {province}
+                        <span className="ml-2 text-sm font-normal text-slate-500">{regionOf(province)}</span>
+                      </p>
+                    </div>
+                    {openProvince ? (
+                      <PlaceGrid places={openProvince.places} onPick={pickPlace} />
+                    ) : (
+                      <p className="text-sm text-slate-500">No trips to {province} open on this date. Try another day or province.</p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {regions.length > 1 && (
+                      <div className="flex flex-wrap gap-2">
+                        {(["All", ...regions] as const).map((r) => (
+                          <Chip key={r} on={region === r} onClick={() => setRegion(r)}>
+                            {r}
+                          </Chip>
+                        ))}
+                      </div>
+                    )}
+                    {regions
+                      .filter((r) => region === "All" || region === r)
+                      .map((r) => (
+                        <div key={r} className="space-y-2">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{r}</p>
+                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+                            {provinces
+                              .filter((p) => p.region === r)
+                              .map((p) => (
+                                <button
+                                  key={p.name}
+                                  type="button"
+                                  onClick={() => (p.places.length === 1 ? pickPlace(p.places[0].place) : setProvince(p.name))}
+                                  className="flex min-w-0 flex-col rounded-lg border border-slate-200 p-3 text-left hover:border-brand hover:bg-brand-tint"
+                                >
+                                  <span className="truncate font-semibold text-slate-900">{p.name}</span>
+                                  <span className="truncate text-xs text-slate-600">
+                                    {p.places.length === 1
+                                      ? p.places[0].place
+                                      : `${p.places.length} destinations`}{" "}
+                                    · {p.trips} trip{p.trips === 1 ? "" : "s"}
+                                  </span>
+                                  <span className="mt-1 text-sm">
+                                    <span className="text-[11px] text-slate-500">from </span>
+                                    <span className="font-bold text-brand">{peso(p.from)}</span>
+                                  </span>
+                                </button>
+                              ))}
+                          </div>
+                        </div>
+                      ))}
+                    {provinces.length === 0 && <p className="text-sm text-slate-500">No trips open for booking on this date. Try another day.</p>}
+                  </div>
                 )}
               </div>
             </section>
@@ -700,6 +771,35 @@ function Stepper({ step, onGo }: { step: number; onGo: (i: number) => void }) {
         </li>
       ))}
     </ol>
+  );
+}
+
+type PlaceCard = { place: string; province: string; trips: number; operators: number; first: string; from: number };
+
+function PlaceGrid({ places, showProvince = false, onPick }: { places: PlaceCard[]; showProvince?: boolean; onPick: (place: string) => void }) {
+  return (
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+      {places.map((p) => (
+        <button
+          key={p.place}
+          type="button"
+          onClick={() => onPick(p.place)}
+          className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-slate-200 p-3 text-left hover:border-brand hover:bg-brand-tint"
+        >
+          <span className="min-w-0">
+            <span className="block truncate font-semibold text-slate-900">{p.place}</span>
+            {showProvince && <span className="block text-xs text-slate-500">{p.province}</span>}
+            <span className="block text-xs text-slate-600">
+              {p.trips} trip{p.trips === 1 ? "" : "s"} · {p.operators} operator{p.operators === 1 ? "" : "s"} · first {time12(p.first)}
+            </span>
+          </span>
+          <span className="shrink-0 text-right">
+            <span className="block text-[11px] text-slate-500">from</span>
+            <span className="block font-bold text-brand">{peso(p.from)}</span>
+          </span>
+        </button>
+      ))}
+    </div>
   );
 }
 

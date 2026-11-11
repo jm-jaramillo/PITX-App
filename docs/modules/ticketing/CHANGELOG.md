@@ -37,6 +37,27 @@ sections 2 and 3).
 
 ---
 
+## 26 · Book a Trip by province first (11 Nov)
+
+Step 1 of Book a Trip listed every destination at once (about 27 a day). It now shows provinces first, grouped by region, and the destinations inside a province after it's picked.
+
+| | Before | Now |
+|---|---|---|
+| Step 1 | One card per destination | One card per province (about 17 on a full day), under region headings: Metro Manila, North Luzon, South Luzon, Bicol, MIMAROPA, Visayas, Mindanao. Each card shows the destinations (or the one destination's name), the number of trips and the lowest fare |
+| Region filter | None | Chips to show one region only |
+| Picking a province | | With one destination, goes straight to its trips. With more, shows that province's destinations, with "All provinces" to go back |
+| Search | Destination name | Destination or province name. Results list the matching towns with their province |
+
+- New `src/lib/places.ts`: the province and region of each of Trip Scheduling's 103 destinations. Trip Scheduling's list has no province, so it's kept by hand. A destination not on it shows under "Other destinations".
+- **Confirm with Ops.** Six names could be more than one place, so their provinces were placed by Trip Scheduling gate and marked "guess" in the file:
+  - LILOAN: Southern Leyte
+  - MAGALLANES: Sorsogon
+  - SABANG: Camarines Sur
+  - SAN ANDRES: Quezon
+  - SAN JOSE: Batangas
+  - STA. CRUZ: Marinduque
+- Master Data provinces are unchanged (sample routes still sit under one "Trip Scheduling destinations" province).
+
 ## 25 · A full week of bookable sample trips (11 Nov)
 
 Passengers couldn't pick most schedules: the sample only had trips for 3 days, the third day had no units, and a third of tomorrow's trips had none either. A trip with no unit has no seat plan, so it can't be sold, and the booking date strip greyed out every day after the second.
