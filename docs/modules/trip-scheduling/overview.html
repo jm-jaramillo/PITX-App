@@ -210,6 +210,7 @@
     <script type="module">
       import {
         supabase,
+        onLiveChange,
         guardPage,
         renderNav,
         escapeHtml,
@@ -259,6 +260,10 @@
       document.getElementById("export-csv").addEventListener("click", exportCsv);
 
       await load();
+      onLiveChange(
+        ["bookings", "vehicles", "booking_transfers", "operator_profile_changes"],
+        load
+      );
 
       async function load() {
         const today = todayISO();

@@ -163,6 +163,87 @@ export function renderNav(profile, { brand = "PITX", links = [] } = {}) {
   initNotifications(profile);
 }
 
+/* ------------------------------------------------------------ live updates */
+
+/**
+ * Re-runs `refresh` whenever a row in one of `tables` changes, so a page
+ * shows other people's work (a new request, an approval, a moved trip) without
+ * a manual reload. Built on Supabase Realtime (the tables are in the
+ * supabase_realtime publication - migration 202611121000); RLS still decides
+ * which rows reach this user.
+ *
+ *  - bursts are merged: many row changes arrive as one refresh;
+ *  - a refresh is held back while a dialog is open or the user is working in a
+ *    form control inside a row, so a screen is never rebuilt under someone who
+ *    is typing, and is retried a few seconds later;
+ *  - the tab also refreshes when it becomes visible again or the connection
+ *    comes back, which covers a missed event while it was asleep.
+ *
+ * Returns a function that stops listening.
+ */
+export function onLiveChange(tables, refresh, { wait = 500, retry = 3000 } = {}) {
+  let timer = null;
+  let running = false;
+  let queued = false;
+
+  const busy = () => {
+    if (document.querySelector("dialog[open]")) return true;
+    const a = document.activeElement;
+    return Boolean(
+      a &&
+        /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) &&
+        a.closest("tr, .request-card, .card form, form[data-live-hold]")
+    );
+  };
+
+  const run = async () => {
+    timer = null;
+    if (running) {
+      queued = true;
+      return;
+    }
+    if (busy()) {
+      timer = setTimeout(run, retry);
+      return;
+    }
+    running = true;
+    try {
+      await refresh();
+    } catch (error) {
+      console.warn("live refresh failed", error);
+    } finally {
+      running = false;
+      if (queued) {
+        queued = false;
+        schedule();
+      }
+    }
+  };
+  const schedule = () => {
+    if (timer) return;
+    timer = setTimeout(run, wait);
+  };
+
+  let channel = supabase.channel("live-" + Math.random().toString(36).slice(2));
+  for (const table of tables) {
+    channel = channel.on("postgres_changes", { event: "*", schema: "public", table }, schedule);
+  }
+  channel.subscribe();
+
+  const onVisible = () => {
+    if (document.visibilityState === "visible") schedule();
+  };
+  document.addEventListener("visibilitychange", onVisible);
+  window.addEventListener("online", schedule);
+
+  return () => {
+    clearTimeout(timer);
+    document.removeEventListener("visibilitychange", onVisible);
+    window.removeEventListener("online", schedule);
+    supabase.removeChannel(channel);
+  };
+}
+
 /* --------------------------------------------------------- notifications */
 
 const NOTIF_LIMIT = 30;
@@ -215,19 +296,24 @@ async function initNotifications(profile) {
     /* ignore - see comment above */
   }
 
-  let query = supabase
-    .from("notifications")
-    .select("id, type, title, body, link, related_table, related_id, is_read, created_at")
-    .order("created_at", { ascending: false })
-    .limit(NOTIF_LIMIT);
-  query =
-    profile.role === "staff" || profile.role === "ticketing"
-      ? query.eq("recipient_role", profile.role).or(`recipient_id.is.null,recipient_id.eq.${profile.id}`)
-      : query.eq("recipient_role", "operator").eq("recipient_id", profile.id);
+  const fetchNotifications = async () => {
+    let query = supabase
+      .from("notifications")
+      .select("id, type, title, body, link, related_table, related_id, is_read, created_at")
+      .order("created_at", { ascending: false })
+      .limit(NOTIF_LIMIT);
+    query =
+      profile.role === "staff" || profile.role === "ticketing"
+        ? query.eq("recipient_role", profile.role).or(`recipient_id.is.null,recipient_id.eq.${profile.id}`)
+        : query.eq("recipient_role", "operator").eq("recipient_id", profile.id);
+    const { data } = await query;
+    return data ?? [];
+  };
 
-  const { data } = await query;
-  const notifications = data ?? [];
+  const notifications = await fetchNotifications();
   renderNotifPanel(notifications);
+  // new notifications arrive on the bell without a reload
+  onLiveChange(["notifications"], async () => renderNotifPanel(await fetchNotifications()), { wait: 300 });
 
   bell.addEventListener("click", (e) => {
     e.stopPropagation();

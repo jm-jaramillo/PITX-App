@@ -174,6 +174,7 @@
           <button type="button" class="btn-outline" id="prev">&larr; Prev day</button>
           <input type="date" id="date" />
           <button type="button" class="btn-outline" id="next">Next day &rarr;</button>
+          <button type="button" class="btn-primary" id="book-trip">Book a trip</button>
           <details class="row-menu"><summary class="menu-btn" aria-label="More">&#8943;</summary><div class="row-menu-pop"><button type="button" class="btn-link" id="export-csv">Export CSV</button></div></details>
         </div>
       </div>
@@ -186,10 +187,24 @@
       <div class="hidden" id="message"></div>
       <div id="grid"></div>
 
-      <dialog id="trip-dialog" class="card" style="max-width: 440px; width: calc(100% - 32px)">
+      <dialog id="trip-dialog" class="card" style="max-width: 460px; width: calc(100% - 32px)">
         <form id="trip-form" method="dialog">
-          <h2 style="margin-top: 0">Plate &amp; operator</h2>
+          <h2 style="margin-top: 0">Edit trip</h2>
           <p class="subtle" id="trip-context"></p>
+          <div class="field">
+            <label for="trip-route">Destination</label>
+            <select id="trip-route"></select>
+          </div>
+          <div class="grid grid-2">
+            <div class="field">
+              <label for="trip-date">Date</label>
+              <input id="trip-date" type="date" />
+            </div>
+            <div class="field">
+              <label for="trip-slot">Time</label>
+              <select id="trip-slot"></select>
+            </div>
+          </div>
           <div class="field">
             <label for="trip-operator">Operator</label>
             <select id="trip-operator"></select>
@@ -206,6 +221,51 @@
           </div>
         </form>
       </dialog>
+
+      <dialog id="book-dialog" class="card" style="max-width: 520px; width: calc(100% - 32px)">
+        <form id="book-form" method="dialog">
+          <h2 style="margin-top: 0">Book a trip for an operator</h2>
+          <p class="subtle">The trip is approved straight away and a balanced bay is assigned.</p>
+          <div class="field">
+            <label for="book-operator">Operator</label>
+            <select id="book-operator" required></select>
+          </div>
+          <div class="field">
+            <label for="book-route">Destination</label>
+            <select id="book-route" required></select>
+          </div>
+          <div class="grid grid-2">
+            <div class="field">
+              <label for="book-date">Date</label>
+              <input id="book-date" type="date" required />
+            </div>
+            <div class="field">
+              <label for="book-slot">Time</label>
+              <select id="book-slot" required></select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="book-plate">Plate number <span class="fineprint">(optional)</span></label>
+            <select id="book-plate"></select>
+          </div>
+          <div class="field">
+            <label class="repeat-toggle"><input type="checkbox" id="book-repeat" /> <span>Repeat on other days</span></label>
+            <div class="hidden" id="book-repeat-options">
+              <div class="repeat-days" id="book-days"></div>
+              <div class="field" style="max-width: 220px; margin: 8px 0 0">
+                <label for="book-until">Repeat until</label>
+                <input id="book-until" type="date" />
+              </div>
+              <p class="fineprint" id="book-preview"></p>
+            </div>
+          </div>
+          <div class="hidden" id="book-message"></div>
+          <div style="display: flex; gap: 8px; justify-content: flex-end">
+            <button type="button" class="btn-outline" id="book-cancel">Cancel</button>
+            <button type="submit" class="btn-primary" id="book-save">Book</button>
+          </div>
+        </form>
+      </dialog>
     </main>
       </div>
     </div>
@@ -216,6 +276,7 @@
       import { renderWeek, weekStartISO, weekRangeLabel } from "./assets/week-view.js";
       import {
         supabase,
+        onLiveChange,
         guardPage,
         renderNav,
         formatSlotStart,
@@ -227,6 +288,8 @@
         showMessage,
         escapeHtml,
         downloadCsv,
+        ROUTES,
+        SLOTS,
       } from "./assets/app.js";
 
       const profile = await guardPage("staff");
@@ -386,6 +449,7 @@
       }
 
       await load();
+      onLiveChange(["bookings", "bays"], load);
 
       async function load() {
         const [baysRes, bookingsRes] = await Promise.all([
@@ -524,7 +588,7 @@
                           }</td>
                           <td class="pids-num">${
                             !isCancelled(b) && !hasDeparted(b)
-                              ? `<button type="button" class="btn-link" data-edit-trip="${escapeHtml(b.id)}">Plate / operator</button>`
+                              ? `<button type="button" class="btn-link" data-edit-trip="${escapeHtml(b.id)}">Edit</button>`
                               : ""
                           }</td>
                         </tr>`;
@@ -618,16 +682,28 @@
         `;
       }
 
-      // Staff-side plate entry and operator swap. Changing only the plate goes
-      // through staff_set_booking_plate; picking a different operator goes
-      // through staff_reassign_booking, which needs that operator's vehicle and
-      // keeps the bay and slot. Both enforce eligibility in the database -
-      // these lists are just the choices that will be accepted.
+      // Staff edit and booking. Everything is validated again in the database
+      // (staff_edit_booking, staff_reassign_booking, staff_create_booking); the
+      // lists below are just the choices that will be accepted.
+      const slotOptionsHtml = () =>
+        SLOTS.map((x) => `<option value="${x}">${escapeHtml(formatSlotStart(x))}</option>`).join("");
+      const routeOptionsHtml = (selected) =>
+        (ROUTES.includes(selected) || !selected ? "" : `<option value="${escapeHtml(selected)}" selected>${escapeHtml(selected)}</option>`) +
+        ROUTES.map(
+          (r) => `<option value="${escapeHtml(r)}"${r === selected ? " selected" : ""}>${escapeHtml(r)}</option>`
+        ).join("");
+
+      /* -------------------------------------------------------- edit trip */
       let editingId = null;
+      let editingBooking = null;
       let editingOperatorName = "";
       const tripDialog = document.getElementById("trip-dialog");
       const tripOperator = document.getElementById("trip-operator");
       const tripPlate = document.getElementById("trip-plate");
+      const tripRoute = document.getElementById("trip-route");
+      const tripDate = document.getElementById("trip-date");
+      const tripSlot = document.getElementById("trip-slot");
+      tripSlot.innerHTML = slotOptionsHtml();
 
       async function loadPlateChoices(username, currentPlate) {
         tripPlate.disabled = true;
@@ -656,19 +732,43 @@
         tripPlate.disabled = false;
       }
 
+      // a different destination invalidates the plates registered for the old
+      // one, so the plate is cleared (set it again after the move)
+      function syncPlateToRoute() {
+        const routeChanged = tripRoute.value !== editingBooking?.route;
+        if (routeChanged) {
+          tripPlate.innerHTML = `<option value="">No plate yet</option>`;
+          tripPlate.disabled = true;
+          tripOperator.disabled = true;
+          tripOperator.value = "";
+          document.getElementById("trip-hint").textContent =
+            "A new destination clears the plate - set it again after saving. Change the operator in a separate edit.";
+        } else {
+          tripOperator.disabled = false;
+          document.getElementById("trip-hint").textContent =
+            "Change the plate or the details, or pick another operator to move the trip to them (their vehicle is required). The bay stays the same unless the destination, date or time changes.";
+          loadPlateChoices(tripOperator.value || null, editingBooking?.plate_no);
+        }
+      }
+
       async function openTripEditor(bookingId) {
         const b = lastDayBookings.find((x) => x.id === bookingId);
         if (!b) return;
         editingId = bookingId;
+        editingBooking = b;
         editingOperatorName = b.operator_name ?? "this operator";
         showMessage("trip-message", "");
         document.getElementById("trip-context").textContent =
-          `${formatSlotStart(b.slot)} · ${b.route} · ${b.booking_date ?? currentDate}`;
+          `${editingOperatorName} · trip ${b.trip_number ?? "—"}`;
+        tripRoute.innerHTML = routeOptionsHtml(b.route);
+        tripDate.value = b.booking_date ?? currentDate;
+        tripSlot.value = String(b.slot);
+        tripOperator.disabled = false;
         tripOperator.innerHTML = `<option value="">${escapeHtml(editingOperatorName)} (current)</option>`;
-        document.getElementById("trip-hint").textContent =
-          "Change the plate for the current operator, or pick another operator to move the trip to them (their vehicle is required). The bay stays the same.";
+        document.getElementById("trip-hint").textContent = "";
         tripDialog.showModal();
         loadPlateChoices(null, b.plate_no);
+        syncPlateToRoute();
         const { data } = await supabase.rpc("staff_list_reassign_operators", { p_booking_id: bookingId });
         tripOperator.innerHTML =
           `<option value="">${escapeHtml(editingOperatorName)} (current)</option>` +
@@ -677,10 +777,8 @@
             .join("");
       }
 
-      tripOperator.addEventListener("change", () => {
-        const b = lastDayBookings.find((x) => x.id === editingId);
-        loadPlateChoices(tripOperator.value || null, b?.plate_no);
-      });
+      tripRoute.addEventListener("change", syncPlateToRoute);
+      tripOperator.addEventListener("change", () => loadPlateChoices(tripOperator.value || null, editingBooking?.plate_no));
       document.getElementById("trip-cancel").addEventListener("click", () => tripDialog.close());
       document.getElementById("trip-form").addEventListener("submit", async (e) => {
         e.preventDefault();
@@ -688,23 +786,177 @@
         const username = tripOperator.value || null;
         const plate = tripPlate.value;
         if (username && !plate) return showMessage("trip-message", "Pick the receiving operator's vehicle.");
-        const { error } = username
-          ? await supabase.rpc("staff_reassign_booking", {
-              p_booking_id: editingId,
-              p_to_username: username,
-              p_plate_no: plate,
-            })
-          : await supabase.rpc("staff_set_booking_plate", {
-              p_booking_id: editingId,
-              p_plate_no: plate,
-            });
-        if (error) return showMessage("trip-message", error.message);
+        if (!tripDate.value) return showMessage("trip-message", "Pick a date.");
+
+        const saveBtn = document.getElementById("trip-save");
+        saveBtn.disabled = true;
+        let error = null;
+        let reassigned = false;
+        if (username) {
+          ({ error } = await supabase.rpc("staff_reassign_booking", {
+            p_booking_id: editingId,
+            p_to_username: username,
+            p_plate_no: plate,
+          }));
+          reassigned = !error;
+        }
+        const b = editingBooking;
+        const detailsChanged =
+          tripRoute.value !== b.route ||
+          tripDate.value !== (b.booking_date ?? currentDate) ||
+          Number(tripSlot.value) !== b.slot;
+        const plateChanged = !username && (plate || "") !== (b.plate_no || "");
+        if (!error && (detailsChanged || plateChanged)) {
+          ({ error } = await supabase.rpc("staff_edit_booking", {
+            p_booking_id: editingId,
+            p_route: tripRoute.value,
+            p_date: tripDate.value,
+            p_slot: Number(tripSlot.value),
+            p_plate_no: username ? plate : plate || null,
+          }));
+        }
+        saveBtn.disabled = false;
+        if (error) {
+          if (reassigned) await load();
+          return showMessage(
+            "trip-message",
+            reassigned ? "The operator was changed, but the rest failed: " + error.message : error.message
+          );
+        }
         tripDialog.close();
-        showMessage(
-          "message",
-          username ? "Trip moved to the new operator." : plate ? `Plate set to ${plate}.` : "Plate cleared.",
-          "ok"
-        );
+        showMessage("message", "Trip updated.", "ok");
+        await load();
+      });
+
+      /* ------------------------------------------------------ book a trip */
+      const bookDialog = document.getElementById("book-dialog");
+      const bookOperator = document.getElementById("book-operator");
+      const bookRoute = document.getElementById("book-route");
+      const bookDate = document.getElementById("book-date");
+      const bookSlot = document.getElementById("book-slot");
+      const bookPlate = document.getElementById("book-plate");
+      const bookRepeat = document.getElementById("book-repeat");
+      const bookUntil = document.getElementById("book-until");
+      const bookDays = new Set();
+      const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      let operatorList = null;
+      bookSlot.innerHTML = slotOptionsHtml();
+      bookRoute.innerHTML =
+        `<option value="" disabled selected>Select a destination</option>` + routeOptionsHtml(null);
+      document.getElementById("book-days").innerHTML = WEEKDAYS.map(
+        (l, i) => `<button type="button" class="repeat-day" data-bookday="${i}">${l}</button>`
+      ).join("");
+
+      const weekdayOf = (iso) => {
+        const [y, m, d] = iso.split("-").map(Number);
+        return new Date(y, m - 1, d, 12).getDay();
+      };
+      function plannedDates() {
+        const start = bookDate.value;
+        if (!start) return [];
+        if (!bookRepeat.checked || !bookUntil.value || bookUntil.value < start || bookDays.size === 0) return [start];
+        const out = [];
+        for (let d = start; d <= bookUntil.value && out.length < 60; d = addDays(d, 1)) {
+          if (bookDays.has(weekdayOf(d))) out.push(d);
+        }
+        return out;
+      }
+      function updateBookPreview() {
+        const el = document.getElementById("book-preview");
+        el.textContent = bookRepeat.checked
+          ? `Books ${plannedDates().length} trip${plannedDates().length === 1 ? "" : "s"}.`
+          : "";
+      }
+
+      async function loadBookPlates() {
+        const opId = bookOperator.value;
+        const route = bookRoute.value;
+        bookPlate.innerHTML = `<option value="">No plate yet</option>`;
+        if (!opId || !route) return;
+        const { data } = await supabase
+          .from("vehicles")
+          .select("plate_no, body_number, route, cpc_validity")
+          .eq("operator_id", opId)
+          .eq("status", "approved")
+          .eq("route", route)
+          .order("plate_no");
+        const today = todayISO();
+        bookPlate.innerHTML =
+          `<option value="">No plate yet</option>` +
+          (data ?? [])
+            .filter((v) => !v.cpc_validity || v.cpc_validity >= today)
+            .map(
+              (v) =>
+                `<option value="${escapeHtml(v.plate_no)}">${escapeHtml(v.plate_no)}${v.body_number ? " · " + escapeHtml(v.body_number) : ""}</option>`
+            )
+            .join("");
+      }
+
+      document.getElementById("book-trip").addEventListener("click", async () => {
+        showMessage("book-message", "");
+        if (!operatorList) {
+          const { data } = await supabase
+            .from("profiles")
+            .select("id, username, operator_name")
+            .eq("role", "operator")
+            .order("operator_name", { ascending: true, nullsFirst: false });
+          operatorList = data ?? [];
+        }
+        bookOperator.innerHTML =
+          `<option value="" disabled selected>Select an operator</option>` +
+          operatorList
+            .map((o) => `<option value="${escapeHtml(o.id)}">${escapeHtml(o.operator_name || o.username)}</option>`)
+            .join("");
+        bookDate.min = todayISO();
+        bookDate.value = currentDate >= todayISO() ? currentDate : todayISO();
+        bookPlate.innerHTML = `<option value="">No plate yet</option>`;
+        bookDialog.showModal();
+      });
+      bookOperator.addEventListener("change", loadBookPlates);
+      bookRoute.addEventListener("change", loadBookPlates);
+      bookDate.addEventListener("change", updateBookPreview);
+      bookUntil.addEventListener("change", updateBookPreview);
+      bookRepeat.addEventListener("change", () => {
+        document.getElementById("book-repeat-options").classList.toggle("hidden", !bookRepeat.checked);
+        if (bookRepeat.checked && bookDays.size === 0 && bookDate.value) {
+          bookDays.add(weekdayOf(bookDate.value));
+          document.querySelectorAll("[data-bookday]").forEach((x) =>
+            x.classList.toggle("is-on", bookDays.has(Number(x.dataset.bookday)))
+          );
+          if (!bookUntil.value) bookUntil.value = addDays(bookDate.value, 27);
+        }
+        updateBookPreview();
+      });
+      document.querySelectorAll("[data-bookday]").forEach((btn) =>
+        btn.addEventListener("click", () => {
+          const d = Number(btn.dataset.bookday);
+          if (bookDays.has(d)) bookDays.delete(d);
+          else bookDays.add(d);
+          btn.classList.toggle("is-on", bookDays.has(d));
+          updateBookPreview();
+        })
+      );
+      document.getElementById("book-cancel").addEventListener("click", () => bookDialog.close());
+      document.getElementById("book-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        showMessage("book-message", "");
+        const dates = plannedDates();
+        if (!bookOperator.value || !bookRoute.value || !dates.length) {
+          return showMessage("book-message", "Pick an operator, destination and date.");
+        }
+        const saveBtn = document.getElementById("book-save");
+        saveBtn.disabled = true;
+        const { data, error } = await supabase.rpc("staff_create_booking", {
+          p_operator_id: bookOperator.value,
+          p_route: bookRoute.value,
+          p_dates: dates,
+          p_slot: Number(bookSlot.value),
+          p_plate_no: bookPlate.value || null,
+        });
+        saveBtn.disabled = false;
+        if (error) return showMessage("book-message", error.message);
+        bookDialog.close();
+        showMessage("message", `Booked ${data} trip${data === 1 ? "" : "s"} and assigned bays.`, "ok");
         await load();
       });
 

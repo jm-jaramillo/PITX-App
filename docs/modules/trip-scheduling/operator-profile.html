@@ -101,6 +101,7 @@
       </div>
 
       <div class="hidden" id="message"></div>
+      <p class="hint hidden" id="change-banner"></p>
 
       <form class="card grid grid-2" id="profile-form">
         <p class="field-group-heading span-all">Operator identity</p>
@@ -166,6 +167,7 @@
     <script type="module">
       import {
         supabase,
+        onLiveChange,
         guardPage,
         renderNav,
         showMessage,
@@ -278,39 +280,85 @@
             : "";
       }
 
-      async function load() {
-        const { data, error } = await supabase
-          .from("operator_profiles")
-          .select("*")
+      // Profile edits wait for PITX staff approval: the live profile (what staff
+      // and other modules see) only changes once a change is approved. While
+      // one is waiting the form shows the operator's requested values, with a
+      // banner saying so.
+      async function latestChange() {
+        const { data } = await supabase
+          .from("operator_profile_changes")
+          .select("id, changes, status, requested_at, decided_at, reject_reason")
           .eq("operator_id", profile.id)
-          .maybeSingle();
+          .order("requested_at", { ascending: false })
+          .limit(1);
+        return data?.[0] ?? null;
+      }
+
+      function showChangeBanner(change) {
+        const el = document.getElementById("change-banner");
+        if (change?.status === "pending") {
+          el.textContent =
+            "Your profile changes are waiting for PITX staff approval. Your live profile stays as it was until then.";
+          el.className = "hint";
+        } else if (change?.status === "rejected" && change.decided_at &&
+                   Date.now() - new Date(change.decided_at).getTime() < 7 * 86400000) {
+          el.textContent =
+            "Your last profile change was declined" +
+            (change.reject_reason ? ": " + change.reject_reason : ".");
+          el.className = "hint";
+        } else {
+          el.textContent = "";
+          el.className = "hint hidden";
+        }
+      }
+
+      async function signedLogo(path) {
+        const { data: signed } = await supabase.storage
+          .from("operator-docs")
+          .createSignedUrl(path, 300);
+        if (signed?.signedUrl) {
+          const preview = document.getElementById("logo-preview");
+          preview.src = signed.signedUrl;
+          preview.classList.remove("is-empty");
+        }
+      }
+
+      async function load() {
+        const [{ data, error }, change] = await Promise.all([
+          supabase
+            .from("operator_profiles")
+            .select("*")
+            .eq("operator_id", profile.id)
+            .maybeSingle(),
+          latestChange(),
+        ]);
 
         if (error) {
           showMessage("message", error.message);
           return;
         }
+        showChangeBanner(change);
 
-        if (!data) return; // Nothing saved yet - leave the form blank.
+        // the requested values win while a change is pending
+        const source = change?.status === "pending" ? { ...(data ?? {}), ...change.changes } : data;
+        if (!source) return; // Nothing saved yet - leave the form blank.
 
         for (const field of FIELDS) {
-          document.getElementById(field).value = data[field] ?? "";
+          document.getElementById(field).value = source[field] ?? "";
         }
 
-        contacts = Array.isArray(data.contacts) ? data.contacts : [];
+        contacts = Array.isArray(source.contacts) ? source.contacts : [];
         renderContacts();
 
-        existingLogoPath = data.logo_path ?? null;
-        if (existingLogoPath) {
-          const { data: signed } = await supabase.storage
-            .from("operator-docs")
-            .createSignedUrl(existingLogoPath, 300);
-          if (signed?.signedUrl) {
-            const preview = document.getElementById("logo-preview");
-            preview.src = signed.signedUrl;
-            preview.classList.remove("is-empty");
-          }
-        }
+        existingLogoPath = source.logo_path ?? null;
+        if (existingLogoPath) await signedLogo(existingLogoPath);
       }
+
+      // a decision (or a staff edit) shows up here without a reload; only the
+      // banner is refreshed so nothing the operator is typing is overwritten
+      onLiveChange(["operator_profile_changes", "operator_profiles"], async () => {
+        showChangeBanner(await latestChange());
+      });
 
       async function save(event) {
         event.preventDefault();
@@ -333,12 +381,11 @@
         let logoPath = existingLogoPath;
         if (pendingLogoFile) {
           const ext = (pendingLogoFile.name.split(".").pop() || "jpg").toLowerCase();
-          const path = `${profile.id}/logo.${ext}`;
+          const path = `${profile.id}/logo-${Date.now()}.${ext}`;
           const { error: uploadError } = await supabase.storage
             .from("operator-docs")
             .upload(path, pendingLogoFile, {
               contentType: pendingLogoFile.type || "image/jpeg",
-              upsert: true,
             });
           if (uploadError) {
             showMessage("message", `Logo upload failed: ${uploadError.message}`);
@@ -358,9 +405,12 @@
         // fill in instead of two.
         values.has_booking_system = Boolean(values.booking_system_name);
 
-        const { error } = await supabase
-          .from("operator_profiles")
-          .upsert(values, { onConflict: "operator_id" });
+        // goes through the approval flow (request_operator_profile_change): the
+        // very first profile is saved at once, later edits wait for staff
+        const { operator_id: _omit, ...changes } = values;
+        const { data: outcome, error } = await supabase.rpc("request_operator_profile_change", {
+          p_changes: changes,
+        });
 
         saveBtn.disabled = false;
         saveBtn.textContent = "Save profile";
@@ -373,7 +423,14 @@
         pendingLogoFile = null;
         contacts = namedContacts;
         renderContacts();
-        showMessage("message", "Profile saved.", "ok");
+        showChangeBanner(await latestChange());
+        showMessage(
+          "message",
+          outcome === "pending"
+            ? "Submitted. PITX staff will review your changes - your live profile updates once they approve."
+            : "Profile saved.",
+          "ok"
+        );
       }
     </script>
   </body>

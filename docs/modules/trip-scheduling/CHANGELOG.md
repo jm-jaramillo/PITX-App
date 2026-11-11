@@ -4594,3 +4594,77 @@ logged:** 202611041002_ticketing_passengers and 202611061100_ticketing_core_link
 exist yet).
 
 ---
+
+### 124. Operator: optional plate when requesting a trip; same destination at the same time allowed (11 Nov)
+
+- **New request form** has a **Plate No. (optional)** list again: the operator's
+  approved vehicles registered for the chosen destination, default "No plate yet".
+  A plate picked here goes in with the request (the existing `bookings_insert_own`
+  policy re-checks it); a repeat booking uses it on every date. Set/Change plate on
+  the schedule is unchanged.
+- **Several trips to the same destination at the same time are allowed.** The form
+  no longer skips a date because the operator already holds that destination + time,
+  and the "another operator is already scheduled there - try a different time" hint
+  and its suggestions are gone (the "Also scheduled at ..." list stays, informational).
+  Nothing server-side ever blocked this. Each trip still gets its own bay.
+- Verified as genesis.ops: two identical requests (same destination, date, time,
+  plate) both went through with different bays; test rows removed.
+
+---
+
+### 125. Admin (staff) can book and edit trips (migration 202611121000, 11 Nov)
+
+- **Schedule -> Book a trip**: staff pick an operator, destination, date, time, an
+  optional plate (that operator's vehicles for the destination) and optionally repeat
+  on weekdays until a date. New `staff_create_booking()`: approved straight away, no
+  2-hour lead time, bay picked by the balanced-assignment trigger, same plate rules
+  as operators, operator notified.
+- **Schedule -> Edit** (per trip, not cancelled / not departed) replaces
+  "Plate / operator": change destination, date, time, plate, or swap the operator
+  (#119). New `staff_edit_booking()`: a new destination/date/time clears the bay so a
+  fresh balanced bay is picked, recomputes the trip number, notifies the operator. A
+  new destination clears the plate; the operator swap is a separate edit.
+- **Operator profiles -> open a profile -> Edit profile** (operator name, trade
+  name/code, owner, booking system, up to 5 contacts). Applies immediately.
+  `staff_update_operator_profile()`.
+- Other operator functions staff already had (vehicles, cancellations, transfers,
+  approvals) are unchanged.
+
+---
+
+### 126. Operator profile changes need staff approval (migration 202611121000, 11 Nov)
+
+- An operator's **Save profile** now submits a change (`operator_profile_changes`,
+  `request_operator_profile_change()`). Their live profile does not change until staff
+  approve; the profile page shows a "waiting for approval" banner (and any recent
+  decline reason) and keeps showing their requested values meanwhile. A new logo is
+  uploaded to a fresh file so the live logo isn't replaced early.
+- The very first profile an operator creates is saved at once (nothing to protect).
+- **Approvals -> Profile changes** (new tab with a red pin): current vs requested per
+  field, Approve / Reject (optional reason), recent decisions. `decide_operator_profile_change()`
+  applies it and notifies the operator. A staff edit supersedes a waiting request.
+- Operators can no longer write `operator_profiles` directly (the insert/update
+  policies were dropped); everything goes through the functions. Checked: a direct
+  update changes 0 rows.
+
+---
+
+### 127. Pages update live, no refresh needed (11 Nov)
+
+- New shared helper `onLiveChange(tables, refresh)` in `docs/shared/platform.js`
+  (Supabase Realtime): merges bursts, holds a refresh while a dialog is open or
+  someone is typing in a row, refreshes when the tab wakes or reconnects. The
+  notification bell updates live too.
+- Wired into: Overview, Approvals (all four queues), Schedule, My schedule,
+  Operator overview (KPIs, requests, incoming transfers), Vehicles, Vehicles
+  database, Operator profiles, Accounts, Bays, Operator profile (banner).
+- Migration adds `bookings, vehicles, notifications, booking_transfers,
+  operator_profiles, operator_profile_changes, bays, profiles` to the
+  `supabase_realtime` publication; RLS still limits what each user receives.
+- Verified: with the staff Schedule open, a trip approved from outside appeared in
+  the table within seconds without touching the page.
+- Applied to the live database by hand with a `_schema_migrations` row.
+  **@Jcbllanto16 / @victoriaronald:** the helper lives in shared `platform.js`
+  (additive); the Terminal Operating System and Ticketing pages are not wired yet.
+
+---

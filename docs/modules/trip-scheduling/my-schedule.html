@@ -188,6 +188,7 @@
       import { renderWeek, weekStartISO, weekRangeLabel } from "./assets/week-view.js";
       import {
         supabase,
+        onLiveChange,
         guardPage,
         renderNav,
         formatSlotStart,
@@ -369,6 +370,7 @@
       }
 
       await load();
+      onLiveChange(["bookings", "bays"], load);
 
       async function load() {
         let query = supabase

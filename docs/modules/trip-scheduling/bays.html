@@ -51,6 +51,7 @@
     <script type="module">
       import {
         supabase,
+        onLiveChange,
         guardPage,
         renderNav,
         compareBayNames,
@@ -64,6 +65,7 @@
 
       document.getElementById("add-form").addEventListener("submit", addBay);
       await load();
+      onLiveChange(["bays"], load);
 
       async function load() {
         const { data } = await supabase

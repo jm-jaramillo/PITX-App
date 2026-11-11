@@ -85,6 +85,9 @@
         <button type="button" class="mode-tab" data-type="transfers">
           Transfer approvals<span class="notif-pin hidden" id="count-transfers"></span>
         </button>
+        <button type="button" class="mode-tab" data-type="profiles">
+          Profile changes<span class="notif-pin hidden" id="count-profiles"></span>
+        </button>
       </div>
 
       <section class="approval-section" id="section-requests" data-type="requests">
@@ -180,6 +183,18 @@
       <div id="xfer-requests"></div>
       <div class="hidden" id="xfer-decided"></div>
       </section>
+      <section class="approval-section hidden" id="section-profiles" data-type="profiles">
+        <p class="subtle" id="prof-queue-count"></p>
+        <p class="subtle">
+          An operator's edits to their profile wait here and only go live when
+          you approve them. Edits you make yourself on Operator profiles are
+          applied immediately.
+        </p>
+        <div class="hidden" id="prof-message"></div>
+        <div id="prof-requests"></div>
+        <h3 style="margin-top: 28px">Recently decided</h3>
+        <div id="prof-decided"></div>
+      </section>
     </main>
       </div>
     </div>
@@ -187,6 +202,7 @@
     <script type="module">
       import {
         supabase,
+        onLiveChange,
         guardPage,
         renderNav,
         formatSlotStart,
@@ -207,9 +223,17 @@
       renderNav(profile);
 
       initTypeFilter();
+      // each section registers its reload here; one realtime subscription runs them all
+      const liveRefreshers = [];
+      onLiveChange(
+        ["bookings", "vehicles", "booking_transfers", "operator_profile_changes"],
+        () => Promise.all(liveRefreshers.map((f) => f()))
+      );
+
       requestsApprovals(profile);
       vehicleApprovals(profile);
       transferApprovals(profile);
+      profileApprovals(profile);
 
       /* ---------------------------------------------------- type filter */
 
@@ -247,7 +271,9 @@
         // already marked is-active in the markup) - only override it
         // when the URL asks for a specific one.
         setType(
-          initial === "vehicles" || initial === "transfers" ? initial : "requests"
+          initial === "vehicles" || initial === "transfers" || initial === "profiles"
+            ? initial
+            : "requests"
         );
       }
 
@@ -286,6 +312,11 @@
         document.getElementById("approve-selected").addEventListener("click", approveSelected);
         document.getElementById("reject-selected").addEventListener("click", rejectSelected);
         await load();
+        liveRefreshers.push(async () => {
+          await load();
+          if (view === "cancellations") await loadCancellations();
+          if (view === "decided") await loadDecided();
+        });
 
       function initViewTabs() {
         document.querySelectorAll("#view-tabs [data-view]").forEach((btn) => {
@@ -1012,6 +1043,10 @@
       document.getElementById("veh-export-csv").addEventListener("click", exportCsv);
 
       await load();
+      liveRefreshers.push(async () => {
+        await load();
+        if (view === "decided") await loadDecided();
+      });
 
       function initViewTabs() {
         document.querySelectorAll("#veh-view-tabs [data-view]").forEach((btn) => {
@@ -1544,6 +1579,10 @@
       initViewTabs();
 
       await load();
+      liveRefreshers.push(async () => {
+        await load();
+        if (view === "decided") await loadDecided();
+      });
 
       function initViewTabs() {
         document.querySelectorAll("#xfer-view-tabs [data-view]").forEach((btn) => {
@@ -1925,6 +1964,157 @@
           </div>
         `;
       }
+      }
+
+      /* --------------------------------------------------- profile changes */
+      async function profileApprovals(profile) {
+        const FIELD_LABELS = {
+          company_name: "Operator",
+          trade_name: "Trade name",
+          operator_code: "Operator/Trade code",
+          company_owner: "Company owner",
+          booking_system_name: "Booking system",
+          logo_path: "Logo",
+          contacts: "Contact persons",
+        };
+
+        const norm = (v) => (v === undefined || v === null || v === "" ? null : v);
+        const contactsText = (list) =>
+          Array.isArray(list) && list.length
+            ? list
+                .map((c) => [c.name, c.position, c.number, c.email].filter(Boolean).join(" / "))
+                .join("\n")
+            : null;
+        const show = (key, v) => (key === "contacts" ? contactsText(v) : key === "logo_path" ? (v ? "New logo" : null) : norm(v));
+
+        function diffRows(current, changes) {
+          return Object.keys(FIELD_LABELS)
+            .map((key) => {
+              const before = show(key, current?.[key]);
+              const after = show(key, changes?.[key]);
+              if (key === "logo_path" && norm(current?.logo_path) === norm(changes?.logo_path)) return null;
+              if (key !== "logo_path" && JSON.stringify(before) === JSON.stringify(after)) return null;
+              return { label: FIELD_LABELS[key], before, after };
+            })
+            .filter(Boolean);
+        }
+
+        const cell = (v) =>
+          v === null || v === undefined
+            ? `<span class="subtle">—</span>`
+            : escapeHtml(v).replace(/\n/g, "<br />");
+
+        async function load() {
+          const [pendingRes, decidedRes] = await Promise.all([
+            supabase
+              .from("operator_profile_changes")
+              .select("id, operator_id, changes, requested_at, profiles!operator_profile_changes_operator_id_fkey ( username, operator_name )")
+              .eq("status", "pending")
+              .order("requested_at", { ascending: true }),
+            supabase
+              .from("operator_profile_changes")
+              .select("id, status, requested_at, decided_at, reject_reason, profiles!operator_profile_changes_operator_id_fkey ( username, operator_name )")
+              .neq("status", "pending")
+              .order("decided_at", { ascending: false })
+              .limit(15),
+          ]);
+          if (pendingRes.error) {
+            showMessage("prof-message", pendingRes.error.message);
+            return;
+          }
+          const pending = pendingRes.data ?? [];
+          setTypeCount("profiles", pending.length);
+          document.getElementById("prof-queue-count").textContent =
+            pending.length === 0
+              ? "No profile changes waiting."
+              : `${pending.length} profile change${pending.length === 1 ? "" : "s"} awaiting review`;
+
+          const { data: currents } = pending.length
+            ? await supabase
+                .from("operator_profiles")
+                .select("*")
+                .in("operator_id", pending.map((c) => c.operator_id))
+            : { data: [] };
+          const currentById = new Map((currents ?? []).map((c) => [c.operator_id, c]));
+
+          document.getElementById("prof-requests").innerHTML = pending
+            .map((c) => {
+              const who = c.profiles?.operator_name || c.profiles?.username || "Operator";
+              const rows = diffRows(currentById.get(c.operator_id), c.changes);
+              return `
+              <div class="request-card">
+                <div class="request-card-head">
+                  <strong>${escapeHtml(who)}</strong>
+                  <span class="subtle">requested ${escapeHtml(new Date(c.requested_at).toLocaleString())}</span>
+                </div>
+                <div class="table-wrap table-plain">
+                  <table>
+                    <thead><tr><th>Field</th><th>Current</th><th>Requested</th></tr></thead>
+                    <tbody>
+                      ${
+                        rows.length
+                          ? rows
+                              .map(
+                                (r) =>
+                                  `<tr><td data-label="Field">${escapeHtml(r.label)}</td><td data-label="Current">${cell(r.before)}</td><td data-label="Requested">${cell(r.after)}</td></tr>`
+                              )
+                              .join("")
+                          : `<tr><td colspan="3" class="subtle">No visible difference from the live profile.</td></tr>`
+                      }
+                    </tbody>
+                  </table>
+                </div>
+                <div class="row-actions" style="margin-top: 10px">
+                  <button type="button" class="btn-approve" data-prof-approve="${escapeHtml(c.id)}">Approve</button>
+                  <button type="button" class="btn-danger-outline" data-prof-reject="${escapeHtml(c.id)}">Reject</button>
+                </div>
+              </div>`;
+            })
+            .join("");
+
+          document.querySelectorAll("[data-prof-approve]").forEach((btn) =>
+            btn.addEventListener("click", () => decide(btn.dataset.profApprove, true))
+          );
+          document.querySelectorAll("[data-prof-reject]").forEach((btn) =>
+            btn.addEventListener("click", () => decide(btn.dataset.profReject, false))
+          );
+
+          const decided = decidedRes.data ?? [];
+          document.getElementById("prof-decided").innerHTML = decided.length
+            ? `<div class="table-wrap table-plain"><table>
+                <thead><tr><th>Operator</th><th>Result</th><th>Decided</th><th>Note</th></tr></thead>
+                <tbody>${decided
+                  .map(
+                    (d) => `<tr>
+                      <td data-label="Operator">${escapeHtml(d.profiles?.operator_name || d.profiles?.username || "—")}</td>
+                      <td data-label="Result"><span class="badge badge-${escapeHtml(d.status)}">${escapeHtml(d.status)}</span></td>
+                      <td data-label="Decided">${d.decided_at ? escapeHtml(new Date(d.decided_at).toLocaleString()) : "—"}</td>
+                      <td data-label="Note">${escapeHtml(d.reject_reason ?? "")}</td>
+                    </tr>`
+                  )
+                  .join("")}</tbody></table></div>`
+            : `<p class="subtle">Nothing decided yet.</p>`;
+        }
+
+        async function decide(id, approve) {
+          showMessage("prof-message", "");
+          const reason = approve ? null : prompt("Reason for declining (optional):", "") ?? null;
+          if (!approve && reason === null) return;
+          const { error } = await supabase.rpc("decide_operator_profile_change", {
+            p_change_id: id,
+            p_approve: approve,
+            p_reason: reason,
+          });
+          if (error) {
+            showMessage("prof-message", error.message);
+            return;
+          }
+          showMessage("prof-message", approve ? "Profile change approved." : "Profile change declined.", "ok");
+          await load();
+        }
+
+        await load();
+        liveRefreshers.push(load);
       }
     </script>
   </body>

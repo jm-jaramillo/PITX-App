@@ -81,6 +81,7 @@
     <script type="module">
       import {
         supabase,
+        onLiveChange,
         guardPage,
         renderNav,
         showMessage,
@@ -100,6 +101,7 @@
         .addEventListener("submit", createAccount);
       document.getElementById("search").addEventListener("input", render);
       await load();
+      onLiveChange(["profiles"], load);
       highlightFromQuery();
 
       // A password-reset-request notification (see the Edge Function

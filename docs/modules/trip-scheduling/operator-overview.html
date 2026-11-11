@@ -170,6 +170,11 @@
             <div class="slot-picker" id="slot-picker"></div>
           </div>
 
+          <div class="field span-all">
+            <label for="plate_no">Plate No. <span class="fineprint">(optional)</span></label>
+            <select id="plate_no" name="plate_no"></select>
+          </div>
+
           <div class="field span-all repeat-box">
             <label class="repeat-toggle">
               <input type="checkbox" id="repeat_enabled" />
@@ -178,8 +183,8 @@
             <div class="hidden" id="repeat-options">
               <p class="fineprint" style="margin-top: 0">
                 Books the same route and time on every selected weekday, from
-                the date above through the end date. Days already booked at
-                that time, or too close to departure, are skipped.
+                the date above through the end date. Days too close to
+                departure are skipped.
               </p>
               <div class="repeat-days" id="repeat-days"></div>
               <div class="field" style="max-width: 220px; margin-bottom: 0">
@@ -192,8 +197,8 @@
 
           <div class="span-all">
             <p class="fineprint">
-              You'll assign a vehicle's plate number to this trip later, any
-              time up to the day of the trip.
+              The plate number is optional - you can also set or change it
+              later from the schedule, any time up to the day of the trip.
             </p>
             <p class="fineprint hidden" id="slot-occupancy"></p>
             <p class="hint hidden" id="route-conflict-hint"></p>
@@ -328,6 +333,7 @@
     <script type="module">
       import {
         supabase,
+        onLiveChange,
         guardPage,
         renderNav,
         escapeHtml,
@@ -349,6 +355,13 @@
       const profile = await guardPage("operator");
       if (!profile) throw new Error("unauthorised");
       renderNav(profile);
+
+      // every section registers its reload here; one realtime subscription runs them all
+      const liveLoaders = [];
+      onLiveChange(
+        ["bookings", "booking_transfers", "vehicles"],
+        () => Promise.all(liveLoaders.map((f) => f()))
+      );
 
       initTabs();
       overviewTab(profile);
@@ -423,6 +436,7 @@
         const plural = (n) => (n === 1 ? "" : "s");
 
         await load();
+        liveLoaders.push(load);
 
         async function load() {
           const today = todayISO();
@@ -662,6 +676,9 @@
         initTransferDialog();
         initStatusFilter();
         await Promise.all([loadRequests(), loadIncomingTransfers()]);
+        liveLoaders.push(() =>
+          Promise.all([loadApprovedVehicles(), loadRequests(), loadIncomingTransfers()])
+        );
 
       /* ------------------------------------------- incoming transfers */
 
@@ -1057,53 +1074,9 @@
           listEl.className = "fineprint";
         }
 
-        const sameRouteHere = route
-          ? atThisSlot.filter((r) => r.route === route)
-          : [];
-
-        if (!route || sameRouteHere.length === 0) {
-          hintEl.className = "hint hidden";
-          return;
-        }
-
-        const takenSlotsForRoute = new Set(
-          rows.filter((r) => r.route === route).map((r) => r.slot)
-        );
-        const candidates = SLOTS.filter((s) => s !== slot)
-          .filter(
-            (s) => slotStartMillis(bookingDate, s) - Date.now() >= BOOKING_LEAD_TIME_MS
-          )
-          .filter((s) => !takenSlotsForRoute.has(s))
-          .sort((a, b) => Math.abs(a - slot) - Math.abs(b - slot))
-          .slice(0, 3);
-
-        hintEl.innerHTML =
-          `${sameRouteHere.length} other operator${
-            sameRouteHere.length === 1 ? "" : "s"
-          } already scheduled to ${escapeHtml(route)} at ${escapeHtml(
-            formatSlotStart(slot)
-          )} - you can still submit, but a different time avoids departing ` +
-          `alongside them: ` +
-          (candidates.length
-            ? candidates
-                .map(
-                  (s) =>
-                    `<button type="button" class="btn-link" data-suggest-route-slot="${s}">${escapeHtml(
-                      formatSlotStart(s)
-                    )}</button>`
-                )
-                .join(", ")
-            : "no other time today - try a different date.");
-        hintEl.className = "hint";
-
-        hintEl.querySelectorAll("[data-suggest-route-slot]").forEach((btn) => {
-          btn.addEventListener("click", () => {
-            document.getElementById("slot").value = btn.dataset.suggestRouteSlot;
-            syncSlotPickerSelection("slot-picker", "slot");
-            checkGateFullness();
-            checkSlotOccupancy();
-          });
-        });
+        // Same destination at the same time is allowed, so there is no
+        // conflict hint any more - the list above is information only.
+        hintEl.className = "hint hidden";
       }
 
       // Hard filter, not a suggestion - a booking can only use a vehicle
@@ -1175,12 +1148,35 @@
         );
       }
 
+      // The new-request form's optional plate list: only vehicles registered
+      // for the chosen route (the same rule the database enforces), plus a
+      // "no plate yet" choice, which is the default.
+      function refreshBookingPlates() {
+        const route = document.getElementById("route").value;
+        const select = document.getElementById("plate_no");
+        const pool = route
+          ? approvedVehicles.filter((v) => vehicleMatchesRoute(v, route))
+          : [];
+        select.innerHTML =
+          `<option value="">No plate yet</option>` +
+          pool
+            .map(
+              (v) =>
+                `<option value="${escapeHtml(v.plate_no)}">${escapeHtml(v.plate_no)}${
+                  v.body_number ? ` - Body No. ${escapeHtml(v.body_number)}` : ""
+                }</option>`
+            )
+            .join("");
+      }
+
       function initForm() {
         document.getElementById("route").innerHTML = routeOptionsHtml(
           null,
           routesWithRegisteredVehicle()
         );
+        refreshBookingPlates();
         document.getElementById("route").addEventListener("change", () => {
+          refreshBookingPlates();
           checkGateFullness();
           checkSlotOccupancy();
           updateRepeatPreview();
@@ -1381,17 +1377,18 @@
         const dates = repeatDates(bookingDate, slot);
         if (dates.length === 0) {
           return fail(
-            "Every repeat date is either already booked at this time or too close to departure - nothing left to submit."
+            "Every repeat date is too close to departure - nothing left to submit."
           );
         }
 
         submitBtn.disabled = true;
         submitBtn.textContent = "Submitting…";
 
-        // No plate_no here - the operator picks a destination and time only;
-        // the plate is filled in later (any time up to the day of the
-        // trip) via the "Set plate" action, which goes through
-        // request_booking_change() (migration 0039).
+        // The plate is optional: when one is picked it goes in with the
+        // request (bookings_insert_own re-checks it server-side); otherwise
+        // it is filled in later via the "Set plate" action, which goes
+        // through request_booking_change() (migration 0039).
+        const plate = document.getElementById("plate_no").value || null;
         //
         // One insert for the whole set: a partial success would otherwise
         // leave the operator guessing which days actually went through.
@@ -1402,6 +1399,7 @@
             route,
             booking_date: d,
             slot,
+            plate_no: plate,
             status: "pending",
           }))
         );
@@ -1415,7 +1413,7 @@
           // page load and submit).
           return fail(
             error.code === "42501" || /row-level security/i.test(error.message)
-              ? "Couldn't submit - one of those slots is now within 2 hours. Please recheck and try again."
+              ? "Couldn't submit - one of those slots is now within 2 hours, or that vehicle already has a trip in an adjacent time slot. Please recheck and try again."
               : error.message
           );
         }
@@ -1435,6 +1433,7 @@
         document.getElementById("booking-dialog").close();
         showMessage("page-message", confirmation, "ok");
         document.getElementById("route").value = "";
+        refreshBookingPlates();
         populateSlotOptions();
         document.getElementById("gate-full-hint").className = "hint hidden";
         document.getElementById("slot-occupancy").className = "fineprint hidden";
@@ -1510,27 +1509,13 @@
         return out;
       }
 
-      // The subset actually submittable: still outside the lead-time
-      // window, and not already booked by this operator at the same
-      // route+slot (re-submitting a day they already hold would just
-      // create a duplicate request for staff to sort out).
+      // The subset actually submittable: still outside the lead-time window.
+      // Several trips to the same destination at the same time are allowed
+      // (more than one bus can leave for the same place together), so
+      // an existing booking at that route + slot no longer excludes a date.
       function repeatDates(startDate, slot) {
-        const route = document.getElementById("route").value.trim();
-        const existing = new Set(
-          allBookings
-            .filter(
-              (b) =>
-                b.slot === slot &&
-                b.route === route &&
-                (b.status === "pending" || b.status === "approved")
-            )
-            .map((b) => b.booking_date)
-        );
-
         return plannedRepeatDates(startDate).filter(
-          (d) =>
-            !existing.has(d) &&
-            slotStartMillis(d, slot) - Date.now() >= BOOKING_LEAD_TIME_MS
+          (d) => slotStartMillis(d, slot) - Date.now() >= BOOKING_LEAD_TIME_MS
         );
       }
 
@@ -1560,7 +1545,7 @@
           `Books ${usable.length} trip${usable.length === 1 ? "" : "s"}` +
           (usable.length ? ` (${usable[0]} to ${usable[usable.length - 1]})` : "") +
           (skipped > 0
-            ? ` - ${skipped} skipped: already booked at this time, or too close to departure.`
+            ? ` - ${skipped} skipped: too close to departure.`
             : ".");
       }
 

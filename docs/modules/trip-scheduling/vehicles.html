@@ -563,6 +563,7 @@
     <script type="module">
       import {
         supabase,
+        onLiveChange,
         guardPage,
         renderNav,
         showMessage,
@@ -1016,6 +1017,7 @@
       document.getElementById("search").addEventListener("input", renderVehicleTable);
       document.getElementById("export-csv").addEventListener("click", exportCsv);
       await loadVehicles();
+      onLiveChange(["vehicles"], loadVehicles);
       applyVehicleHighlightFromQuery(openDetails);
 
       function initColumnsPopover() {

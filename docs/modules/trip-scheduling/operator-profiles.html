@@ -67,13 +67,34 @@
       </div>
       <div id="details-body" class="details-grid"></div>
       <div class="dialog-actions">
+        <button type="button" class="btn-primary" id="details-edit">Edit profile</button>
         <button type="button" class="btn-outline" id="details-close">Close</button>
       </div>
+    </dialog>
+
+    <!-- --------------------------------------------------- edit dialog -->
+    <dialog class="details-dialog" id="edit-dialog">
+      <h2 class="dialog-title" id="edit-title">Edit operator profile</h2>
+      <p class="subtle">Changes you save here go live immediately - they don't need approval. An operator's own edits do.</p>
+      <form id="edit-form" class="grid grid-2">
+        <div class="field span-all"><label for="pe_company_name">Operator</label><input id="pe_company_name" /></div>
+        <div class="field"><label for="pe_trade_name">Trade name</label><input id="pe_trade_name" /></div>
+        <div class="field"><label for="pe_operator_code">Operator/Trade code</label><input id="pe_operator_code" /></div>
+        <div class="field span-all"><label for="pe_company_owner">Company owner</label><input id="pe_company_owner" /></div>
+        <div class="field span-all"><label for="pe_booking_system_name">Booking system (software/app/website)</label><input id="pe_booking_system_name" /></div>
+        <div class="span-all" id="pe_contacts"></div>
+        <p class="inline-error hidden span-all" id="edit-error"></p>
+        <div class="dialog-actions span-all">
+          <button type="button" class="btn-outline" id="edit-cancel">Cancel</button>
+          <button type="submit" class="btn-primary" id="edit-save">Save</button>
+        </div>
+      </form>
     </dialog>
 
     <script type="module">
       import {
         supabase,
+        onLiveChange,
         guardPage,
         renderNav,
         showMessage,
@@ -115,6 +136,7 @@
       document.getElementById("export-csv").addEventListener("click", exportCsv);
       initDetailsDialog();
       await load();
+      onLiveChange(["operator_profiles", "profiles", "operator_profile_changes"], load);
 
       // A contact's plain-text one-liner ("Name (Position) · Number ·
       // Email"), used by both the table cell and the CSV export so the
@@ -274,15 +296,79 @@
 
       /* ----------------------------------------------- details dialog */
 
+      let detailsOperatorId = null;
+
       function initDetailsDialog() {
         document
           .getElementById("details-close")
           .addEventListener("click", () => document.getElementById("details-dialog").close());
+        document.getElementById("details-edit").addEventListener("click", openEdit);
+        document
+          .getElementById("edit-cancel")
+          .addEventListener("click", () => document.getElementById("edit-dialog").close());
+        document.getElementById("edit-form").addEventListener("submit", saveEdit);
+      }
+
+      // Staff edit: the fields of the operator's own profile form, applied at
+      // once through staff_update_operator_profile (no approval step - the
+      // approval is for the operator's own edits). Up to 5 contact persons;
+      // a row left blank is dropped. The logo is not editable here.
+      const EDIT_FIELDS = ["company_name", "trade_name", "operator_code", "company_owner", "booking_system_name"];
+
+      function openEdit() {
+        const r = rowsById.get(detailsOperatorId);
+        if (!r) return;
+        const p = r.companyProfile ?? {};
+        document.getElementById("edit-title").textContent =
+          "Edit profile - " + (r.operator_name || r.username);
+        for (const f of EDIT_FIELDS) document.getElementById("pe_" + f).value = p[f] ?? "";
+        const contacts = Array.isArray(p.contacts) ? p.contacts : [];
+        document.getElementById("pe_contacts").innerHTML = Array.from({ length: 5 }, (_, i) => {
+          const c = contacts[i] ?? {};
+          return `
+            <p class="field-group-heading">Contact person ${i + 1}</p>
+            <div class="grid grid-2" style="margin-bottom: 8px">
+              <div class="field"><label>Name</label><input data-c="${i}" data-k="name" value="${escapeHtml(c.name ?? "")}" /></div>
+              <div class="field"><label>Position</label><input data-c="${i}" data-k="position" value="${escapeHtml(c.position ?? "")}" /></div>
+              <div class="field"><label>Contact no.</label><input data-c="${i}" data-k="number" value="${escapeHtml(c.number ?? "")}" /></div>
+              <div class="field"><label>Email</label><input data-c="${i}" data-k="email" type="email" value="${escapeHtml(c.email ?? "")}" /></div>
+            </div>`;
+        }).join("");
+        showMessage("edit-error", "");
+        document.getElementById("details-dialog").close();
+        document.getElementById("edit-dialog").showModal();
+      }
+
+      async function saveEdit(event) {
+        event.preventDefault();
+        showMessage("edit-error", "");
+        const r = rowsById.get(detailsOperatorId);
+        if (!r) return;
+        const changes = { logo_path: r.companyProfile?.logo_path ?? null };
+        for (const f of EDIT_FIELDS) changes[f] = document.getElementById("pe_" + f).value.trim() || null;
+        const byIndex = {};
+        document.querySelectorAll("#pe_contacts [data-c]").forEach((el) => {
+          (byIndex[el.dataset.c] ??= {})[el.dataset.k] = el.value.trim();
+        });
+        changes.contacts = Object.values(byIndex).filter((c) => c.name);
+
+        const saveBtn = document.getElementById("edit-save");
+        saveBtn.disabled = true;
+        const { error } = await supabase.rpc("staff_update_operator_profile", {
+          p_operator_id: detailsOperatorId,
+          p_changes: changes,
+        });
+        saveBtn.disabled = false;
+        if (error) return showMessage("edit-error", error.message);
+        document.getElementById("edit-dialog").close();
+        showMessage("message", "Profile updated.", "ok");
+        await load();
       }
 
       async function openDetails(operatorId) {
         const r = rowsById.get(operatorId);
         if (!r) return;
+        detailsOperatorId = operatorId;
         const p = r.companyProfile;
         const label = r.operator_name || r.username;
 
