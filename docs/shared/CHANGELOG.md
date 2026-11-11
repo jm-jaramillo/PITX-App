@@ -3,6 +3,18 @@
 Changes to `docs/shared/`, `supabase/functions/` and `core` migrations.
 Newest first. Owners: @jm-jaramillo @Jcbllanto16 @victoriaronald
 
+## 2026-11-11 - `supabase/functions/tos-device` Edge Function (@Jcbllanto16)
+- New Edge Function `tos-device` (deployed 3 Nov, `verify_jwt = false`). This is
+  the endpoint that gate cameras, barriers and the gate controller call. It
+  authenticates with a per-device `x-device-key` created in TOS (Devices & rules
+  > Device keys), which is stored hashed. It calls only the `tos_device_*`
+  functions, which only the service role can run.
+- Routes: `/read`, `/reads`, `/event`, `/heartbeat`, `/bundle`, `/ping`.
+  Answers include the barrier action and the gate display text
+  ("PROCEED TO BAY nn").
+- The contract for IT and the vendor is
+  `docs/modules/terminal-operating-system/DEVICE-API.md`. Details are in the
+  Terminal Operating System CHANGELOG, entries 11 and 13.
 ## 2026-11-10 - Ticketing card renamed Ticketing and Boarding (@victoriaronald)
 - `modules.js`: the Ticketing card's name is now "Ticketing and Boarding" (was Ticketing and
   Booking). Same id, path and roles (Ticketing CHANGELOG entry 20).
