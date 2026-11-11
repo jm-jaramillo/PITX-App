@@ -117,7 +117,7 @@ Migrations:
 | `tos_snapshot(date)` | every page: rules, gates, devices, bays, the day's trips with their gate state, gate events, and the vehicles involved |
 | `tos_gate_read(gate, plate, confidence, booking, test)` | test reads from Gate monitor (decision logic in `tos.gate_read_core`) |
 | `tos_create_device_key` / `tos_revoke_device_key` / `tos_device_keys` | Devices & rules → Device keys |
-| `tos_bays()` / `tos_set_bay_active(bay, active, note)` | Devices & rules → Bays in service (pending: not applied yet, see CHANGELOG 12). TOS becomes the only place bays are switched on or off; a trigger on `public.bays` blocks direct changes |
+| `tos_bays()` / `tos_set_bay_active(bay, active, note)` | Devices & rules → Bays in service. TOS is the only place bays are switched on or off; a trigger on `public.bays` blocks direct changes (`202611111000_…_bay_activation.sql`) |
 | `tos_device_read` / `_event` / `_heartbeat` / `_bundle` | the `tos-device` Edge Function only (service role) |
 | `tos_resolve_review(event, allow)` | Open barrier / Keep closed |
 | `tos_analytics(from, to, include_tests)` | Analytics sheets: bay utilization (a booked trip holds its bay for its 30-minute window; utilization is booked time over 24 h per day), late, early and unregistered reads, and daily totals (`202610301000_…_analytics.sql`) |

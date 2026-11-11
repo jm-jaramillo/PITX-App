@@ -250,12 +250,11 @@ Commits `cc8b40c`, `7dd16ea`, `e6b2986`
     - `tos_create_device_key`, `tos_revoke_device_key` and `tos_device_keys`
       for staff
 
-## 12 · Bays are switched on and off in TOS only (11 Nov) · NOT LIVE YET
+## 12 · Bays are switched on and off in TOS only (11 Nov)
 
-> Waiting for approval: the migration adds a guard to Trip Scheduling's
-> `public.bays`, so it is applied only after sign-off. Until then the
-> *Bays in service* section stays hidden, Trip Scheduling's Bays page is
-> unchanged, and the migration file is not in the repo yet.
+> Applied on 11 Nov after @Jcbllanto16 approved it. The trigger is on Trip
+> Scheduling's `public.bays`: logged as Trip Scheduling entry 121 for
+> @jm-jaramillo to review.
 
 - **Devices & rules → Bays in service** is now the only place staff put a bay
   in or out of service. For each bay, grouped by gate, it shows:
@@ -342,7 +341,7 @@ Commits `cc8b40c`, `7dd16ea`, `e6b2986`
 | `202610301000_terminal-operating-system_analytics.sql` | 10 |
 | `202611031000_trip-scheduling_tos_feed_service_role.sql` | 11 |
 | `202611031001_terminal-operating-system_device_api.sql` | 11 |
-| `202611111000_terminal-operating-system_bay_activation.sql` | 12 (not applied yet) |
+| `202611111000_terminal-operating-system_bay_activation.sql` | 12 |
 | `202611111100_terminal-operating-system_device_bay_directions.sql` | 13 |
 | `202611111200_terminal-operating-system_overview_range.sql` | 14 |
 
