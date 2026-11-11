@@ -37,6 +37,20 @@ sections 2 and 3).
 
 ---
 
+## 25 · A full week of bookable sample trips (11 Nov)
+
+Passengers couldn't pick most schedules: the sample only had trips for 3 days, the third day had no units, and a third of tomorrow's trips had none either. A trip with no unit has no seat plan, so it can't be sold, and the booking date strip greyed out every day after the second.
+
+| | Before | Now |
+|---|---|---|
+| Days of sample trips | Today and the next 2 | Today and the next 6 (`SAMPLE_DAYS = 7`), the companies' 7-day advance selling window. Still only the trips Trip Scheduling's demo week approves for each weekday |
+| Units | All of today, two thirds of tomorrow, none the day after | Every trip, except every fourth trip on the last 2 days (25 trips), left for the Operator Admin to set in Unit Assignment |
+| Trips | 152 | 323 |
+| Sample tickets | About 1,900 | About 2,400. Advance sales taper off by days away: 100%, 35%, 20%, 15%, then 10% |
+
+- All 7 days in Book a Trip can now be picked, with about 27 destinations a day.
+- Data size 1.65 MB. Demo data resets once (storage key v16), so switch View as back to Passenger after the reset.
+
 ## 24 · Passenger booking like a cinema, with sample history (11 Nov)
 
 Book a Trip (Passenger view) is now a 5-step flow, like buying a cinema ticket. A passenger also starts with a booking history of their own.

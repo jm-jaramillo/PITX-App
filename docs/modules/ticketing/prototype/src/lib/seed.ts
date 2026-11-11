@@ -178,6 +178,9 @@ export function statusAt(date: string, time: string, now: number, cancelled = fa
   return "Scheduled";
 }
 
+/** Days of sample trips: today and the next six, the companies' advance selling window. */
+export const SAMPLE_DAYS = 7;
+
 export function seedDb(): Db {
   const today = todayManila();
   const now = Date.now();
@@ -193,22 +196,26 @@ export function seedDb(): Db {
   });
   const routes: Route[] = SAMPLE_OPERATORS.flatMap((o, n) => o.destinations.map((d) => sampleRoute(companies[n], d)));
 
-  // The approved Trip Scheduling trips for today and the next two days.
+  // The approved Trip Scheduling trips for today and the next six days, so a passenger can
+  // book any day of the week ahead (companies sell 7 days in advance).
   const trips: Trip[] = [];
   const pickBay = bayPicker();
   const unitTurn = new Map<string, number>();
-  const plan: { date: string; day: number; trip: ApprovedTrip }[] = [0, 1, 2].flatMap((day) => {
+  const days = Array.from({ length: SAMPLE_DAYS }, (_, day) => day);
+  const plan: { date: string; day: number; trip: ApprovedTrip }[] = days.flatMap((day) => {
     const date = addDays(today, day);
     return approvedTrips(date).map((trip) => ({ date, day, trip }));
   });
   plan.forEach(({ date, day, trip: t }, i) => {
     const code = codeByUser.get(t.username)!;
-    // Today every trip has its unit and tomorrow most do. The day after, the Operator Admin
-    // still has to set them (Unit Assignment), like Trip Scheduling's trips without a plate.
+    // Every trip has its unit, so it has a seat plan and can be sold, except every fourth trip
+    // on the last two days: the Operator Admin still has to set those (Unit Assignment), like
+    // Trip Scheduling's trips without a plate.
     const turn = unitTurn.get(code) ?? 0;
     unitTurn.set(code, turn + 1);
     const types = busTypes.filter((b) => b.companyId === `co-${code}`);
-    const unit = day === 0 || (day === 1 && i % 3 !== 2) ? `bus-${code}-${types[turn % types.length].code}-1` : "";
+    const unset = day >= SAMPLE_DAYS - 2 && i % 4 === 3;
+    const unit = unset ? "" : `bus-${code}-${types[turn % types.length].code}-1`;
     trips.push({
       id: `trip-${i + 1}`,
       tripNo: tripNumber(t.destination, t.time),

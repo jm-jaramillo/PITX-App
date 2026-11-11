@@ -59,7 +59,7 @@ export function addDemoSales(db: Db): Db {
     // Departed trips sold well; later trips are still filling up, and trips days away have
     // only advance bookings. A cancelled trip's few sales were all refunded.
     const daysAway = Math.max(0, Math.floor((departs - today) / 86_400_000));
-    const advance = daysAway === 0 ? 1 : daysAway === 1 ? 0.35 : 0.15;
+    const advance = [1, 0.35, 0.2, 0.15][daysAway] ?? 0.1;
     const share = cancelled ? 0.1 : departed ? 0.55 + rand() * 0.4 : (0.1 + rand() * 0.6) * advance;
     const count = Math.min(Math.round(capacity * share), capacity - blocked.size);
     const saleStart = departs - 3 * 86_400_000;

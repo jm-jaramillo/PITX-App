@@ -29,7 +29,7 @@ import type {
 
 // Prototype data layer: browser localStorage. All reads and writes go through this
 // file so it can be swapped for a real backend without touching the screens.
-const KEY = "pitx-tms-db-v15"; // v15: 11 Nov passenger booking history and cinema-style booking
+const KEY = "pitx-tms-db-v16"; // v16: 11 Nov a full week of bookable sample trips
 
 let db: Db | null = null;
 const listeners = new Set<() => void>();
