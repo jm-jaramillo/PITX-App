@@ -4531,3 +4531,25 @@ The staff Schedule board is unchanged. Checked as genesis.ops: 6 columns, no bad
   Operating System CHANGELOG, entry 11.
 
 ---
+### 121. Bays are switched on and off in the Terminal Operating System (migration 202611111000, by @Jcbllanto16, 11 Nov)
+
+- **Bays page:** the *Activate / Deactivate* button is gone. *Add bay* and
+  *Rename* stay, and so does the Active / Inactive status. A line under the
+  heading links to TOS › Devices & rules › Bays in service, which is now the
+  only place a bay is put in or out of service. There it asks for confirmation,
+  warns about trips already booked on the bay, never switches off the last bay,
+  and logs who changed it.
+- **Database:** a `tos_guard_bay_activation` trigger on `public.bays` refuses
+  any `is_active` change made straight from a page (the Data API's
+  `authenticated` / `anon` roles). TOS's `tos_set_bay_active()` and
+  server-side scripts are not affected. Inserts and renames are unaffected,
+  and new bays still start active.
+- **Nothing else changes for Trip Scheduling:** `pick_balanced_bay` and the
+  per-slot cap still read `is_active` exactly as before. Trips already on a
+  bay keep it when the bay is switched off.
+- Applied to the live database with a `_schema_migrations` row. Verified as
+  staff: a direct update is refused with a message pointing to TOS, and TOS
+  lists all 27 bays. **@jm-jaramillo: please review.** Details are in the
+  Terminal Operating System CHANGELOG, entry 12.
+
+---

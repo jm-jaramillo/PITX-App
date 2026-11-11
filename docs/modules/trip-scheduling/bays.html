@@ -22,6 +22,10 @@
           <p class="eyebrow">Transport Operations &middot; Terminal Layout</p>
           <h1>Bays</h1>
           <p class="subtle" id="count-note"></p>
+          <p class="subtle">
+            Bays are put in or taken out of service in the Terminal Operating System:
+            <a href="../terminal-operating-system/rules.html#bays">Devices &amp; rules &rsaquo; Bays in service</a>.
+          </p>
         </div>
       </div>
 
@@ -89,11 +93,6 @@
                     <td style="text-align: right">
                       <button type="button" class="btn-link"
                         data-rename="${bay.id}" data-name="${escapeHtml(bay.name)}">Rename</button>
-                      <button type="button" class="btn-link"
-                        data-toggle="${bay.id}"
-                        data-next="${(!bay.is_active).toString()}">${
-                      bay.is_active ? "Deactivate" : "Activate"
-                    }</button>
                     </td>
                   </tr>`;
 
@@ -116,11 +115,6 @@
           })
           .join("");
 
-        document.querySelectorAll("[data-toggle]").forEach((btn) => {
-          btn.addEventListener("click", () =>
-            setActive(Number(btn.dataset.toggle), btn.dataset.next === "true")
-          );
-        });
         document.querySelectorAll("[data-rename]").forEach((btn) => {
           btn.addEventListener("click", () =>
             renameBay(Number(btn.dataset.rename), btn.dataset.name)
@@ -153,16 +147,6 @@
         if (error) return showMessage("message", error.message);
 
         input.value = "";
-        await load();
-      }
-
-      async function setActive(bayId, isActive) {
-        showMessage("message", "");
-        const { error } = await supabase
-          .from("bays")
-          .update({ is_active: isActive })
-          .eq("id", bayId);
-        if (error) return showMessage("message", error.message);
         await load();
       }
     </script>
