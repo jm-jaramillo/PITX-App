@@ -4512,3 +4512,22 @@ The staff Schedule board is unchanged. Checked as genesis.ops: 6 columns, no bad
 
 ---
 
+
+### 120. TOS feed also answers the gate device endpoint (migration 202611031000, by @Jcbllanto16, 3 Nov; logged 11 Nov)
+
+- `tos_trip_feed(date)` and `tos_vehicle_masterfile()` now return rows to the
+  **service role** as well as staff:
+  `where (public.is_staff() or auth.jwt()->>'role' = 'service_role') and ...`.
+  The service role is used by the Terminal Operating System's `tos-device` Edge
+  Function, which gate cameras and barriers call with a device key. It is needed
+  so a gate read can match trips and vehicles.
+- Nothing else changed. Both functions are still read-only, and still return only
+  approved trips and approved vehicles. `anon` and operators still get nothing,
+  and the column lists and signatures are the same. `tos_vehicle_lookup` was
+  granted to `service_role`.
+- Applied to the live database with a `_schema_migrations` row on 3 Nov. This
+  entry was added on 11 Nov, after the repo's changelog check flagged that it
+  was missing. **@jm-jaramillo: please review.** Details are in the Terminal
+  Operating System CHANGELOG, entry 11.
+
+---
