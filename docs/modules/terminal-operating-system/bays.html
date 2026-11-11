@@ -149,11 +149,15 @@
         h += `</div></div>`;
 
         const groups = {};
-        M.bays.forEach((b) => (groups[b.gate || "No gate"] ??= []).push(b));
+        // Out-of-service bays only appear when trips were already booked on them.
+        M.bays
+          .filter((b) => b.active !== false || M.trips.some((t) => t.bayId === b.id))
+          .forEach((b) => (groups[b.gate || "No gate"] ??= []).push(b));
         for (const [gate, bays] of Object.entries(groups)) {
           h += `<div class="tos-g-group">${escapeHtml(gate)}</div>`;
           for (const bay of bays) {
-            h += `<div class="tos-g-row"><div class="tos-g-label">${escapeHtml(bay.name)}</div><div class="tos-g-track" style="width:${width}px">`;
+            const off = bay.active === false;
+            h += `<div class="tos-g-row"><div class="tos-g-label"${off ? ` title="Out of service: no new trips are assigned here" style="opacity:.6"` : ""}>${escapeHtml(bay.name)}${off ? " ·off" : ""}</div><div class="tos-g-track" style="width:${width}px">`;
             for (const t of M.trips.filter((t) => t.bayId === bay.id)) {
               const end = t.departedAt != null ? Math.max(t.departedAt, t.slot + 5) : t.dep;
               const s = tripStatus(M, t);

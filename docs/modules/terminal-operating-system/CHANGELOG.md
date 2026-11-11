@@ -203,6 +203,130 @@ Commits `cc8b40c`, `7dd16ea`, `e6b2986`
   `tos_analytics(from, to, include_tests)`.
 - Pages bumped to `?v=20261030-1`.
 
+## 11 · Device API for gate hardware (3 Nov)
+
+- **Why:** IT asked for the code that sits between the camera/barrier SDK and
+  the app. TOS now has a device endpoint and a written contract, so the vendor
+  or IT only writes the small gate controller (SDK → endpoint → barrier).
+- **[DEVICE-API.md](DEVICE-API.md):** the interface agreement for IT and the
+  vendor. Covers endpoints, JSON, the barrier actions (`open`, `keep_closed`,
+  `staging`, `wait_for_staff`), safe retries, offline mode and replay, errors,
+  testing, and questions for the vendor.
+- **Edge Function `tos-device`** (`supabase/functions/tos-device/index.ts`):
+  `/read`, `/reads` (batch after an outage), `/event` (wait for staff),
+  `/heartbeat`, `/bundle` (rules, trips and masterfile for offline use) and
+  `/ping`. It authenticates with a per-device key, not a staff login.
+- **Devices & rules → Device keys:** staff create a key per camera or
+  controller (limited to one gate or any gate). The key is shown once and
+  stored only as a hash. Staff can revoke keys and see when each was last used.
+- **Same gate rules for every read:** the decision logic moved into
+  `tos.gate_read_core()`. Staff test reads and device reads both use it.
+  Device reads are judged at the camera's own read time, so reads queued
+  offline still count as on time or late correctly.
+- **`tools/device-simulator.ps1`:** acts as a gate controller from any Windows
+  PC. It covers a demo run, single reads, waiting for staff, an offline queue
+  with retry, heartbeats and the bundle. It sends test reads unless `-Live` is
+  passed.
+- **Tested live** with a temporary key and test reads:
+  - registered bus, unknown plate and unclear read
+  - staff decision reaching the waiting device
+  - offline queue, where the retry came back as duplicates
+  - wrong-gate and revoked-key errors
+  - the bundle
+
+  The key was then revoked and the test reads cleared.
+- **Migrations**
+  - `202611031000_trip-scheduling_tos_feed_service_role.sql`
+    (**Trip Scheduling-owned, for @jm-jaramillo to review**):
+    `tos_trip_feed` and `tos_vehicle_masterfile` also answer the service role
+    used by the endpoint. They are still read-only, approved rows only, and
+    give nothing to anon or operators.
+  - `202611031001_terminal-operating-system_device_api.sql`:
+    - `tos.device_keys`
+    - `gate_events.source` / `device_key_id` / `device_read_id`
+    - `tos.gate_read_core`
+    - `tos_device_read` / `_event` / `_heartbeat` / `_bundle`, which only the
+      service role can call
+    - `tos_create_device_key`, `tos_revoke_device_key` and `tos_device_keys`
+      for staff
+
+## 12 · Bays are switched on and off in TOS only (11 Nov) · NOT LIVE YET
+
+> Waiting for approval: the migration adds a guard to Trip Scheduling's
+> `public.bays`, so it is applied only after sign-off. Until then the
+> *Bays in service* section stays hidden, Trip Scheduling's Bays page is
+> unchanged, and the migration file is not in the repo yet.
+
+- **Devices & rules → Bays in service** is now the only place staff put a bay
+  in or out of service. For each bay, grouped by gate, it shows:
+  - the approved trips on it in the next 14 days, and the next one
+  - who last changed it, and when
+- **Taking a bay out of service** asks for a second click. If trips are
+  already booked on that bay, it says how many: they keep the bay, and staff
+  move them in Trip Scheduling if needed. The last bay in service can't be
+  switched off.
+- **Trip Scheduling → Bays** keeps *Add bay* and *Rename*. Its
+  *Activate/Deactivate* button is gone, and the page links to TOS instead.
+  Trip Scheduling still uses the setting exactly as before: bay picking and
+  trips per slot.
+- **The rule is enforced in the database.** A guard on `public.bays` refuses
+  any change to `is_active` made straight from a page. Only TOS's function
+  can change it.
+- **Bay timeline** still shows a bay that is out of service when trips are
+  already booked on it that day, marked "·off".
+- **Migration** `202611111000_terminal-operating-system_bay_activation.sql`:
+  - `tos.bay_changes` (log)
+  - `tos_bays()`
+  - `tos_set_bay_active(bay, active, note)`
+  - the `tos_guard_bay_activation` trigger on `public.bays`
+    (**Trip Scheduling's table, for @jm-jaramillo to review**)
+  - `tos_snapshot` now returns every bay, each with an `active` flag
+
+## 13 · Driver directions at the gate: "Proceed to Bay X" (11 Nov)
+
+- **Every device answer now includes `bay` and `display`.** That covers
+  reads, batch reads and staff decisions picked up by polling. `display` is
+  ready-made text for the gate's LED board:
+  - *PROCEED TO BAY 20 / NA20400 NAGA, CAMARINES NORTE 04:00* (green)
+  - *PROCEED TO STAGING / ENTRY FROM 03:00* (amber)
+  - *PLEASE WAIT / STAFF ARE CHECKING* (amber)
+  - *ENTRY NOT ALLOWED / PLEASE SEE TERMINAL OFFICE* (red)
+  - *THANK YOU / SAFE TRIP* at the exit (green)
+- **When staff let a waiting bus in,** the gate's next poll turns *PLEASE WAIT*
+  into *PROCEED TO BAY nn*.
+- **[DEVICE-API.md](DEVICE-API.md) v1.1** documents this in §2.1a, and asks the
+  vendor about the gate board (question 9). The simulator prints the board
+  text in colour.
+- **Tested** against the live endpoint with a temporary key and test reads. A
+  late bus was shown *PLEASE WAIT*; after staff let it in, the sign changed to
+  *PROCEED TO BAY 36*. The key was then revoked and the reads deleted.
+- **Fixed while testing:** a read with no trip (an unknown plate) briefly made
+  the answer fail. It was fixed live within minutes, and no hardware was
+  connected at the time.
+- **Migration** `202611111100_terminal-operating-system_device_bay_directions.sql`:
+  `tos.device_answer`.
+
+## 14 · Overview for any day or month (11 Nov)
+
+- **Overview has a period picker: *Today / Day / Month*.**
+  - **Today** is the live view, unchanged.
+  - **Day** shows any date, with ‹ › to step one day.
+  - **Month** shows any month, with ‹ › to step one month.
+  - The choice is kept in the link, e.g. `overview.html?month=2026-11` or
+    `?day=2026-11-03`, so a view can be bookmarked or shared.
+- **Day and Month show:**
+  - Totals: trips booked (and how many have no plate), buses let in, on-time
+    arrivals, turned away (and unregistered), and no-shows
+  - Gate entries, per hour for a day or per day for a month. Click a day's
+    bars to open that day.
+  - "Why buses were stopped" for the period
+- **Test reads** are left out unless *Include test reads* is ticked. When a
+  period has trips but no gate reads, a note explains that every past trip
+  counts as a no-show until the cameras are connected.
+- **Migration** `202611111200_terminal-operating-system_overview_range.sql`:
+  `tos_overview_range(from, to, include_tests)`, up to 62 days. It uses the
+  same definitions as the live Overview.
+
 ---
 
 ## Migrations (in order)
@@ -216,12 +340,22 @@ Commits `cc8b40c`, `7dd16ea`, `e6b2986`
 | `202610291600_terminal-operating-system_swap_plate_entry.sql` | 7 |
 | `202610291800_terminal-operating-system_confirm_plate.sql` | 9 |
 | `202610301000_terminal-operating-system_analytics.sql` | 10 |
+| `202611031000_trip-scheduling_tos_feed_service_role.sql` | 11 |
+| `202611031001_terminal-operating-system_device_api.sql` | 11 |
+| `202611111000_terminal-operating-system_bay_activation.sql` | 12 (not applied yet) |
+| `202611111100_terminal-operating-system_device_bay_directions.sql` | 13 |
+| `202611111200_terminal-operating-system_overview_range.sql` | 14 |
 
 ## Open items
 
-- **Gate hardware:** not connected. Devices are listed as *planned*. Real
-  cameras should call `tos_gate_read` through a device adapter (e.g. an Edge
-  Function with its own key).
+- **Gate hardware:** the device endpoint is ready ([DEVICE-API.md](DEVICE-API.md)).
+  Still needed:
+  - the vendor's answers to the questions in DEVICE-API.md §7
+  - the gate controller program from IT or the vendor
+  - a device key for each gate
+  - acceptance tests on the real hardware
+
+  Until then, devices are listed as *planned*.
 - **Trip data quality:**
   - Many approved trips have no plate assigned, so the camera can't match them.
   - About half of the approved vehicles show expired OR/CR or CPC dates. Worth

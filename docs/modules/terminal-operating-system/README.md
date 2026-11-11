@@ -15,7 +15,7 @@ Staff accounts can open it from the module picker after signing in.
 | Page | What it shows |
 | --- | --- |
 | `gates.html` | Gate monitor (landing page): barrier state per gate, buses expected at the gates in the next 2 hours, every plate read today, vehicles waiting for a staff decision, and test reads |
-| `overview.html` | Today's totals, entries per hour, why buses were stopped, and the buses expected next |
+| `overview.html` | Today (live): totals, entries per hour, why buses were stopped, and the buses expected next. Day / Month: the same totals for any date or month (`tos_overview_range`), entries per hour or per day; `?day=YYYY-MM-DD` / `?month=YYYY-MM` |
 
 **Expected at the gates** lists approved trips whose bay window opens within
 2 hours, plus overdue ones up to 20 minutes past ETD. Each trip is checked
@@ -26,7 +26,7 @@ it in Trip Scheduling first.
 | `board.html` | Concourse departures board in PITX blue and red, with All / Provincial / Commuter tabs |
 | `feed.html` | What TOS receives from Trip Scheduling: approved trips for a day, the vehicle masterfile, and vehicles with expired documents |
 | `analytics.html` | Four sheets for a date range of up to 62 days, each exportable to CSV: bay utilization from booked trips, late arrivals, early arrivals (staging), and unregistered plates |
-| `rules.html` | Gate rules (saved to the database), devices, clearing test reads, and which destinations are commuter or provincial |
+| `rules.html` | Gate rules (saved to the database), bays in service, devices, device keys, clearing test reads, and which destinations are commuter or provincial |
 
 **Commuter or provincial:** Trip Scheduling stores no service type, so TOS
 keeps its own destination list (`tos.route_service`), which staff edit on
@@ -115,7 +115,10 @@ Migrations:
 | Function | Used by |
 | --- | --- |
 | `tos_snapshot(date)` | every page: rules, gates, devices, bays, the day's trips with their gate state, gate events, and the vehicles involved |
-| `tos_gate_read(gate, plate, confidence, booking, test)` | the device adapter (and test reads) |
+| `tos_gate_read(gate, plate, confidence, booking, test)` | test reads from Gate monitor (decision logic in `tos.gate_read_core`) |
+| `tos_create_device_key` / `tos_revoke_device_key` / `tos_device_keys` | Devices & rules → Device keys |
+| `tos_bays()` / `tos_set_bay_active(bay, active, note)` | Devices & rules → Bays in service (pending: not applied yet, see CHANGELOG 12). TOS becomes the only place bays are switched on or off; a trigger on `public.bays` blocks direct changes |
+| `tos_device_read` / `_event` / `_heartbeat` / `_bundle` | the `tos-device` Edge Function only (service role) |
 | `tos_resolve_review(event, allow)` | Open barrier / Keep closed |
 | `tos_analytics(from, to, include_tests)` | Analytics sheets: bay utilization (a booked trip holds its bay for its 30-minute window; utilization is booked time over 24 h per day), late, early and unregistered reads, and daily totals (`202610301000_…_analytics.sql`) |
 | `tos_confirm_plate(event, plate, allow)` | Unregistered or unclear read: record the typed plate, then let in or keep out (`202610291800_…_confirm_plate.sql`) |
@@ -124,15 +127,24 @@ Migrations:
 | `tos_simulate(kind)` / `tos_clear_tests()` | test reads until the hardware is connected |
 | `tos_route_services()` / `tos_set_route_service(route, service)` | the commuter / provincial list (added in `202610291100_terminal-operating-system_route_service.sql`) |
 
-Every function checks `public.is_staff()`. The `tos` schema is not exposed
+Staff functions check `public.is_staff()`; device functions check a device key
+and can only be called by the service role. The `tos` schema is not exposed
 through the REST API, so pages can only reach it through these functions.
 
 Pages poll `tos_snapshot` every 20 seconds while visible, and right after
 every action.
 
+## Gate hardware
+
+Cameras and barriers connect through the `tos-device` Edge Function
+(`supabase/functions/tos-device/`, deployed with `verify_jwt = false`, auth is
+the `x-device-key` header). The contract for IT and the vendor is
+[DEVICE-API.md](DEVICE-API.md); `tools/device-simulator.ps1` plays the gate
+controller for testing. Since `202611031000_…_tos_feed_service_role.sql`, the
+Trip Scheduling feed functions also answer the service role.
+
 ## Not done yet
 
-- Gate hardware: devices are listed as "planned". Real cameras should call
-  `tos_gate_read` from a device adapter, such as an Edge Function holding a
-  device key.
+- Gate hardware: the endpoint is ready, but no device is connected. Devices are
+  listed as "planned" until a gate controller sends heartbeats.
 - Entry gates are not tied to destinations yet. Test reads use Entry Gate 1.

@@ -67,6 +67,36 @@
             </div>
           </div>
 
+          <section class="table-wrap" style="margin-top: 18px" id="bays-section">
+            <div class="tos-panel-head">
+              <h3>Bays in service</h3>
+              <span class="subtle" id="bays-note"></span>
+            </div>
+            <p class="subtle" style="margin: 10px 16px 0">
+              Trip Scheduling only assigns trips to bays in service, and the number of bays in service is the most
+              trips it approves per 15-minute slot. Trips already on a bay keep it when the bay is taken out of
+              service; move them in Trip Scheduling if needed. Bays are added and renamed in Trip Scheduling.
+            </p>
+            <div id="bays"><p class="tos-none">Loading…</p></div>
+          </section>
+
+          <section class="table-wrap" style="margin-top: 18px">
+            <div class="tos-panel-head">
+              <h3>Device keys</h3>
+              <span class="subtle">
+                Cameras and the gate controller send plate reads with one of these keys.
+                <a href="https://github.com/jm-jaramillo/PITX-App/blob/main/docs/modules/terminal-operating-system/DEVICE-API.md" target="_blank" rel="noopener">Device API for IT and the vendor</a>
+              </span>
+            </div>
+            <form class="toolbar" id="key-form" style="padding: 12px 16px; border-bottom: 1px solid var(--divider)">
+              <input id="key-label" type="text" maxlength="80" placeholder="Name, e.g. Entry Gate 1 camera" style="min-width: 0; flex: 1 1 240px" required />
+              <select id="key-gate" aria-label="Gate this key may report for"></select>
+              <button type="submit" class="btn-primary" id="key-create">Create key</button>
+            </form>
+            <div id="key-new"></div>
+            <div id="keys"><p class="tos-none">Loading…</p></div>
+          </section>
+
           <section class="table-wrap" style="margin-top: 18px">
             <div class="tos-panel-head">
               <h3>Commuter and provincial routes</h3>
@@ -241,8 +271,175 @@
         renderRoutes();
       });
 
+      /* ---- bays in service (TOS owns public.bays.is_active) */
+      let bays = [];
+      let bayArmed = null;
+      let bayBusy = false;
+
+      async function loadBays() {
+        const { data, error } = await supabase.rpc("tos_bays");
+        // Until the bay activation migration is applied the function doesn't exist: hide the section.
+        if (error?.code === "PGRST202") return document.getElementById("bays-section").classList.add("hidden");
+        if (error) {
+          document.getElementById("bays").innerHTML = `<p class="tos-none">Could not load bays: ${escapeHtml(error.message)}</p>`;
+          return;
+        }
+        bays = data;
+        renderBays();
+      }
+
+      function renderBays() {
+        const on = bays.filter((b) => b.active).length;
+        document.getElementById("bays-note").textContent = `${on} of ${bays.length} in service · up to ${on} trips per 15-minute slot`;
+        const groups = {};
+        bays.forEach((b) => (groups[b.gate || "No gate"] ??= []).push(b));
+        const byName = (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true });
+        const action = (b) => {
+          if (bayArmed === b.id) {
+            const warn = b.upcoming
+              ? `${b.upcoming} trip${b.upcoming === 1 ? "" : "s"} in the next 14 days stay on this bay (next ${escapeHtml(b.next_trip ?? "")} ${formatDateTime(b.next_etd)}).`
+              : "No trips booked on it in the next 14 days.";
+            return `<div class="tos-actions" style="justify-content:flex-end; flex-wrap:wrap"><span class="subtle" style="align-self:center">${warn}</span>
+              <button type="button" class="btn-danger-outline" data-bay-off="${b.id}"${bayBusy ? " disabled" : ""}>Take out of service</button>
+              <button type="button" class="btn-outline" data-bay-cancel>Cancel</button></div>`;
+          }
+          return b.active
+            ? `<button type="button" class="btn-outline" data-bay-arm="${b.id}"${bayBusy ? " disabled" : ""}>Take out of service</button>`
+            : `<button type="button" class="btn-primary" data-bay-on="${b.id}"${bayBusy ? " disabled" : ""}>Put in service</button>`;
+        };
+        document.getElementById("bays").innerHTML = Object.entries(groups)
+          .map(([gate, list]) => {
+            const n = list.filter((b) => b.active).length;
+            return `<p class="section-head" style="margin: 14px 16px 6px">${escapeHtml(gate)} <span class="subtle">&middot; ${n} of ${list.length} in service</span></p>
+              <table><thead><tr><th>Bay</th><th>Next 14 days</th><th>Last change</th><th>Status</th><th></th></tr></thead><tbody>${list
+                .sort(byName)
+                .map(
+                  (b) => `<tr><td class="cell-strong">${escapeHtml(b.name)}</td>
+                    <td>${b.upcoming ? `${b.upcoming} trip${b.upcoming === 1 ? "" : "s"}<span class="cell-sub">next ${escapeHtml(b.next_trip ?? "")} ${formatDateTime(b.next_etd)}</span>` : `<span class="subtle">None</span>`}</td>
+                    <td>${b.changed_at ? `${formatDateTime(b.changed_at)}<span class="cell-sub">${escapeHtml(b.changed_by ?? "")}${b.note ? ` · ${escapeHtml(b.note)}` : ""}</span>` : `<span class="subtle">—</span>`}</td>
+                    <td>${b.active ? pill("In service", "s-ok") : pill("Out of service", "s-done")}</td>
+                    <td style="text-align:right">${action(b)}</td></tr>`
+                )
+                .join("")}</tbody></table>`;
+          })
+          .join("");
+      }
+
+      document.getElementById("bays").addEventListener("click", async (e) => {
+        const arm = e.target.closest("[data-bay-arm]");
+        const off = e.target.closest("[data-bay-off]");
+        const on = e.target.closest("[data-bay-on]");
+        if (arm) bayArmed = Number(arm.dataset.bayArm);
+        else if (e.target.closest("[data-bay-cancel]")) bayArmed = null;
+        else if (off || on) {
+          const id = Number((off || on).dataset[off ? "bayOff" : "bayOn"]);
+          bayBusy = true;
+          bayArmed = null;
+          renderBays();
+          await act("tos_set_bay_active", { p_bay: id, p_active: !!on }, (r) =>
+            r.active ? `${r.name} is in service.` : `${r.name} is out of service. Trip Scheduling won't assign new trips to it.`
+          );
+          bayBusy = false;
+          return loadBays();
+        } else return;
+        renderBays();
+      });
+
+      /* ---- device keys (gate cameras / controller -> tos-device endpoint) */
+      let keys = [];
+      let revokeArmed = null;
+
+      async function loadKeys() {
+        const { data, error } = await supabase.rpc("tos_device_keys");
+        if (error) {
+          document.getElementById("keys").innerHTML = `<p class="tos-none">Could not load device keys: ${escapeHtml(error.message)}</p>`;
+          return;
+        }
+        keys = data;
+        renderKeys();
+      }
+
+      function renderKeys() {
+        const gateSel = document.getElementById("key-gate");
+        if (!gateSel.options.length) {
+          gateSel.innerHTML = `<option value="">Any gate (gate controller)</option>${Object.values(model.gates)
+            .map((g) => `<option value="${escapeHtml(g.id)}">${escapeHtml(g.name)} only</option>`)
+            .join("")}`;
+        }
+        const gateName = (id) => (id ? model.gates[id]?.name ?? id : "Any gate");
+        document.getElementById("keys").innerHTML = keys.length
+          ? `<table><thead><tr><th>Key</th><th>Gate</th><th>Last used</th><th>Reads</th><th>Status</th><th></th></tr></thead><tbody>${keys
+              .map(
+                (k) => `<tr><td><span class="cell-strong">${escapeHtml(k.label)}</span><span class="cell-sub">…${escapeHtml(k.key_hint)} · made ${formatDateTime(k.created_at)}${k.created_by ? ` by ${escapeHtml(k.created_by)}` : ""}</span></td>
+                  <td>${escapeHtml(gateName(k.gate_id))}</td>
+                  <td>${k.last_used_at ? formatDateTime(k.last_used_at) : "Never"}</td>
+                  <td>${k.reads}</td>
+                  <td>${k.active ? pill("Active", "s-ok") : pill("Revoked", "s-done")}</td>
+                  <td>${
+                    !k.active
+                      ? ""
+                      : revokeArmed === k.id
+                        ? `<div class="tos-actions"><button type="button" class="btn-danger-outline" data-key-revoke="${k.id}">Revoke now</button><button type="button" class="btn-outline" data-key-cancel>Cancel</button></div>`
+                        : `<button type="button" class="btn-outline" data-key-arm="${k.id}">Revoke</button>`
+                  }</td></tr>`
+              )
+              .join("")}</tbody></table>`
+          : `<p class="tos-none">No device keys yet. Create one for each camera or gate controller when the hardware is installed.</p>`;
+      }
+
+      document.getElementById("key-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById("key-create");
+        btn.disabled = true;
+        const { data, error } = await supabase.rpc("tos_create_device_key", {
+          p_label: document.getElementById("key-label").value,
+          p_gate: document.getElementById("key-gate").value || null,
+        });
+        btn.disabled = false;
+        if (error) return showMessage("message", error.message);
+        showMessage("message", "");
+        document.getElementById("key-label").value = "";
+        // Shown once: only a hash is stored.
+        document.getElementById("key-new").innerHTML = `<div class="card" style="margin: 12px 16px">
+            <p class="card-label">New key for ${escapeHtml(data.label)}: copy it now</p>
+            <p class="subtle" style="margin-top: -6px">This is the only time it is shown. Give it to whoever sets up the device, and keep it out of chat and email. If it is lost, revoke it and make a new one.</p>
+            <div class="toolbar"><input type="text" readonly value="${escapeHtml(data.key)}" id="key-plain" style="flex: 1 1 320px; min-width: 0; font-family: monospace" />
+            <button type="button" class="btn-outline" data-key-copy>Copy</button><button type="button" class="btn-outline" data-key-done>Done</button></div></div>`;
+        await loadKeys();
+      });
+
+      document.getElementById("key-new").addEventListener("click", async (e) => {
+        if (e.target.closest("[data-key-copy]")) {
+          const input = document.getElementById("key-plain");
+          input.select();
+          try {
+            await navigator.clipboard.writeText(input.value);
+            e.target.textContent = "Copied";
+          } catch {
+            e.target.textContent = "Press Ctrl+C";
+          }
+        } else if (e.target.closest("[data-key-done]")) {
+          document.getElementById("key-new").innerHTML = "";
+        }
+      });
+
+      document.getElementById("keys").addEventListener("click", async (e) => {
+        const arm = e.target.closest("[data-key-arm]");
+        const revoke = e.target.closest("[data-key-revoke]");
+        if (arm) revokeArmed = arm.dataset.keyArm;
+        else if (e.target.closest("[data-key-cancel]")) revokeArmed = null;
+        else if (revoke) {
+          revoke.disabled = true;
+          revokeArmed = null;
+          await act("tos_revoke_device_key", { p_id: revoke.dataset.keyRevoke }, (k) => `${k.label} revoked. Its device can no longer send reads.`);
+          return loadKeys();
+        } else return;
+        renderKeys();
+      });
+
       await load();
-      await loadRoutes();
+      await Promise.all([loadBays(), loadKeys(), loadRoutes()]);
+      if (location.hash === "#bays") document.getElementById("bays-section").scrollIntoView();
     </script>
   </body>
 </html>
