@@ -117,6 +117,8 @@ Migrations:
 | `tos_snapshot(date)` | every page: rules, gates, devices, bays, the day's trips with their gate state, gate events, and the vehicles involved |
 | `tos_gate_read(gate, plate, confidence, booking, test)` | test reads from Gate monitor (decision logic in `tos.gate_read_core`) |
 | `tos_create_device_key` / `tos_revoke_device_key` / `tos_device_keys` | Devices & rules → Device keys |
+| `tos_late_bay_options(event)` / `tos_move_late_trip(event, bay, slot)` | Late bus on Gate monitor / Bay timeline: vacant bays in order (same bay later, same gate, same floor), then move the trip and open the barrier (`202611111300_…_late_bay_finder.sql`) |
+| `tos_set_bay_floor(bay, floor)` | Devices & rules › Bays: floor per bay, used by the late-bus search |
 | `tos_bays()` / `tos_set_bay_active(bay, active, note)` | Devices & rules → Bays in service. TOS is the only place bays are switched on or off; a trigger on `public.bays` blocks direct changes (`202611111000_…_bay_activation.sql`) |
 | `tos_device_read` / `_event` / `_heartbeat` / `_bundle` | the `tos-device` Edge Function only (service role) |
 | `tos_resolve_review(event, allow)` | Open barrier / Keep closed |

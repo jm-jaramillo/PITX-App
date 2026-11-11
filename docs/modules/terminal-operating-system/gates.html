@@ -11,7 +11,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="../../shared/styles.css" />
-    <link rel="stylesheet" href="assets/tos.css?v=20261030-1" />
+    <link rel="stylesheet" href="assets/tos.css?v=20261111-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -54,7 +54,8 @@
         reviewActionsHtml,
         swapFormActive,
         handleSwapForms,
-      } from "./assets/tos.js?v=20261030-1";
+        handleLateMoves,
+      } from "./assets/tos.js?v=20261111-1";
 
       const profile = await guardPage("staff");
       if (!profile) throw new Error("unauthorised");
@@ -256,6 +257,9 @@
           return !!done;
         },
       });
+
+      // Late bus: move the trip to the bay TOS found (own bay later, same gate, same floor) and let it in.
+      handleLateMoves({ rerender: () => render(), after: () => live.refresh() });
 
       setInterval(() => M && !busy && render(), 15000);
       renderHead();

@@ -326,6 +326,59 @@ Commits `cc8b40c`, `7dd16ea`, `e6b2986`
   `tos_overview_range(from, to, include_tests)`, up to 62 days. It uses the
   same definitions as the live Overview.
 
+## 15 · Late bus: TOS finds a vacant bay. Devices & rules in tabs (11 Nov)
+
+- **When a bus arrives past the grace period** (a *Late* read waiting for
+  staff), Gate monitor and the Bay timeline trip detail now list where it can
+  go, searched in this order:
+  1. **Same bay:** at its own time if there is still room, otherwise the next
+     free 15-minute slots on that bay.
+  2. **Same gate:** another bay in service at that gate.
+  3. **Same floor:** another bay on the same floor.
+
+  Within a step, the earliest departure wins. The best option is the main
+  button, e.g. *Bay 20 · departs 04:30 (same bay)*, with up to two
+  alternatives beside it. If nothing is free, staff can still *Open barrier
+  anyway* or *Keep closed*.
+- **What counts as free for a departure slot:**
+  - the bay is in service;
+  - no other pending or approved trip that hasn't left yet is booked on it
+    from now through that slot;
+  - the bus gets at least 15 minutes to board;
+  - the same vehicle isn't booked in an adjacent slot (Trip Scheduling's
+    rule).
+
+  The search looks 2 hours ahead, on the same day.
+- **One click moves the trip and opens the barrier.** The trip's bay and
+  departure slot change in Trip Scheduling, and its own checks (one approved
+  trip per bay and slot, pending proposals re-picked) still apply. The move is
+  logged in `tos.trip_moves`, the gate log says where the bus went, and the
+  gate sign shows *PROCEED TO BAY nn* with the new time. A test read runs the
+  move and rolls it back.
+- **Floors:** Trip Scheduling has no floors, so each bay now has a **Floor**
+  box on Devices & rules › Bays. It suggests floor names already used. Bays
+  with no floor count as one floor.
+- **Devices & rules is split into tabs:** *Gate rules* (with test reads),
+  *Bays*, *Devices & keys* (connection overview, devices, device keys) and
+  *Routes*. The tab is kept in the link: `rules.html#bays`, which is also
+  where Trip Scheduling's Bays page now points.
+- **Tested** in a rolled-back transaction on live data. A bus booked on Bay 20
+  at 04:00 arrives at 04:05:
+  - normally, it gets **Bay 20 at 04:30** (same bay);
+  - with Bay 20 out of service, **Bay 18 at 04:30** (same gate);
+  - with all of Gate 4 out of service, **Bay 1 at 04:30** (same floor);
+  - with Gate 4 on its own floor and all of it off, **no bay**, so staff decide.
+
+  The pages were checked locally with fake data.
+- **Migration** `202611111300_terminal-operating-system_late_bay_finder.sql`:
+  - `tos.bay_floor`, `tos.trip_moves`
+  - `tos_set_bay_floor`, `tos_late_bay_options`, `tos_move_late_trip`
+  - `tos_bays` now returns the floor
+
+  The move writes `public.bookings` (bay and slot), so it is logged as Trip
+  Scheduling entry 122 for @jm-jaramillo.
+- Pages bumped to `?v=20261111-1`.
+
 ---
 
 ## Migrations (in order)
@@ -344,6 +397,7 @@ Commits `cc8b40c`, `7dd16ea`, `e6b2986`
 | `202611111000_terminal-operating-system_bay_activation.sql` | 12 |
 | `202611111100_terminal-operating-system_device_bay_directions.sql` | 13 |
 | `202611111200_terminal-operating-system_overview_range.sql` | 14 |
+| `202611111300_terminal-operating-system_late_bay_finder.sql` | 15 |
 
 ## Open items
 

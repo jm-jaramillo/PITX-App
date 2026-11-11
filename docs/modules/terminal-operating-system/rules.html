@@ -11,7 +11,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="../../shared/styles.css" />
-    <link rel="stylesheet" href="assets/tos.css?v=20261030-1" />
+    <link rel="stylesheet" href="assets/tos.css?v=20261111-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -30,33 +30,17 @@
             </div>
           </div>
 
+          <div class="tos-seg" role="tablist" aria-label="Setup sections" id="tabs" style="margin-bottom: 16px"></div>
           <div class="hidden" id="message"></div>
 
-          <section class="card" style="margin-top: 0">
-            <p class="card-label">How TOS connects</p>
-            <div class="tos-flow">
-              <div class="tos-fbox"><b>Trip Scheduling</b><span>Approved trips and bays</span><span>Approved vehicle masterfile</span></div>
-              <div class="tos-farrow" aria-hidden="true">→</div>
-              <div class="tos-fbox is-core"><b>TOS gate rules</b><span>Match plate to trip and masterfile, check bay-window timing and documents, then open, stage, ask staff, or deny</span></div>
-              <div class="tos-farrow" aria-hidden="true">⇄</div>
-              <div class="tos-fstack">
-                <div class="tos-fbox"><b>Device adapter</b><span>LPR cameras, RFID, boom barriers</span></div>
-                <div class="tos-fbox"><b>Outputs</b><span>Concourse and bay displays, staff alerts</span></div>
-              </div>
-            </div>
-          </section>
-
-          <div class="tos-split" style="margin-top: 18px; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr)">
-            <section class="table-wrap">
-              <div class="tos-panel-head"><h3>Gate rules</h3><span class="subtle" id="rules-note"></span></div>
-              <div id="rules"><p class="tos-none">Loading…</p></div>
-            </section>
-            <div class="tos-side">
+          <!-- Gate rules -->
+          <div data-tab="rules">
+            <div class="tos-split" style="grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr)">
               <section class="table-wrap">
-                <div class="tos-panel-head"><h3>Devices</h3></div>
-                <div id="devices"></div>
+                <div class="tos-panel-head"><h3>Gate rules</h3><span class="subtle" id="rules-note"></span></div>
+                <div id="rules"><p class="tos-none">Loading…</p></div>
               </section>
-              <section class="card">
+              <section class="card" style="margin-top: 0; align-self: start">
                 <p class="card-label">Test reads</p>
                 <p class="subtle" style="margin-top: -6px">
                   Reads sent with "Test a vehicle" on Gate monitor are marked as tests. Clearing removes
@@ -67,53 +51,80 @@
             </div>
           </div>
 
-          <section class="table-wrap" style="margin-top: 18px" id="bays-section">
-            <div class="tos-panel-head">
-              <h3>Bays in service</h3>
-              <span class="subtle" id="bays-note"></span>
-            </div>
-            <p class="subtle" style="margin: 10px 16px 0">
-              Trip Scheduling only assigns trips to bays in service, and the number of bays in service is the most
-              trips it approves per 15-minute slot. Trips already on a bay keep it when the bay is taken out of
-              service; move them in Trip Scheduling if needed. Bays are added and renamed in Trip Scheduling.
-            </p>
-            <div id="bays"><p class="tos-none">Loading…</p></div>
-          </section>
+          <!-- Bays -->
+          <div data-tab="bays" class="hidden">
+            <section class="table-wrap" id="bays-section">
+              <div class="tos-panel-head">
+                <h3>Bays in service</h3>
+                <span class="subtle" id="bays-note"></span>
+              </div>
+              <p class="subtle" style="margin: 10px 16px 0">
+                Trip Scheduling only assigns trips to bays in service, and the number of bays in service is the most
+                trips it approves per 15-minute slot. Trips already on a bay keep it when the bay is taken out of
+                service. <b>Floor</b> is used to find a vacant bay for a late bus (own bay, then same gate, then same
+                floor); bays with no floor count as one floor. Bays are added and renamed in Trip Scheduling.
+              </p>
+              <div id="bays"><p class="tos-none">Loading…</p></div>
+            </section>
+          </div>
 
-          <section class="table-wrap" style="margin-top: 18px">
-            <div class="tos-panel-head">
-              <h3>Device keys</h3>
-              <span class="subtle">
-                Cameras and the gate controller send plate reads with one of these keys.
-                <a href="https://github.com/jm-jaramillo/PITX-App/blob/main/docs/modules/terminal-operating-system/DEVICE-API.md" target="_blank" rel="noopener">Device API for IT and the vendor</a>
-              </span>
-            </div>
-            <form class="toolbar" id="key-form" style="padding: 12px 16px; border-bottom: 1px solid var(--divider)">
-              <input id="key-label" type="text" maxlength="80" placeholder="Name, e.g. Entry Gate 1 camera" style="min-width: 0; flex: 1 1 240px" required />
-              <select id="key-gate" aria-label="Gate this key may report for"></select>
-              <button type="submit" class="btn-primary" id="key-create">Create key</button>
-            </form>
-            <div id="key-new"></div>
-            <div id="keys"><p class="tos-none">Loading…</p></div>
-          </section>
+          <!-- Devices -->
+          <div data-tab="devices" class="hidden">
+            <section class="card" style="margin-top: 0">
+              <p class="card-label">How TOS connects</p>
+              <div class="tos-flow">
+                <div class="tos-fbox"><b>Trip Scheduling</b><span>Approved trips and bays</span><span>Approved vehicle masterfile</span></div>
+                <div class="tos-farrow" aria-hidden="true">→</div>
+                <div class="tos-fbox is-core"><b>TOS gate rules</b><span>Match plate to trip and masterfile, check bay-window timing and documents, then open, stage, ask staff, or deny</span></div>
+                <div class="tos-farrow" aria-hidden="true">⇄</div>
+                <div class="tos-fstack">
+                  <div class="tos-fbox"><b>Device adapter</b><span>LPR cameras, RFID, boom barriers</span></div>
+                  <div class="tos-fbox"><b>Outputs</b><span>Concourse and bay displays, staff alerts</span></div>
+                </div>
+              </div>
+            </section>
+            <section class="table-wrap" style="margin-top: 18px">
+              <div class="tos-panel-head"><h3>Devices</h3></div>
+              <div id="devices"></div>
+            </section>
+            <section class="table-wrap" style="margin-top: 18px">
+              <div class="tos-panel-head">
+                <h3>Device keys</h3>
+                <span class="subtle">
+                  Cameras and the gate controller send plate reads with one of these keys.
+                  <a href="https://github.com/jm-jaramillo/PITX-App/blob/main/docs/modules/terminal-operating-system/DEVICE-API.md" target="_blank" rel="noopener">Device API for IT and the vendor</a>
+                </span>
+              </div>
+              <form class="toolbar" id="key-form" style="padding: 12px 16px; border-bottom: 1px solid var(--divider)">
+                <input id="key-label" type="text" maxlength="80" placeholder="Name, e.g. Entry Gate 1 camera" style="min-width: 0; flex: 1 1 240px" required />
+                <select id="key-gate" aria-label="Gate this key may report for"></select>
+                <button type="submit" class="btn-primary" id="key-create">Create key</button>
+              </form>
+              <div id="key-new"></div>
+              <div id="keys"><p class="tos-none">Loading…</p></div>
+            </section>
+          </div>
 
-          <section class="table-wrap" style="margin-top: 18px">
-            <div class="tos-panel-head">
-              <h3>Commuter and provincial routes</h3>
-              <span class="subtle" id="routes-note"></span>
-            </div>
-            <div class="toolbar" style="padding: 12px 16px; border-bottom: 1px solid var(--divider)">
-              <input id="route-q" type="search" placeholder="Search destinations" style="min-width: 0; flex: 0 1 300px" />
-              <div class="tos-seg" role="group" aria-label="Show" id="route-filter"></div>
-            </div>
-            <div id="routes"><p class="tos-none">Loading…</p></div>
-          </section>
+          <!-- Routes -->
+          <div data-tab="routes" class="hidden">
+            <section class="table-wrap">
+              <div class="tos-panel-head">
+                <h3>Commuter and provincial routes</h3>
+                <span class="subtle" id="routes-note"></span>
+              </div>
+              <div class="toolbar" style="padding: 12px 16px; border-bottom: 1px solid var(--divider)">
+                <input id="route-q" type="search" placeholder="Search destinations" style="min-width: 0; flex: 0 1 300px" />
+                <div class="tos-seg" role="group" aria-label="Show" id="route-filter"></div>
+              </div>
+              <div id="routes"><p class="tos-none">Loading…</p></div>
+            </section>
+          </div>
         </main>
       </div>
     </div>
 
     <script type="module">
-      import { guardPage, renderNav, escapeHtml, showMessage, supabase, buildModel, act, pill, fmt, formatDateTime } from "./assets/tos.js?v=20261030-1";
+      import { guardPage, renderNav, escapeHtml, showMessage, supabase, buildModel, act, pill, fmt, formatDateTime } from "./assets/tos.js?v=20261111-1";
 
       const profile = await guardPage("staff");
       if (!profile) throw new Error("unauthorised");
@@ -279,7 +290,10 @@
       async function loadBays() {
         const { data, error } = await supabase.rpc("tos_bays");
         // Until the bay activation migration is applied the function doesn't exist: hide the section.
-        if (error?.code === "PGRST202") return document.getElementById("bays-section").classList.add("hidden");
+        if (error?.code === "PGRST202") {
+          document.getElementById("bays").innerHTML = `<p class="tos-none">Bay settings are not switched on in the database yet.</p>`;
+          return;
+        }
         if (error) {
           document.getElementById("bays").innerHTML = `<p class="tos-none">Could not load bays: ${escapeHtml(error.message)}</p>`;
           return;
@@ -307,14 +321,19 @@
             ? `<button type="button" class="btn-outline" data-bay-arm="${b.id}"${bayBusy ? " disabled" : ""}>Take out of service</button>`
             : `<button type="button" class="btn-primary" data-bay-on="${b.id}"${bayBusy ? " disabled" : ""}>Put in service</button>`;
         };
-        document.getElementById("bays").innerHTML = Object.entries(groups)
+        const floors = [...new Set(bays.map((b) => b.floor).filter(Boolean))].sort();
+        document.getElementById("bays").innerHTML =
+          `<datalist id="floor-list">${floors.map((f) => `<option value="${escapeHtml(f)}"></option>`).join("")}</datalist>` +
+          Object.entries(groups)
           .map(([gate, list]) => {
             const n = list.filter((b) => b.active).length;
             return `<p class="section-head" style="margin: 14px 16px 6px">${escapeHtml(gate)} <span class="subtle">&middot; ${n} of ${list.length} in service</span></p>
-              <table><thead><tr><th>Bay</th><th>Next 14 days</th><th>Last change</th><th>Status</th><th></th></tr></thead><tbody>${list
+              <table><thead><tr><th>Bay</th><th style="width:120px">Floor</th><th>Next 14 days</th><th>Last change</th><th>Status</th><th></th></tr></thead><tbody>${list
                 .sort(byName)
                 .map(
                   (b) => `<tr><td class="cell-strong">${escapeHtml(b.name)}</td>
+                    <td><input type="text" list="floor-list" data-floor="${b.id}" value="${escapeHtml(b.floor ?? "")}" placeholder="—" maxlength="30"
+                      aria-label="Floor of ${escapeHtml(b.name)}" style="width:100px; min-width:0" /></td>
                     <td>${b.upcoming ? `${b.upcoming} trip${b.upcoming === 1 ? "" : "s"}<span class="cell-sub">next ${escapeHtml(b.next_trip ?? "")} ${formatDateTime(b.next_etd)}</span>` : `<span class="subtle">None</span>`}</td>
                     <td>${b.changed_at ? `${formatDateTime(b.changed_at)}<span class="cell-sub">${escapeHtml(b.changed_by ?? "")}${b.note ? ` · ${escapeHtml(b.note)}` : ""}</span>` : `<span class="subtle">—</span>`}</td>
                     <td>${b.active ? pill("In service", "s-ok") : pill("Out of service", "s-done")}</td>
@@ -344,6 +363,38 @@
         } else return;
         renderBays();
       });
+
+      // Floor: saved when the box loses focus or Enter is pressed. Blank clears it.
+      document.getElementById("bays").addEventListener("change", async (e) => {
+        const box = e.target.closest("[data-floor]");
+        if (!box) return;
+        const bay = bays.find((b) => b.id === Number(box.dataset.floor));
+        const floor = box.value.trim();
+        if ((bay.floor ?? "") === floor) return;
+        box.disabled = true;
+        const saved = await act("tos_set_bay_floor", { p_bay: bay.id, p_floor: floor }, (r) =>
+          r.floor ? `${r.name} is on floor ${r.floor}.` : `${r.name} has no floor set.`
+        );
+        if (saved) bay.floor = saved.floor;
+        renderBays();
+      });
+
+      /* ---- tabs: Gate rules / Bays / Devices / Routes, kept in the link (#bays) */
+      const TABS = [["rules", "Gate rules"], ["bays", "Bays"], ["devices", "Devices & keys"], ["routes", "Routes"]];
+      function showTab(name) {
+        const tab = TABS.some(([k]) => k === name) ? name : "rules";
+        document.getElementById("tabs").innerHTML = TABS.map(
+          ([k, l]) => `<button type="button" role="tab" data-tab-btn="${k}" aria-pressed="${k === tab}" aria-selected="${k === tab}">${l}</button>`
+        ).join("");
+        document.querySelectorAll("[data-tab]").forEach((el) => el.classList.toggle("hidden", el.dataset.tab !== tab));
+        if (location.hash.slice(1) !== tab) history.replaceState(null, "", tab === "rules" ? location.pathname : `#${tab}`);
+      }
+      document.getElementById("tabs").addEventListener("click", (e) => {
+        const b = e.target.closest("[data-tab-btn]");
+        if (b) showTab(b.dataset.tabBtn);
+      });
+      window.addEventListener("hashchange", () => showTab(location.hash.slice(1)));
+      showTab(location.hash.slice(1));
 
       /* ---- device keys (gate cameras / controller -> tos-device endpoint) */
       let keys = [];
@@ -439,7 +490,6 @@
 
       await load();
       await Promise.all([loadBays(), loadKeys(), loadRoutes()]);
-      if (location.hash === "#bays") document.getElementById("bays-section").scrollIntoView();
     </script>
   </body>
 </html>
