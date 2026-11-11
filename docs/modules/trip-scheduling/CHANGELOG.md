@@ -4574,3 +4574,23 @@ The staff Schedule board is unchanged. Checked as genesis.ops: 6 columns, no bad
   entry 15.
 
 ---
+### 123. Trip Scheduling owns moving a booking's bay and slot (migration 202611111400, 11 Nov)
+
+Accepts the suggestion in #122. New `staff_move_booking(booking, bay, slot)`:
+staff only; booking pending/approved; slot 00:00-23:45; bay in service; refuses a
+bay already taken at that slot (plain message) and the same-bus adjacent-slot
+case; re-picks any pending request proposed that bay (existing trigger); never
+touches status, operator, plate or route; notifies the operator (`trip_moved`).
+`tos_move_late_trip()` now calls it instead of updating `bookings` itself - only
+that line changed, TOS keeps its search and its `tos.trip_moves` log.
+Applied by hand with a `_schema_migrations` row. Verified in a rolled-back
+transaction as staff: a move to a free bay/slot works, a clash is refused.
+**@Jcbllanto16: no action needed, but `tos_move_late_trip` was edited.**
+
+Also logged in `_schema_migrations` (already in effect on the live database, just
+never recorded): 0049, 0051, 202611041000_ticketing_init. **Not applied, so not
+logged:** 202611041002_ticketing_passengers and 202611061100_ticketing_core_links
+(Victoria's - the `ticketing.passengers` table and `ticketing.my_role()` don't
+exist yet).
+
+---
