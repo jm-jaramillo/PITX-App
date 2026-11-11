@@ -247,8 +247,72 @@ export function swapFormActive() {
   return swapDraft.event != null && !!document.activeElement?.closest?.("[data-swap-form]");
 }
 
+/* ------------------------------------------------- late bus: find a bay */
+
+// Where a late bus can go, per read (tos_late_bay_options): own bay at a later
+// slot, then the same gate, then the same floor. Fetched once per read.
+const lateOptions = {};
+let lateRerender = () => {};
+const LATE_STEP = { 1: "same bay", 2: "same gate", 3: "same floor" };
+
+function loadLateOptions(id) {
+  if (lateOptions[id]) return lateOptions[id];
+  lateOptions[id] = { loading: true };
+  supabase.rpc("tos_late_bay_options", { p_event: id }).then(({ data, error }) => {
+    lateOptions[id] = error ? { error: error.message } : data;
+    lateRerender();
+  });
+  return lateOptions[id];
+}
+
+function lateActionsHtml(e, keep, off) {
+  const o = loadLateOptions(e.id);
+  const open = `<button type="button" class="btn-outline" data-act="allow" data-id="${e.id}" data-plate="${escapeHtml(e.plate)}"${off}>Open barrier anyway</button>`;
+  if (o.loading) return `<span class="subtle" style="align-self:center">Finding a vacant bay…</span>${keep}`;
+  if (o.error) return `<span class="subtle" style="align-self:center">Could not search bays: ${escapeHtml(o.error)}</span>${open}${keep}`;
+  if (!o.options.length) {
+    return `<span class="subtle" style="align-self:center">No vacant bay on this floor in the next 2 hours.</span>${open}${keep}`;
+  }
+  const t = (iso) => new Date(iso).toLocaleTimeString("en-GB", { timeZone: "Asia/Manila", hour: "2-digit", minute: "2-digit" });
+  const label = (x) =>
+    x.keeps_time && x.bay_id === o.original.bay_id
+      ? `Let in · ${escapeHtml(x.bay)} as booked`
+      : `${escapeHtml(x.bay)} · departs ${t(x.etd)}`;
+  const btn = (x, primary) =>
+    `<button type="button" class="${primary ? "btn-primary" : "btn-outline"}" data-act="late-move" data-id="${e.id}"
+      data-bay="${x.bay_id}" data-slot="${x.slot}" data-label="${escapeHtml(x.bay)} at ${t(x.etd)}"${off}>${label(x)} <span style="opacity:.75;font-weight:500">(${LATE_STEP[x.step]})</span></button>`;
+  const [best, ...rest] = o.options;
+  return `${btn(best, true)}${rest.slice(0, 2).map((x) => btn(x, false)).join("")}${keep}`;
+}
+
 /**
- * Buttons for a read waiting on staff. A substitute bus gets one "Swap onto"
+ * Wires the late-bus buttons on a page: moves the trip to the chosen bay and
+ * time in Trip Scheduling and opens the barrier. `after()` reloads the page data.
+ */
+export function handleLateMoves({ rerender, after }) {
+  lateRerender = rerender;
+  let moving = false;
+  document.addEventListener("click", async (ev) => {
+    const b = ev.target.closest('[data-act="late-move"]');
+    if (!b || b.disabled || moving) return;
+    moving = true;
+    b.disabled = true;
+    const id = Number(b.dataset.id);
+    const done = await act(
+      "tos_move_late_trip",
+      { p_event: id, p_bay: Number(b.dataset.bay), p_slot: Number(b.dataset.slot) },
+      (r) => (r.moved ? `${r.plate}: barrier opened. Trip moved to ${b.dataset.label}.` : `${r.plate}: barrier opened, ${r.bay} as booked.`)
+    );
+    moving = false;
+    delete lateOptions[id]; // refetch if it is still waiting (e.g. the bay was just taken)
+    if (done) await after();
+    else rerender();
+  });
+}
+
+/**
+ * Buttons for a read waiting on staff. A late bus gets the vacant bays TOS
+ * found (own bay later, same gate, same floor). A substitute bus gets one "Swap onto"
  * button per candidate trip; choosing one asks for the plate number on the
  * bus before anything changes (Trip Scheduling's staff_set_booking_plate then
  * checks the swap). Anything else gets Open barrier.
@@ -271,6 +335,7 @@ export function reviewActionsHtml(M, e, busy = false) {
         <p class="subtle">Camera read <b>${escapeHtml(e.plate)}</b>. Required for the gate record either way. If the plate is a registered bus with a trip today, letting it in records the arrival on that trip.</p>
       </form>`;
   }
+  if (e.cat === "Late" && e.bid) return lateActionsHtml(e, keep, off);
   if (e.cat !== "Substitute bus") {
     return `<button type="button" class="btn-primary" data-act="allow" data-id="${e.id}" data-plate="${escapeHtml(e.plate)}"${off}>Open barrier</button>${keep}`;
   }
