@@ -400,6 +400,7 @@ Commits `cc8b40c`, `7dd16ea`, `e6b2986`
 | `202611111300_terminal-operating-system_late_bay_finder.sql` | 15 |
 | `202611121100_terminal-operating-system_bay_add_rename.sql` | 16 |
 | `202611121000_terminal-operating-system_bay_service.sql` | 17 |
+| `202611121200_terminal-operating-system_overview_punctuality.sql` | 18 |
 
 ## Open items
 
@@ -457,5 +458,38 @@ Commits `cc8b40c`, `7dd16ea`, `e6b2986`
   - `tos_bays` returns the service and route label
   - `tos_set_bay_floor` keeps the other settings when the floor is cleared
   - `tos.late_bay_options` matches the service
+
+---
+
+## 18 · Overview shows punctuality only (12 Nov)
+
+- **Overview is down to four measures**, for Today, any Day or any Month:
+  - **On-time arrivals:** in by bay-window open (ETD - 30 min) plus the grace
+    period
+  - **Late arrivals:** in after that
+  - **On-time departures:** left by the exit gate by ETD plus the grace period
+  - **Late departures:** left after that
+
+  Each tile also shows its share of all arrivals or departures. Below the
+  tiles are two charts, *Arrivals* and *Departures* (on time vs late), per
+  hour for a day or per day for a month. Clicking a day in the month view
+  opens that day.
+- **Removed from Overview:** buses let in, turned away, no-shows, trips without
+  a plate, waiting for staff, "Expected at the gates" and "Why buses were
+  stopped". They are still on Gate monitor and Analytics.
+- **Today** now uses the same database function as Day and Month and refreshes
+  every 20 seconds. *Include test reads* works for Today too.
+- **Grace** is the *Late grace period* rule on Devices & rules (now 5 min), for
+  both arrivals and departures. The gate log still says "Left on time" up to
+  2 min after ETD.
+- **Tested:**
+  - In a rolled-back transaction on live data: the one arrival recorded so
+    far, a late test read on 29 Oct, counts as 1 late arrival with test reads
+    included and 0 without.
+  - Locally with fake data: the four tiles and both charts render for Today,
+    Day and Month.
+- **Migration** `202611121200_terminal-operating-system_overview_punctuality.sql`:
+  `tos_overview_range` returns these counts per period, day and hour. The
+  signature is unchanged.
 
 ---

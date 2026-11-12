@@ -15,7 +15,7 @@ Staff accounts can open it from the module picker after signing in.
 | Page | What it shows |
 | --- | --- |
 | `gates.html` | Gate monitor (landing page): barrier state per gate, buses expected at the gates in the next 2 hours, every plate read today, vehicles waiting for a staff decision, and test reads |
-| `overview.html` | Today (live): totals, entries per hour, why buses were stopped, and the buses expected next. Day / Month: the same totals for any date or month (`tos_overview_range`), entries per hour or per day; `?day=YYYY-MM-DD` / `?month=YYYY-MM` |
+| `overview.html` | On-time and late arrivals and departures for Today (refreshes every 20 s), any Day or any Month (`tos_overview_range`), with per-hour or per-day charts; `?day=YYYY-MM-DD` / `?month=YYYY-MM` / `&tests=1` |
 
 **Expected at the gates** lists approved trips whose bay window opens within
 2 hours, plus overdue ones up to 20 minutes past ETD. Each trip is checked
