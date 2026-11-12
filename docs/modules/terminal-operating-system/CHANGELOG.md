@@ -416,3 +416,16 @@ Commits `cc8b40c`, `7dd16ea`, `e6b2986`
 - **Entry gates aren't tied to destinations yet.** Test reads use Entry Gate 1.
 - **Commuter list:** review it on Devices & rules. Only four destinations are
   marked commuter.
+
+## 16 · Add and rename bays here (12 Nov)
+
+> Logged as Trip Scheduling entry 128. Requested by @jm-jaramillo; edits
+> `rules.html` and adds migration `202611121100_terminal-operating-system_bay_add_rename.sql`.
+> **@Jcbllanto16: please review.**
+
+- **Devices & rules → Bays** now also has **Add bay** and a **Rename** link per
+  bay (`tos_add_bay`, `tos_rename_bay`, staff only, names must be unique). Together
+  with in/out of service and floors, the whole bay list is managed here.
+- Trip Scheduling's Bays page is now a redirect to this tab.
+
+---

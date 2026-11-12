@@ -62,8 +62,12 @@
                 Trip Scheduling only assigns trips to bays in service, and the number of bays in service is the most
                 trips it approves per 15-minute slot. Trips already on a bay keep it when the bay is taken out of
                 service. <b>Floor</b> is used to find a vacant bay for a late bus (own bay, then same gate, then same
-                floor); bays with no floor count as one floor. Bays are added and renamed in Trip Scheduling.
+                floor); bays with no floor count as one floor. Bays are added, renamed and switched on or off here.
               </p>
+              <form id="bay-add-form" class="tos-actions" style="margin: 12px 16px 0; gap: 8px; flex-wrap: wrap" data-live-hold>
+                <input id="bay-add-name" type="text" maxlength="40" placeholder="New bay name, e.g. Bay 40" aria-label="New bay name" style="max-width: 240px" />
+                <button type="submit" class="btn-primary" id="bay-add-btn">Add bay</button>
+              </form>
               <div id="bays"><p class="tos-none">Loading…</p></div>
             </section>
           </div>
@@ -331,7 +335,7 @@
               <table><thead><tr><th>Bay</th><th style="width:120px">Floor</th><th>Next 14 days</th><th>Last change</th><th>Status</th><th></th></tr></thead><tbody>${list
                 .sort(byName)
                 .map(
-                  (b) => `<tr><td class="cell-strong">${escapeHtml(b.name)}</td>
+                  (b) => `<tr><td class="cell-strong">${escapeHtml(b.name)} <button type="button" class="btn-link" data-bay-rename="${b.id}">Rename</button></td>
                     <td><input type="text" list="floor-list" data-floor="${b.id}" value="${escapeHtml(b.floor ?? "")}" placeholder="—" maxlength="30"
                       aria-label="Floor of ${escapeHtml(b.name)}" style="width:100px; min-width:0" /></td>
                     <td>${b.upcoming ? `${b.upcoming} trip${b.upcoming === 1 ? "" : "s"}<span class="cell-sub">next ${escapeHtml(b.next_trip ?? "")} ${formatDateTime(b.next_etd)}</span>` : `<span class="subtle">None</span>`}</td>
@@ -344,7 +348,29 @@
           .join("");
       }
 
+      // Add and rename (moved here from Trip Scheduling's Bays page).
+      document.getElementById("bay-add-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const input = document.getElementById("bay-add-name");
+        const name = input.value.trim();
+        if (!name) return;
+        const btn = document.getElementById("bay-add-btn");
+        btn.disabled = true;
+        const added = await act("tos_add_bay", { p_name: name }, (r) => `${r.name} added and in service.`);
+        btn.disabled = false;
+        if (added) input.value = "";
+        await loadBays();
+      });
+
       document.getElementById("bays").addEventListener("click", async (e) => {
+        const rename = e.target.closest("[data-bay-rename]");
+        if (rename) {
+          const bay = bays.find((b) => b.id === Number(rename.dataset.bayRename));
+          const name = prompt("Rename bay:", bay?.name ?? "")?.trim();
+          if (!name || name === bay.name) return;
+          await act("tos_rename_bay", { p_bay: bay.id, p_name: name }, (r) => `Renamed to ${r.name}.`);
+          return loadBays();
+        }
         const arm = e.target.closest("[data-bay-arm]");
         const off = e.target.closest("[data-bay-off]");
         const on = e.target.closest("[data-bay-on]");

@@ -395,7 +395,6 @@ const STAFF_LINKS = [
   { href: "approvals.html", label: "Approvals", icon: ICONS.check },
   { href: "vehicles-database.html", label: "Vehicles", icon: ICONS.bus },
   { href: "schedule.html", label: "Schedule", icon: ICONS.calendar },
-  { href: "bays.html", label: "Bays", icon: ICONS.bays },
   { href: "operator-profiles.html", label: "Operator profiles", icon: ICONS.users },
   { href: "accounts.html", label: "Accounts", icon: ICONS.user },
 ];

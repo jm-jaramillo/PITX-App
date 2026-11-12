@@ -4668,3 +4668,22 @@ exist yet).
   (additive); the Terminal Operating System and Ticketing pages are not wired yet.
 
 ---
+
+### 128. The Bays page moved to the Terminal Operating System (migration 202611121100, 12 Nov)
+
+Completes what #121 started: all bay management is in TOS now.
+- **TOS -> Devices & rules -> Bays** gets **Add bay** (new bays start in service,
+  no gate) and **Rename** next to each bay name, beside the in/out-of-service
+  switch and floors it already had. New staff-only `tos_add_bay(name)` and
+  `tos_rename_bay(bay, name)`; a name must be non-empty and not used by another bay
+  (case-insensitive).
+- **Trip Scheduling's Bays page is gone**: `bays.html` is a redirect to the TOS
+  Bays tab, and "Bays" is removed from the Trip Scheduling sidebar. (The gate
+  grouping from #117 was the Trip Scheduling page's; TOS lists bays by gate too.)
+- Trip Scheduling still reads the bays exactly as before (balanced assignment, per
+  slot cap, schedule). Gates are still set outside the app.
+- Applied by hand with a `_schema_migrations` row. Verified as staff on TOS: add,
+  duplicate refused ("already exists"), rename, redirect; test bay removed.
+  **@Jcbllanto16: this edits your `rules.html`/Bays tab - please review.**
+
+---
