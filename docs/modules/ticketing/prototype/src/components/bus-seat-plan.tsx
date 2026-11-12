@@ -14,6 +14,19 @@ const LEGEND = [
   { label: "Not for sale", className: "border-amber-300 bg-amber-100" },
 ];
 
+/** Window, aisle or middle seat, from where it sits across the bench (positions 0 and 5 are the windows). */
+export function seatSide(layout: SeatLayout | null | undefined, seatNo: number): "Window" | "Aisle" | "Middle" | "" {
+  const cell = layout?.cells.find((c) => c.seatNo === seatNo);
+  if (!cell) return "";
+  if (cell.position === 0 || cell.position === 5) return "Window";
+  if (cell.position === 2) return "Middle";
+  if (cell.position === 4) {
+    const besideAisle = !layout!.cells.some((c) => c.bench === cell.bench && c.position === 3);
+    return besideAisle ? "Aisle" : "Middle";
+  }
+  return "Aisle";
+}
+
 export function BusSeatPlan({
   layout,
   taken,
@@ -71,7 +84,8 @@ export function BusSeatPlan({
               const isTaken = taken.has(cell.seatNo);
               const isHeld = !isTaken && held.has(cell.seatNo);
               const isSelected = selected.includes(cell.seatNo);
-              const note = isBlocked ? ", not for sale" : isTaken ? ", taken" : isHeld ? ", being booked by someone else" : "";
+              const side = seatSide(layout, cell.seatNo);
+              const note = `${side ? `, ${side.toLowerCase()}` : ""}${isBlocked ? ", not for sale" : isTaken ? ", taken" : isHeld ? ", being booked by someone else" : ""}`;
               return (
                 <button
                   key={cell.seatNo}

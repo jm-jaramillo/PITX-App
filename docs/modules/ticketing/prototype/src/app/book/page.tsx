@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { BusSeatPlan } from "@/components/bus-seat-plan";
+import { BusSeatPlan, seatSide } from "@/components/bus-seat-plan";
 import { CompanyLogo } from "@/components/company-logo";
 import { PageTitle } from "@/components/page-title";
 import { peso, todayManila } from "@/lib/format";
@@ -36,6 +36,10 @@ import { FARE_TYPES, type Db, type FareType, type Trip } from "@/lib/types";
 
 const STEPS = ["Route", "Trip", "Seats", "Passengers", "Payment"] as const;
 const DAYS_AHEAD = 7;
+// How many seats one booking can take (demo cap, like the bus lines' online booking limits).
+const MAX_SEATS = 10;
+const SORTS = ["Earliest", "Cheapest", "Most seats"] as const;
+type Sort = (typeof SORTS)[number];
 
 type Wallet = "GCash" | "Maya" | "Card";
 const WALLETS: { id: Wallet; label: string; note: string }[] = [
@@ -95,6 +99,9 @@ export default function BookPage() {
   const [region, setRegion] = useState<Region | "All">("All");
   const [when, setWhen] = useState<TimeOfDay>("Any time");
   const [operator, setOperator] = useState("");
+  const [busClass, setBusClass] = useState("");
+  const [sort, setSort] = useState<Sort>("Earliest");
+  const [count, setCount] = useState(1);
   const [tripId, setTripId] = useState("");
   const [passengers, setPassengers] = useState<PassengerInput[]>([]);
   // Contact details from the passenger's last booking, like a saved profile.
@@ -164,13 +171,45 @@ export default function BookPage() {
     ? places.filter((p) => p.place.toLowerCase().includes(query) || p.province.toLowerCase().includes(query))
     : [];
   const openProvince = provinces.find((p) => p.name === province);
+  // Shortcuts above the provinces: where this passenger went before, then the busiest routes.
+  const recent = [
+    ...new Set(
+      db.tickets
+        .filter((t) => t.bookedBy === db.session?.name && t.source === "Online")
+        .reverse()
+        .map((t) => placeOf(routeOf(db.trips.find((x) => x.id === t.tripId)?.routeId ?? "")?.description)),
+    ),
+  ]
+    .map((name) => places.find((p) => p.place === name))
+    .filter((p): p is PlaceCard => Boolean(p))
+    .slice(0, 4);
+  const popular = places
+    .filter((p) => !recent.includes(p))
+    .sort((a, b) => b.trips - a.trips)
+    .slice(0, 6);
 
   // Step 2: departures to the destination.
   const toPlace = dayTrips.filter((t) => placeOf(routeOf(t.routeId)?.description) === destination);
   const operators = [...new Set(toPlace.map((t) => tripCompanyId(db, t) ?? ""))];
-  const departures = toPlace.filter(
-    (t) => (when === "Any time" || timeOfDay(t.time) === when) && (!operator || tripCompanyId(db, t) === operator),
-  );
+  const classes = [...new Set(toPlace.map((t) => busTypeOf(t)?.description ?? ""))].filter(Boolean).sort();
+  const fareFrom = (t: Trip) => {
+    const r = routeOf(t.routeId);
+    return r ? computeFare(r, "Adult") : Infinity;
+  };
+  const departures = toPlace
+    .filter(
+      (t) =>
+        (when === "Any time" || timeOfDay(t.time) === when) &&
+        (!operator || tripCompanyId(db, t) === operator) &&
+        (!busClass || busTypeOf(t)?.description === busClass),
+    )
+    .sort((a, b) =>
+      sort === "Cheapest"
+        ? fareFrom(a) - fareFrom(b) || a.time.localeCompare(b.time)
+        : sort === "Most seats"
+          ? ticketAvailability(db, b).left - ticketAvailability(db, a).left || a.time.localeCompare(b.time)
+          : a.time.localeCompare(b.time),
+    );
 
   const trip = db.trips.find((t) => t.id === tripId);
   const route = trip ? routeOf(trip.routeId) : undefined;
@@ -198,6 +237,7 @@ export default function BookPage() {
     setDestination(place);
     setWhen("Any time");
     setOperator("");
+    setBusClass("");
     go(1);
   }
 
@@ -221,6 +261,11 @@ export default function BookPage() {
       releaseSeats(tripId, [seatNo]);
       setPassengers((current) => current.filter((p) => p.seatNo !== seatNo));
       return;
+    }
+    if (passengers.length >= count) {
+      return setError(
+        `You're booking for ${count} passenger${count === 1 ? "" : "s"}. Tap a picked seat to let it go, or go back to Route to add a passenger.`,
+      );
     }
     const problem = holdSeat(tripId, seatNo);
     if (problem) return setError(problem);
@@ -343,6 +388,35 @@ export default function BookPage() {
                   })}
                 </div>
                 <p className="mt-2 text-xs text-slate-500">Days without trips open for booking are greyed out.</p>
+                <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-slate-100 pt-3">
+                  <span className="section-head">Passengers</span>
+                  <div className="flex items-center rounded-lg border border-slate-300">
+                    <button
+                      type="button"
+                      aria-label="One passenger less"
+                      disabled={count <= 1}
+                      onClick={() => setCount((c) => c - 1)}
+                      className="px-3 py-1 text-lg font-bold text-brand disabled:text-slate-300"
+                    >
+                      −
+                    </button>
+                    <span className="w-8 text-center font-bold" aria-live="polite">
+                      {count}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label="One passenger more"
+                      disabled={count >= MAX_SEATS}
+                      onClick={() => setCount((c) => c + 1)}
+                      className="px-3 py-1 text-lg font-bold text-brand disabled:text-slate-300"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <span className="text-xs text-slate-500">
+                    Up to {MAX_SEATS} per booking. Student, senior and PWD fares are picked per passenger later.
+                  </span>
+                </div>
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-white p-4">
@@ -386,6 +460,12 @@ export default function BookPage() {
                   </div>
                 ) : (
                   <div className="space-y-4">
+                    {(recent.length > 0 || popular.length > 0) && (
+                      <div className="space-y-2 rounded-lg bg-slate-50 p-3">
+                        {recent.length > 0 && <QuickRow label="Book again" places={recent} onPick={pickPlace} />}
+                        {popular.length > 0 && <QuickRow label="Popular from PITX" places={popular} onPick={pickPlace} />}
+                      </div>
+                    )}
                     {regions.length > 1 && (
                       <div className="flex flex-wrap gap-2">
                         {(["All", ...regions] as const).map((r) => (
@@ -436,7 +516,15 @@ export default function BookPage() {
           {/* Step 2: trip */}
           {step === 1 && (
             <section className="space-y-3">
-              <TripHeader destination={destination} date={date} onChange={() => go(0)} />
+              <TripHeader destination={destination} date={date} count={count} onChange={() => go(0)} />
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sort</span>
+                {SORTS.map((s) => (
+                  <Chip key={s} on={sort === s} onClick={() => setSort(s)}>
+                    {s}
+                  </Chip>
+                ))}
+              </div>
               <div className="flex flex-wrap gap-2">
                 {TIMES.map((t) => (
                   <Chip key={t} on={when === t} onClick={() => setWhen(t)}>
@@ -458,6 +546,21 @@ export default function BookPage() {
                     ))}
                   </select>
                 )}
+                {classes.length > 1 && (
+                  <select
+                    aria-label="Bus class"
+                    value={busClass}
+                    onChange={(e) => setBusClass(e.target.value)}
+                    className="!mt-0 !w-auto rounded-full text-sm"
+                  >
+                    <option value="">All bus classes</option>
+                    {classes.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
                 {departures.map((t) => {
@@ -466,12 +569,14 @@ export default function BookPage() {
                   const c = companyOf(t);
                   const capacity = tripSeating(db, t).layout?.seats ?? 0;
                   const soldOut = a.status !== "Available" && a.status !== "Last Few Seats";
+                  const short = !soldOut && a.left < count;
                   const fill = capacity ? Math.round(((capacity - a.left) / capacity) * 100) : 100;
+                  const arrangement = tripSeating(db, t).layout?.label.match(/\d+x\d+/)?.[0];
                   return (
                     <button
                       key={t.id}
                       type="button"
-                      disabled={soldOut}
+                      disabled={soldOut || short}
                       onClick={() => {
                         changeTrip(t.id);
                         go(2);
@@ -489,14 +594,21 @@ export default function BookPage() {
                           <span className="truncate text-sm font-semibold">{c?.name}</span>
                         </span>
                         <span className="block text-xs text-slate-600">
-                          {busOf(t)?.aircon ? "Aircon" : "Ordinary"} · {busTypeOf(t)?.description} · {t.bay || "Bay to follow"}
+                          {busOf(t)?.aircon ? "Aircon" : "Ordinary"} · {busTypeOf(t)?.description}
+                          {arrangement ? ` (${arrangement} seats)` : ""} · {t.bay || "Bay to follow"}
                         </span>
                         <span className="flex items-center gap-2 text-xs">
                           <span className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-200">
                             <span className={`block h-full ${a.status === "Last Few Seats" ? "bg-amber-500" : "bg-brand"}`} style={{ width: `${fill}%` }} />
                           </span>
-                          <span className={a.status === "Last Few Seats" ? "font-semibold text-amber-700" : "text-slate-600"}>
-                            {soldOut ? a.status : a.status === "Last Few Seats" ? `Only ${a.left} left` : `${a.left} seats left`}
+                          <span className={short ? "font-semibold text-red-700" : a.status === "Last Few Seats" ? "font-semibold text-amber-700" : "text-slate-600"}>
+                            {soldOut
+                              ? a.status
+                              : short
+                                ? `Only ${a.left} left, you need ${count}`
+                                : a.status === "Last Few Seats"
+                                  ? `Only ${a.left} left`
+                                  : `${a.left} seats left`}
                           </span>
                         </span>
                       </span>
@@ -508,7 +620,7 @@ export default function BookPage() {
                   );
                 })}
               </div>
-              {departures.length === 0 && <p className="text-sm text-slate-500">No departures match. Try another time of day or operator.</p>}
+              {departures.length === 0 && <p className="text-sm text-slate-500">No departures match. Try another time of day, operator or bus class.</p>}
             </section>
           )}
 
@@ -517,8 +629,15 @@ export default function BookPage() {
             <section className="space-y-3">
               <TripSummary db={db} trip={trip} onChange={() => { changeTrip(""); go(1); }} />
               <div className="rounded-xl border border-slate-200 bg-white p-4">
-                <p className="section-head mb-1 text-center">Pick your seats</p>
-                <p className="mb-3 text-center text-xs text-slate-500">Tap a seat to pick it, tap again to let it go.</p>
+                <p className="section-head mb-1 text-center">
+                  Pick {count} seat{count === 1 ? "" : "s"}
+                  <span className={`ml-2 rounded-full px-2 py-0.5 text-xs ${passengers.length === count ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-600"}`}>
+                    {passengers.length} of {count} picked
+                  </span>
+                </p>
+                <p className="mb-3 text-center text-xs text-slate-500">
+                  Tap a seat to pick it, tap again to let it go. Seat selection is free. Seats along the left and right edges are by the window.
+                </p>
                 {block && <p className="mb-3 text-center text-sm text-red-700">{block}</p>}
                 {seating?.layout ? (
                   <BusSeatPlan
@@ -551,6 +670,7 @@ export default function BookPage() {
                   <fieldset key={p.seatNo} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
                     <legend className="rounded-full bg-brand px-3 py-0.5 text-xs font-semibold text-white">
                       Passenger {index + 1} · Seat {p.seatNo}
+                      {seatSide(seating?.layout, p.seatNo) ? ` (${seatSide(seating?.layout, p.seatNo)})` : ""}
                     </legend>
                     <label>
                       Full name (as on the ID)
@@ -639,10 +759,18 @@ export default function BookPage() {
                     approve {peso(total)}, then come back here for your e-ticket.
                   </p>
                 </div>
-                <p className="text-xs text-slate-500">
-                  By paying you agree to the operator&apos;s terms. For refunds or changes, go to the operator&apos;s ticket counter at
-                  PITX with your e-ticket.
-                </p>
+                <div className="rounded-xl border border-slate-200 bg-white p-4">
+                  <p className="section-head mb-2">Before you travel</p>
+                  <ul className="list-disc space-y-1 pl-5 text-sm text-slate-700">
+                    <li>Your e-ticket&apos;s QR code is your boarding pass. No need to swap it at a ticket counter.</li>
+                    <li>Check your bay on the e-ticket or the PITX departure screens. We text you if the bay or time changes.</li>
+                    {passengers.some((p) => p.fareType !== "Adult") && (
+                      <li>Bring the ID of every student, senior or PWD passenger. Without it, the regular fare applies.</li>
+                    )}
+                    <li>For refunds or changes, go to the operator&apos;s ticket counter at PITX with your e-ticket.</li>
+                  </ul>
+                </div>
+                <p className="text-xs text-slate-500">By paying you agree to the operator&apos;s terms of carriage.</p>
               </div>
               <OrderSummary
                 db={db}
@@ -713,7 +841,7 @@ export default function BookPage() {
                 {step < 4 ? (
                   <button
                     type="button"
-                    disabled={passengers.length === 0 || Boolean(block) || holdExpired}
+                    disabled={passengers.length === 0 || (step === 2 && passengers.length < count) || Boolean(block) || holdExpired}
                     onClick={() => {
                       if (step === 3) {
                         const problem = checkPassengers();
@@ -723,7 +851,11 @@ export default function BookPage() {
                     }}
                     className="flex-1 rounded-lg bg-brand px-5 py-2.5 sm:flex-none text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-40"
                   >
-                    {step === 2 ? "Continue" : "Go to payment"}
+                    {step === 2
+                      ? passengers.length < count
+                        ? `Pick ${count - passengers.length} more seat${count - passengers.length === 1 ? "" : "s"}`
+                        : "Continue"
+                      : "Go to payment"}
                   </button>
                 ) : (
                   <button
@@ -803,6 +935,25 @@ function PlaceGrid({ places, showProvince = false, onPick }: { places: PlaceCard
   );
 }
 
+function QuickRow({ label, places, onPick }: { label: string; places: PlaceCard[]; onPick: (place: string) => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="w-full text-xs font-semibold uppercase tracking-wide text-slate-500 sm:w-32">{label}</span>
+      {places.map((p) => (
+        <button
+          key={p.place}
+          type="button"
+          onClick={() => onPick(p.place)}
+          className="rounded-full border border-slate-300 bg-white px-3 py-1 text-sm hover:border-brand hover:bg-brand-tint"
+        >
+          <span className="font-semibold">{p.place}</span>
+          <span className="ml-1.5 text-xs text-slate-500">from {peso(p.from)}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button
@@ -816,12 +967,14 @@ function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; chi
   );
 }
 
-function TripHeader({ destination, date, onChange }: { destination: string; date: string; onChange: () => void }) {
+function TripHeader({ destination, date, count, onChange }: { destination: string; date: string; count: number; onChange: () => void }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-brand px-4 py-3 text-white">
       <p className="font-semibold">
         PITX <span aria-hidden>→</span> {destination}
-        <span className="ml-2 font-normal opacity-80">{dayLabel(date, { weekday: "short", month: "short", day: "numeric" })}</span>
+        <span className="ml-2 font-normal opacity-80">
+          {dayLabel(date, { weekday: "short", month: "short", day: "numeric" })} · {count} passenger{count === 1 ? "" : "s"}
+        </span>
       </p>
       <button type="button" onClick={onChange} className="rounded border border-white/40 px-2 py-0.5 text-xs font-semibold hover:bg-white/10">
         Change
@@ -908,6 +1061,10 @@ function OrderSummary({
             </li>
           ))}
       </ul>
+      <div className="flex justify-between text-xs text-slate-500">
+        <span>Seat selection</span>
+        <span className="font-semibold text-green-700">Free</span>
+      </div>
       {savings > 0 && (
         <div className="flex justify-between text-sm font-semibold text-green-700">
           <span>Total discount</span>

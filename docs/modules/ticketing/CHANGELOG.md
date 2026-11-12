@@ -37,6 +37,25 @@ sections 2 and 3).
 
 ---
 
+## 28 · Book a Trip ideas from other bus booking sites (12 Nov)
+
+Patterns borrowed from Victory Liner, Biyaheroes, redBus and 12Go, so Book a Trip feels like the booking sites passengers already know. Nothing copied from their branding.
+
+| Step | Added | Seen on |
+|---|---|---|
+| Route | Passenger count (1 to 10) before searching | Biyaheroes, redBus |
+| Route | "Book again" chips from the passenger's past trips, and "Popular from PITX" (busiest routes that day) | redBus |
+| Trip | Sort by Earliest, Cheapest or Most seats | redBus, 12Go |
+| Trip | Bus class filter (Regular aircon, Deluxe, Super deluxe, High capacity) and the seat arrangement (2x1, 2x2) on each card | Victory Liner bus classes |
+| Trip | Trips with fewer seats left than the passenger count can't be picked ("Only 2 left, you need 3") | redBus |
+| Seats | "Pick 3 seats, 1 of 3 picked". Continue says how many more to pick. Picking more than the count is blocked | Biyaheroes, Victory Liner |
+| Seats | Window, aisle or middle on each seat's label and on the passenger card | MakeMyTrip, redBus |
+| Payment | "Seat selection: Free" in the summary, and a "Before you travel" card (QR is the boarding pass, check the bay, bring discount IDs, refunds at the counter) | Biyaheroes fees, Klook voucher notes |
+
+Not added: pay later at 7-Eleven or over the counter (Biyaheroes). It needs an unpaid booking status and a payment deadline, so it's for the live system's payment design.
+
+The 10-seat cap is a demo value. Confirm the real limit per booking with Ops.
+
 ## 27 · No staff modules in the Passenger view (12 Nov)
 
 The other PITX App modules (Trip Scheduling, TOS and the rest) are staff tools, so the Passenger view no longer links to them.
