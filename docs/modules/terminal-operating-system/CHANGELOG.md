@@ -398,6 +398,8 @@ Commits `cc8b40c`, `7dd16ea`, `e6b2986`
 | `202611111100_terminal-operating-system_device_bay_directions.sql` | 13 |
 | `202611111200_terminal-operating-system_overview_range.sql` | 14 |
 | `202611111300_terminal-operating-system_late_bay_finder.sql` | 15 |
+| `202611121100_terminal-operating-system_bay_add_rename.sql` | 16 |
+| `202611121000_terminal-operating-system_bay_service.sql` | 17 |
 
 ## Open items
 
@@ -427,5 +429,33 @@ Commits `cc8b40c`, `7dd16ea`, `e6b2986`
   bay (`tos_add_bay`, `tos_rename_bay`, staff only, names must be unique). Together
   with in/out of service and floors, the whole bay list is managed here.
 - Trip Scheduling's Bays page is now a redirect to this tab.
+
+---
+
+## 17 · Bays labelled commuter or provincial, with their routes (12 Nov)
+
+- **Devices & rules › Bays** has a *Service & routes* cell for each bay:
+  - **Provincial / Commuter.** Provincial bays are booked through Trip
+    Scheduling. Blank counts as provincial.
+  - **Routes:** free text for what the bay serves, e.g. "Alabang, Pacita P2P".
+
+  Both save as soon as they change. Each gate heading shows its provincial and
+  commuter counts.
+- **Late-bus search:** it only offers bays of the same service as the trip's
+  own bay, so a provincial bus is never sent to a commuter bay.
+- **Not changed:** Trip Scheduling's bay picking still uses every bay in
+  service. Whether it should skip commuter bays is for @jm-jaramillo to decide.
+- **Tested** in a rolled-back transaction. With a Gate 4 bus's own bay out of
+  service, the search offered Bays 18, 19, 21, 22 and 23. With Bays 18 and 19
+  marked commuter, it offered only 21, 22 and 23. Clearing a bay's labels
+  removes its settings row, and an unknown service is refused. The page was
+  checked locally with fake data.
+- **Migration** `202611121000_terminal-operating-system_bay_service.sql`:
+  - `tos.bay_floor` gains `service` and `route_label`, and `floor` becomes
+    optional
+  - new `tos_set_bay_service`
+  - `tos_bays` returns the service and route label
+  - `tos_set_bay_floor` keeps the other settings when the floor is cleared
+  - `tos.late_bay_options` matches the service
 
 ---

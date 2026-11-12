@@ -61,8 +61,10 @@
               <p class="subtle" style="margin: 10px 16px 0">
                 Trip Scheduling only assigns trips to bays in service, and the number of bays in service is the most
                 trips it approves per 15-minute slot. Trips already on a bay keep it when the bay is taken out of
-                service. <b>Floor</b> is used to find a vacant bay for a late bus (own bay, then same gate, then same
-                floor); bays with no floor count as one floor. Bays are added, renamed and switched on or off here.
+                service. Mark each bay <b>Provincial</b> (booked through Trip Scheduling) or <b>Commuter</b>, and note the
+                routes it serves. <b>Floor</b> and service are used to find a vacant bay for a late bus (own bay, then
+                same gate, then same floor, and never a bay of the other service); bays with no floor count as one
+                floor. Bays are added, renamed and switched on or off here.
               </p>
               <form id="bay-add-form" class="tos-actions" style="margin: 12px 16px 0; gap: 8px; flex-wrap: wrap" data-live-hold>
                 <input id="bay-add-name" type="text" maxlength="40" placeholder="New bay name, e.g. Bay 40" aria-label="New bay name" style="max-width: 240px" />
@@ -331,11 +333,20 @@
           Object.entries(groups)
           .map(([gate, list]) => {
             const n = list.filter((b) => b.active).length;
-            return `<p class="section-head" style="margin: 14px 16px 6px">${escapeHtml(gate)} <span class="subtle">&middot; ${n} of ${list.length} in service</span></p>
-              <table><thead><tr><th>Bay</th><th style="width:120px">Floor</th><th>Next 14 days</th><th>Last change</th><th>Status</th><th></th></tr></thead><tbody>${list
+            const com = list.filter((b) => b.service === "commuter").length;
+            return `<p class="section-head" style="margin: 14px 16px 6px">${escapeHtml(gate)} <span class="subtle">&middot; ${n} of ${list.length} in service &middot; ${list.length - com} provincial, ${com} commuter</span></p>
+              <div style="overflow-x:auto"><table><thead><tr><th>Bay</th><th style="min-width:230px">Service &amp; routes</th><th style="width:120px">Floor</th><th>Next 14 days</th><th>Last change</th><th>Status</th><th></th></tr></thead><tbody>${list
                 .sort(byName)
                 .map(
                   (b) => `<tr><td class="cell-strong">${escapeHtml(b.name)} <button type="button" class="btn-link" data-bay-rename="${b.id}">Rename</button></td>
+                    <td><div style="display:grid; gap:6px">
+                      <select data-service="${b.id}" aria-label="Service of ${escapeHtml(b.name)}" style="width:150px">
+                        <option value="provincial"${b.service !== "commuter" ? " selected" : ""}>Provincial</option>
+                        <option value="commuter"${b.service === "commuter" ? " selected" : ""}>Commuter</option>
+                      </select>
+                      <input type="text" data-routes="${b.id}" value="${escapeHtml(b.route_label ?? "")}" maxlength="120"
+                        placeholder="Routes, e.g. Alabang, Pacita P2P" aria-label="Routes served at ${escapeHtml(b.name)}" style="min-width:0" />
+                    </div></td>
                     <td><input type="text" list="floor-list" data-floor="${b.id}" value="${escapeHtml(b.floor ?? "")}" placeholder="—" maxlength="30"
                       aria-label="Floor of ${escapeHtml(b.name)}" style="width:100px; min-width:0" /></td>
                     <td>${b.upcoming ? `${b.upcoming} trip${b.upcoming === 1 ? "" : "s"}<span class="cell-sub">next ${escapeHtml(b.next_trip ?? "")} ${formatDateTime(b.next_etd)}</span>` : `<span class="subtle">None</span>`}</td>
@@ -343,7 +354,7 @@
                     <td>${b.active ? pill("In service", "s-ok") : pill("Out of service", "s-done")}</td>
                     <td style="text-align:right">${action(b)}</td></tr>`
                 )
-                .join("")}</tbody></table>`;
+                .join("")}</tbody></table></div>`;
           })
           .join("");
       }
@@ -387,6 +398,23 @@
           bayBusy = false;
           return loadBays();
         } else return;
+        renderBays();
+      });
+
+      // Service and route label: saved together when either changes.
+      document.getElementById("bays").addEventListener("change", async (e) => {
+        const el = e.target.closest("[data-service], [data-routes]");
+        if (!el) return;
+        const id = Number(el.dataset.service ?? el.dataset.routes);
+        const bay = bays.find((b) => b.id === id);
+        const service = document.querySelector(`[data-service="${id}"]`).value;
+        const routes = document.querySelector(`[data-routes="${id}"]`).value.trim();
+        if (bay.service === service && (bay.route_label ?? "") === routes) return;
+        el.disabled = true;
+        const saved = await act("tos_set_bay_service", { p_bay: id, p_service: service, p_route_label: routes }, (r) =>
+          `${r.name}: ${r.service === "commuter" ? "Commuter" : "Provincial"}${r.route_label ? ` · ${r.route_label}` : ""}.`
+        );
+        if (saved) Object.assign(bay, { service: saved.service, route_label: saved.route_label });
         renderBays();
       });
 
