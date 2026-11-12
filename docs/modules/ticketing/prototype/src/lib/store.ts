@@ -95,6 +95,13 @@ export function replaceData(next: Db) {
   commit({ ...next, session: load().session });
 }
 
+/** Back to the sample week, with the signed-in user's own samples (e.g. a passenger's trips). */
+export function restoreSampleData() {
+  const session = load().session;
+  const base = seedDb();
+  commit({ ...(session ? withUserSamples(base, session) : base), session });
+}
+
 function entry(data: Db, action: string, detail: string, ids: { ticketId?: string; tripId?: string } = {}): AuditEntry {
   const by = data.session ? `${data.session.name} (${data.session.role})` : "System";
   return { id: crypto.randomUUID(), at: new Date().toISOString(), by, action, detail, ...ids };

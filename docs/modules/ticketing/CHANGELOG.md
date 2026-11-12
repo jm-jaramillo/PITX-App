@@ -37,6 +37,17 @@ sections 2 and 3).
 
 ---
 
+## 29 · Passenger view keeps the sample week on the site (12 Nov)
+
+On the site, Book a Trip had almost no trips and My trips was empty. The demo swaps the sample week for real PITX trips on sign-in, but a passenger account only gets the few trips with a seat map (`list_seat_trips`), and the passenger's sample bookings were dropped with the sample trips.
+
+| View | Before | Now |
+|---|---|---|
+| Passenger (own account or View as) | Real PITX trips, often only a handful, no booking history | The 7-day sample week, with the passenger's 5 sample bookings |
+| Every staff view | Real PITX trips | No change. Switching back from Passenger reads PITX again |
+
+Bookings made in the Passenger view start over after a staff view reloads real PITX data.
+
 ## 28 · Book a Trip ideas from other bus booking sites (12 Nov)
 
 Patterns borrowed from Victory Liner, Biyaheroes, redBus and 12Go, so Book a Trip feels like the booking sites passengers already know. Nothing copied from their branding.

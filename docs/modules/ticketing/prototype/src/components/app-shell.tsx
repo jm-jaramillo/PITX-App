@@ -12,7 +12,7 @@ import { asset } from "@/lib/paths";
 import { SAMPLE_OPERATORS } from "@/lib/operator-routes";
 import { moduleHomeUrl, onPortalSite, portalUrl, portalUser, type PortalUser } from "@/lib/portal";
 import { canAccess, homeFor, isCompanyRole, NAV, sells } from "@/lib/roles";
-import { getDb, replaceData, resetDemoData, saveRecord, signIn, signOut, useDb, useHydrated } from "@/lib/store";
+import { getDb, replaceData, resetDemoData, restoreSampleData, saveRecord, signIn, signOut, useDb, useHydrated } from "@/lib/store";
 import { ROLES, type Db, type Role, type Session } from "@/lib/types";
 import PITX_ICONS from "@/lib/pitx-icons.json";
 
@@ -53,6 +53,11 @@ async function refreshLive(setState: (state: LiveState) => void) {
   liveState = "loading";
   setState(liveState);
   const result = await loadLive(getDb());
+  // Switched to the Passenger view while reading: that view keeps the sample week.
+  if (getDb().session?.role === "Passenger") {
+    liveState = "idle";
+    return setState(liveState);
+  }
   if (result) replaceData(result.db);
   liveState = result ? "loaded" : "empty";
   setState(liveState);
@@ -270,10 +275,21 @@ function Shell({ children }: { children: ReactNode }) {
   const [live, setLive] = useState<LiveState>(liveState);
   const [navCollapsed, setNavCollapsed] = useState(() => window.innerWidth < 860);
   const signedIn = !!session && !!user;
+  const passengerView = session?.role === "Passenger";
   useEffect(() => {
-    if (!onSite || !signedIn || liveState !== "idle") return;
+    if (!onSite || !signedIn) return;
+    if (passengerView) {
+      // Passengers play through the sample week. The real feed is for staff: a passenger
+      // account only gets the few trips with a seat map, and their sample bookings drop off.
+      if (getDb().source === "pitx") {
+        restoreSampleData();
+        liveState = "idle"; // switching back to a staff view reads PITX again
+      }
+      return;
+    }
+    if (liveState !== "idle") return;
     refreshLive(setLive);
-  }, [onSite, signedIn]);
+  }, [onSite, signedIn, passengerView]);
 
   if (!session || (onSite && (!user || sessionStale))) {
     return onSite ? <p className="p-6 text-sm text-slate-500">Signing in…</p> : <SignIn />;
