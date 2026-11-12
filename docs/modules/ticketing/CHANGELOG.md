@@ -37,6 +37,18 @@ sections 2 and 3).
 
 ---
 
+## 27 · No staff modules in the Passenger view (12 Nov)
+
+The other PITX App modules (Trip Scheduling, TOS and the rest) are staff tools, so the Passenger view no longer links to them.
+
+| Where | Before | Now (Passenger) |
+|---|---|---|
+| Sidebar | "All modules" above Book a Trip | Book a Trip only |
+| Account menu | "All modules" button | Removed. Staff viewing as Passenger switch back with View as |
+| PITX logo | Opens the portal's module list | Opens Book a Trip |
+
+Every other role is unchanged.
+
 ## 26 · Book a Trip by province first (11 Nov)
 
 Step 1 of Book a Trip listed every destination at once (about 27 a day). It now shows provinces first, grouped by region, and the destinations inside a province after it's picked.

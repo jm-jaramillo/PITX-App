@@ -287,11 +287,14 @@ function Shell({ children }: { children: ReactNode }) {
       : live === "empty"
         ? "Sample data: no real trips are open to your account. Sales are saved in this browser only."
         : "Prototype: dummy data saved in this browser only. No real payments yet.";
+  // The other PITX App modules are staff tools: a passenger never sees links to them.
+  const showModules = onSite && session.role !== "Passenger";
+
   return (
     <div className="app-shell">
       <aside className={`sidebar no-print${navCollapsed ? " is-collapsed" : ""}`} id="nav">
         <div className="sidebar-brand">
-          <a href={onSite ? portalUrl() : "/"} className="brand-link" aria-label="PITX modules">
+          <a href={showModules ? portalUrl() : asset(homeFor(session.role))} className="brand-link" aria-label={showModules ? "PITX modules" : "Home"}>
             <img src={onSite ? `${portalUrl()}shared/pitx-logo.webp` : asset("/brand/pitx-horizontal-on-dark.png")} alt="PITX" />
           </a>
           <span className="unit">
@@ -301,7 +304,7 @@ function Shell({ children }: { children: ReactNode }) {
           </span>
         </div>
         <nav className="sidebar-links">
-          {onSite && (
+          {showModules && (
             <a href={portalUrl()}>
               <Icon name="overview" />
               All modules
@@ -361,9 +364,11 @@ function Shell({ children }: { children: ReactNode }) {
                   </button>
                 )}
                 {onSite ? (
-                  <a className="btn-outline" href={portalUrl()}>
-                    All modules
-                  </a>
+                  showModules && (
+                    <a className="btn-outline" href={portalUrl()}>
+                      All modules
+                    </a>
+                  )
                 ) : (
                   <button type="button" className="btn-outline" onClick={signOut}>
                     Sign out
