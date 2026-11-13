@@ -4687,3 +4687,55 @@ Completes what #121 started: all bay management is in TOS now.
   **@Jcbllanto16: this edits your `rules.html`/Bays tab - please review.**
 
 ---
+
+### 129. Masterlist fields on `vehicles`, and the gates that were missing (migration 202611131000, 13 Nov)
+
+The vehicle masterlist's **"Database- City Provl"** sheet carries five
+fields `vehicles` had nowhere to put. All five are now nullable text
+columns, backfilled by plate for **1,830 of 1,832** vehicles:
+
+| Column | Populated | What it is |
+|---|---|---|
+| `transport_mode` | 1,830 | PUB (provincial bus), MPUJ / TPUJ (jeepney), MUVE (UV Express) |
+| `province` | 1,816 | province of the destination |
+| `region` | 1,816 | IV-A, NCR, V, … |
+| `cluster` | 1,815 | BICOL, VISMIN, NORTH, LABAZON, MIMAROPA, CAVITEX, AGUINALDO |
+| `document_type` | 1,639 | CPC, CPC & OR/CR, SPECIAL PERMIT, PA, EOV and variants |
+
+`transport_mode` is the genuinely new fact - nothing in the app
+distinguished a provincial bus from a jeepney or UV Express before. The
+sheet's **CITY cluster (1,203 commuter rows) is deliberately excluded**:
+this module schedules provincial trips, so no vehicle carries
+`cluster = 'CITY'`. The columns are plain text with no CHECK - the sheet
+is hand-maintained and still contains a cluster of `0` and one of
+`are th`, which are read as null.
+
+**43 destinations gained a gate.** The importer only reads the Database
+sheet's own `Gate Assignment` column, which 40 of its 94 destinations
+leave blank - so `route_gates` had 88 rows and a re-import would have
+left those 40 with no gate at all. The workbook already had the answer in
+two sheets the importer ignores: **"Route Database"** names the gate
+outright for 35 of them, and the **"Bay"** sheet's cluster-to-gate map
+covers 4 more via City Provl's `CLUSTER` (CAVITEX and AGUINALDO are
+Cavite, so Gate 2). `route_gates` is now **131 rows**, and `ROUTE_GATES`
+in `assets/app.js` was regenerated to match.
+
+Ten of the 43 fix destinations vehicles use *today*; the rest match the
+shortened destination names the workbook has since moved to (`STA. CRUZ,
+LAGUNA` → `STA. CRUZ`, `RAWIS, LAOANG` → `LAOANG`), so they are in place
+before the next masterlist import rather than after it.
+
+Two live destinations still have no gate: **ALABANG**, whose only cluster
+is CITY, and **SAN JOSE**, ambiguous between Occidental Mindoro, Nueva
+Ecija and Dinagat Islands. The workbook's `0` destination is a data
+error, not a place.
+
+`ROUTES` is untouched - this change adds no bookable destination. Also
+unchanged: `ltfrb_status`, which the masterlist could fill from its
+`LTFRB UNIT STATUS` column but which stays null on all 1,832 rows for
+now, because populating it would immediately make 210 INACTIVE and 43
+NO RECORD units unbookable (`vehicle_matches_route` callers accept only
+null / `active` / `ltfrb_verified`). That is a decision, not a side
+effect of an import.
+
+---
