@@ -1249,6 +1249,12 @@
             v.status === "approved" &&
             (v.ltfrb_status === "inactive" || v.ltfrb_status === "no_record")
         );
+        // Kept separate from the two above: a duplicate is LTFRB holding the
+        // same unit twice, which the operator resolves with LTFRB rather
+        // than by renewing anything here.
+        const hasDuplicateLtfrb = data.some(
+          (v) => v.status === "approved" && v.ltfrb_status === "duplicate"
+        );
 
         host.innerHTML = `
           ${
@@ -1257,6 +1263,15 @@
                   <strong>Inactive</strong> or <strong>No Record</strong> at LTFRB and
                   won't appear in the booking form's plate list until that's
                   resolved - contact PITX staff if this looks wrong.</p>`
+              : ""
+          }
+          ${
+            hasDuplicateLtfrb
+              ? `<p class="hint">One or more approved vehicles below are marked
+                  <strong>Duplicate</strong> at LTFRB - the same unit appears twice on
+                  the masterlist. They won't appear in the booking form's plate list
+                  until LTFRB's record is corrected. Contact PITX staff with the
+                  unit's OR/CR so the duplicate can be raised with LTFRB.</p>`
               : ""
           }
           ${

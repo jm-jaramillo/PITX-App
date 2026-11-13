@@ -503,6 +503,9 @@ const LTFRB_STATUS_LABELS = {
   inactive: "Inactive",
   no_record: "No Record",
   ltfrb_verified: "LTFRB Verified",
+  // LTFRB holds this unit twice. Not bookable - every eligibility rule
+  // allows only null / active / ltfrb_verified (migration 202611131400).
+  duplicate: "Duplicate",
 };
 
 // Only set on vehicles that came from the masterlist import (migration

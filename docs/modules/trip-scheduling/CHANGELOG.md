@@ -4829,3 +4829,42 @@ values come from a workbook rather than the repo, so this is a data load
 like the #129 backfill rather than a schema change.
 
 ---
+
+### 133. `duplicate` LTFRB status: flagged to the operator, never bookable (migration 202611131400, 13 Nov)
+
+The masterlist's `LTFRB UNIT STATUS` has a fifth value the schema had no
+room for - **DUPLICATE**, meaning LTFRB holds the same unit twice. #132
+loaded the other four and left these null, which reads as *bookable* -
+the opposite of what a duplicate record should be.
+
+`vehicles_ltfrb_status_check` now allows `duplicate`. **No booking rule
+changed**: all 24 places that decide eligibility are allow-lists of
+null / `active` / `ltfrb_verified` - there is no deny-list anywhere in
+the migrations or the client - so `duplicate` is refused everywhere the
+moment it becomes a legal value.
+
+Flagged to the operator rather than silently dropped:
+
+- `ltfrbBadge()` labels it **Duplicate**, styled amber like *No Record*.
+  Both mean LTFRB's record needs fixing before the unit can run, as
+  against *Inactive*, which is simply out of service.
+- **Vehicles** (operator) gets its own notice, separate from the
+  inactive/no-record one, because the fix is different: the operator
+  resolves a duplicate with LTFRB, not by renewing anything in the app.
+  It names the next step - bring the unit's OR/CR to PITX staff.
+- **Vehicles (staff)** can set it from the Edit vehicle dialog.
+
+Nothing is set to `duplicate` yet: the only two rows the masterlist
+flags are CITY-cluster commuter units this module does not carry (#129).
+This puts the status in place for them and for any future one.
+
+Verified by temporarily setting a unit that was already `no_record` - so
+its bookability never changed - confirming the constraint accepts the
+value and the badge renders amber, then reverting it. Counts before and
+after are identical: 1,699 active / 88 inactive / 24 no_record / 19
+ltfrb_verified / 2 null.
+
+**@Jcbllanto16: this adds a `.badge-duplicate` rule to `docs/shared/`
+(shared, co-owned) - additive only, no existing selector changed.**
+
+---

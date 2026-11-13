@@ -3,6 +3,15 @@
 Changes to `docs/shared/`, `supabase/functions/` and `core` migrations.
 Newest first. Owners: @jm-jaramillo @Jcbllanto16 @victoriaronald
 
+## 2026-11-13 - `.badge-duplicate` for the fifth LTFRB status (@jm-jaramillo)
+- `styles.css`: new `.badge-duplicate`, added alongside the existing `.badge-no_record`
+  rules in both badge blocks so it inherits the same amber. Additive only - no existing
+  selector changed, and nothing outside Trip Scheduling renders it today.
+- Why amber rather than neutral: `duplicate` and `no_record` both mean LTFRB's record
+  needs fixing before a unit can run, as against `inactive`, which is simply out of
+  service. See Trip Scheduling CHANGELOG 133 and migration
+  `202611131400_trip-scheduling_ltfrb_status_duplicate.sql`.
+
 ## 2026-11-11 - `supabase/functions/tos-device` Edge Function (@Jcbllanto16)
 - New Edge Function `tos-device` (deployed 3 Nov, `verify_jwt = false`). This is
   the endpoint that gate cameras, barriers and the gate controller call. It

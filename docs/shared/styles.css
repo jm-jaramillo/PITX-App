@@ -968,8 +968,11 @@ td strong,
 }
 
 /* LTFRB status from the masterlist import (docs/vehicles-database.html,
-   docs/vehicles.html) - active/inactive reuse the badges above, these two
-   cover the masterlist's other statuses. */
+   docs/vehicles.html) - active/inactive reuse the badges above, these
+   cover the masterlist's other statuses. `duplicate` shares no_record's
+   amber: both mean LTFRB's record needs fixing before the unit can be
+   booked, as opposed to inactive, which is simply out of service. */
+.badge-duplicate,
 .badge-no_record {
   background: var(--amber-wash);
   color: var(--amber-ink);
@@ -2503,6 +2506,7 @@ td button:active,
   text-transform: uppercase;
 }
 .badge-pending,
+.badge-duplicate,
 .badge-no_record {
   background: var(--amber-wash);
   border-color: var(--amber-br);
