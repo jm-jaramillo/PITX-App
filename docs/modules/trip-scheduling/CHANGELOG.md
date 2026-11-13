@@ -4785,3 +4785,47 @@ trips keep the plate they were booked with. An empty LTFRB status stays empty.
 Verified as staff: an edit saved, status unchanged, test value reverted.
 
 ---
+
+### 132. LTFRB unit status loaded from the masterlist (13 Nov)
+
+`vehicles.ltfrb_status` has existed since migration 0021 but was null on
+all 1,832 rows, so it never gated anything. It is now filled from the
+masterlist's **"Database- City Provl"** sheet `LTFRB UNIT STATUS`
+column, matched by plate, with the CITY cluster excluded as in #129:
+
+| Sheet value | Stored as | Units | Bookable |
+|---|---|---|---|
+| ACTIVE | `active` | 1,699 | yes |
+| LTFRB VERIFIED | `ltfrb_verified` | 19 | yes |
+| INACTIVE | `inactive` | 88 | **no** |
+| NO RECORD | `no_record` | 24 | **no** |
+| (no non-CITY row) | stays null | 2 | yes |
+
+**112 units are now unbookable**, all of them previously `approved`.
+Every caller of the eligibility rule - `vehicle_matches_route()` in
+`bookings_insert_own`, `request_booking_change()`,
+`staff_reassign_operator` and the admin booking RPCs - accepts only
+null, `active` or `ltfrb_verified`, so this takes effect everywhere at
+once with no code change.
+
+This was applied deliberately, not as a side effect of an import. Two
+things were checked first:
+
+- **No existing booking breaks.** Of the 16 bookings dated today or
+  later and not cancelled/rejected, none is on an affected unit. The
+  change blocks new bookings only; nothing in the schedule is orphaned.
+- **No operator loses its whole fleet.** The 112 are spread over 20
+  operators, the worst hit being Penafrancia (22 of 63), Bicol Isarog
+  (14 of 85) and Elavil Tours (11 of 55). Smallest fleets affected are
+  Tabaco Women's and Ma Victoria at 4 of 6 each.
+
+`DUPLICATE`, which the full sheet uses twice and which the
+`vehicles_ltfrb_status_check` constraint would reject, occurs only on
+CITY-cluster rows and so never reaches the table. The two units with no
+non-CITY row (AAB's TXZ296/TXZ294) stay null, which reads as bookable.
+
+No migration: the column and its constraint already existed, and the
+values come from a workbook rather than the repo, so this is a data load
+like the #129 backfill rather than a schema change.
+
+---
