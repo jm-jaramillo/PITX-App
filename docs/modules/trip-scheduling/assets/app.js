@@ -622,3 +622,40 @@ export function applyVehicleHighlightFromQuery(openDetails) {
   openDetails(vehicleId);
 }
 
+
+/* ---------------------------------------------------------- table fit */
+
+// Tables in Trip Scheduling fit the page width instead of scrolling sideways:
+// cells wrap (long operator and route names break onto a second line) and the
+// padding and type are a little tighter. A table with many columns switched on
+// (Vehicles' Columns panel) tightens further. Below 640px the shared
+// stylesheet already turns tables into stacked cards, so this only applies
+// above it. The weekly schedule matrix has its own fixed layout and is left
+// alone. Injected here, not in shared/styles.css, so other modules' tables are
+// untouched.
+(function injectTableFitStyles() {
+  if (typeof document === "undefined" || document.getElementById("ts-table-fit")) return;
+  const style = document.createElement("style");
+  style.id = "ts-table-fit";
+  style.textContent = `
+@media (min-width: 641px) {
+  .table-wrap table:not(.week-matrix) { table-layout: auto; width: 100%; }
+  .table-wrap table:not(.week-matrix) th,
+  .table-wrap table:not(.week-matrix) td {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    padding: 8px 10px;
+  }
+  .table-wrap table:not(.week-matrix) th { font-size: 10.5px; letter-spacing: 0.3px; }
+  .table-wrap table:not(.week-matrix) td { font-size: 12.5px; line-height: 1.35; }
+  /* controls and badges keep their shape */
+  .table-wrap td button, .table-wrap td .btn-link, .table-wrap td .badge,
+  .table-wrap td .status-badge, .table-wrap td select { white-space: nowrap; }
+  .table-wrap td select { max-width: 100%; }
+  /* many columns switched on: tighter again */
+  .table-wrap table:not(.week-matrix):has(th:nth-child(11)) th,
+  .table-wrap table:not(.week-matrix):has(th:nth-child(11)) td { padding: 6px 5px; font-size: 11px; }
+  .table-wrap table:not(.week-matrix):has(th:nth-child(11)) th { font-size: 9.5px; letter-spacing: 0; }
+}`;
+  document.head.appendChild(style);
+})();

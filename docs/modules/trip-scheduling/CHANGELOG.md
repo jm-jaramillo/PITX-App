@@ -4868,3 +4868,20 @@ ltfrb_verified / 2 null.
 (shared, co-owned) - additive only, no existing selector changed.**
 
 ---
+
+### 134. Tables fit the page width, no sideways scrolling (13 Nov)
+
+Every table in Trip Scheduling (Approvals, Vehicles for staff, My vehicles for
+operators, Schedule, profiles, accounts...) now fits the width of the page: cells
+wrap instead of staying on one line, so a long operator or route name breaks onto
+a second line, and padding and type are slightly tighter. A table with many columns
+switched on in the Columns panel tightens further. Below 640px it is still the
+stacked-card layout. The weekly schedule matrix keeps its own layout. Injected from
+`assets/app.js` (Trip Scheduling's own file), so TOS and Ticketing tables are not
+affected.
+Measured at 1280px: staff Vehicles went from 1507px of table in a 969px box (scrolling)
+to 969/969 with the default columns and with all 25 columns on; operator My vehicles
+with all columns on fits at 1280 and 1100px. The Approvals tables use the same rule;
+their pending lists were empty when I measured, so those were not measured directly.
+
+---
