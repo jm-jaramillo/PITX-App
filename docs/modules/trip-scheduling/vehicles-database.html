@@ -212,8 +212,53 @@
       <h2 class="dialog-title" id="details-title"></h2>
       <div id="details-body"></div>
       <div class="dialog-actions">
+        <button type="button" class="btn-primary" id="details-edit">Edit vehicle</button>
         <button type="button" class="btn-outline" id="details-close">Close</button>
       </div>
+    </dialog>
+
+    <!-- --------------------------------------------------- edit dialog -->
+    <dialog class="details-dialog" id="edit-dialog">
+      <form id="edit-form" data-live-hold>
+        <h2 class="dialog-title" id="edit-title">Edit vehicle</h2>
+        <p class="subtle" id="edit-context"></p>
+        <div class="dialog-grid">
+          <div class="field"><label for="ev_plate_no">Plate No. <span class="req">*</span></label><input id="ev_plate_no" required /></div>
+          <div class="field"><label for="ev_route">Destination (route)</label><select id="ev_route"></select></div>
+          <div class="field"><label for="ev_body_number">Body Number</label><input id="ev_body_number" /></div>
+          <div class="field"><label for="ev_trade_name">Trade Name</label><input id="ev_trade_name" /></div>
+
+          <p class="field-group-heading span-all">Vehicle details</p>
+          <div class="field"><label for="ev_mv_file_number">MV File #</label><input id="ev_mv_file_number" /></div>
+          <div class="field"><label for="ev_chassis_no">Chassis No.</label><input id="ev_chassis_no" /></div>
+          <div class="field"><label for="ev_vehicle_year">Year</label><input id="ev_vehicle_year" type="number" min="1950" max="2100" /></div>
+          <div class="field"><label for="ev_vehicle_make">Make</label><input id="ev_vehicle_make" /></div>
+          <div class="field"><label for="ev_bus_type">Bus Type</label>
+            <select id="ev_bus_type"><option value="">&mdash;</option><option value="ordinary">Ordinary</option><option value="aircon">Aircon</option><option value="deluxe">Deluxe</option><option value="luxury">Luxury</option></select></div>
+          <div class="field"><label for="ev_seating_capacity">Seating capacity</label><input id="ev_seating_capacity" type="number" min="1" /></div>
+          <div class="field"><label for="ev_seat_type">Seat configuration</label>
+            <select id="ev_seat_type"><option value="">&mdash;</option><option value="1x1">1x1</option><option value="2x2">2x2</option><option value="2x3">2x3</option><option value="1x3">1x3</option></select></div>
+
+          <p class="field-group-heading span-all">LTFRB franchise details</p>
+          <div class="field"><label for="ev_case_number">Case No.</label><input id="ev_case_number" /></div>
+          <div class="field"><label for="ev_franchise">Franchise</label><input id="ev_franchise" /></div>
+          <div class="field"><label for="ev_sticker_no">Sticker No.</label><input id="ev_sticker_no" /></div>
+          <div class="field"><label for="ev_ltfrb_status">LTFRB status</label>
+            <select id="ev_ltfrb_status"><option value="">&mdash;</option><option value="active">Active</option><option value="ltfrb_verified">LTFRB verified</option><option value="inactive">Inactive</option><option value="no_record">No record</option></select></div>
+          <div class="field"><label for="ev_cpc_validity">CPC validity</label><input id="ev_cpc_validity" type="date" /></div>
+          <div class="field"><label for="ev_orcr_validity">OR/CR validity</label><input id="ev_orcr_validity" type="date" /></div>
+          <div class="field"><label for="ev_cpc_eov">CPC Extension of Validity?</label>
+            <select id="ev_cpc_eov"><option value="false">No</option><option value="true">Yes</option></select></div>
+          <div class="field" id="ev_cpc_eov_validity_field"><label for="ev_cpc_eov_validity">EOV validity date</label><input id="ev_cpc_eov_validity" type="date" /></div>
+          <div class="field span-all"><label for="ev_remarks">Remarks</label><input id="ev_remarks" /></div>
+        </div>
+        <p class="fineprint">Saved immediately - the vehicle's approval status is not changed. Trips already booked keep the plate they were booked with.</p>
+        <p class="inline-error hidden" id="edit-error"></p>
+        <div class="dialog-actions">
+          <button type="button" class="btn-outline" id="edit-cancel">Cancel</button>
+          <button type="submit" class="btn-primary" id="edit-save">Save vehicle</button>
+        </div>
+      </form>
     </dialog>
 
     <script type="module">
@@ -229,6 +274,7 @@
         vehicleDetailsHtml,
         applyVehicleHighlightFromQuery,
         escapeHtml,
+        ROUTES,
         downloadCsv,
       } from "./assets/app.js";
 
@@ -501,15 +547,109 @@
 
       /* -------------------------------------------------- details dialog */
 
+      let detailsVehicleId = null;
+
       function initDetailsDialog() {
         document
           .getElementById("details-close")
           .addEventListener("click", () => document.getElementById("details-dialog").close());
+        document.getElementById("details-edit").addEventListener("click", openEdit);
+        document
+          .getElementById("edit-cancel")
+          .addEventListener("click", () => document.getElementById("edit-dialog").close());
+        document.getElementById("edit-form").addEventListener("submit", saveEdit);
+        document.getElementById("ev_cpc_eov").addEventListener("change", syncEovField);
+      }
+
+      /* ---- staff edit: the vehicle's own fields, saved straight away
+         (vehicles_staff_update policy). Status is left alone - approving or
+         rejecting stays in Approvals. */
+      const TEXT_FIELDS = ["plate_no", "body_number", "trade_name", "mv_file_number", "chassis_no", "vehicle_make",
+        "case_number", "franchise", "sticker_no", "remarks"];
+      const DATE_FIELDS = ["cpc_validity", "orcr_validity"];
+
+      function syncEovField() {
+        document
+          .getElementById("ev_cpc_eov_validity_field")
+          .classList.toggle("hidden", document.getElementById("ev_cpc_eov").value !== "true");
+      }
+
+      function openEdit() {
+        const v = vehiclesById.get(detailsVehicleId);
+        if (!v) return;
+        const operatorLabel = v.profiles?.operator_name || v.profiles?.username || "";
+        document.getElementById("edit-title").textContent = "Edit vehicle - " + v.plate_no;
+        document.getElementById("edit-context").textContent = operatorLabel;
+        for (const f of TEXT_FIELDS) document.getElementById("ev_" + f).value = v[f] ?? "";
+        for (const f of DATE_FIELDS) document.getElementById("ev_" + f).value = v[f] ?? "";
+        document.getElementById("ev_vehicle_year").value = v.vehicle_year ?? "";
+        document.getElementById("ev_seating_capacity").value = v.seating_capacity ?? "";
+        document.getElementById("ev_bus_type").value = v.bus_type ?? "";
+        document.getElementById("ev_seat_type").value = v.seat_type ?? "";
+        document.getElementById("ev_ltfrb_status").value = v.ltfrb_status ?? "";
+        document.getElementById("ev_cpc_eov").value = v.cpc_eov ? "true" : "false";
+        document.getElementById("ev_cpc_eov_validity").value = v.cpc_eov_validity ?? "";
+        const current = v.route ?? "";
+        document.getElementById("ev_route").innerHTML =
+          `<option value="">&mdash;</option>` +
+          (current && !ROUTES.includes(current)
+            ? `<option value="${escapeHtml(current)}" selected>${escapeHtml(current)}</option>`
+            : "") +
+          ROUTES.map(
+            (r) => `<option value="${escapeHtml(r)}"${r === current ? " selected" : ""}>${escapeHtml(r)}</option>`
+          ).join("");
+        syncEovField();
+        showMessage("edit-error", "");
+        document.getElementById("details-dialog").close();
+        document.getElementById("edit-dialog").showModal();
+      }
+
+      async function saveEdit(event) {
+        event.preventDefault();
+        showMessage("edit-error", "");
+        const v = vehiclesById.get(detailsVehicleId);
+        if (!v) return;
+        const val = (id) => document.getElementById("ev_" + id).value.trim();
+        const changes = {};
+        for (const f of TEXT_FIELDS) changes[f] = val(f) || null;
+        if (!changes.plate_no) return showMessage("edit-error", "Plate No. is required.");
+        for (const f of DATE_FIELDS) changes[f] = val(f) || null;
+        changes.route = val("route") || null;
+        changes.vehicle_year = val("vehicle_year") ? Number(val("vehicle_year")) : null;
+        changes.seating_capacity = val("seating_capacity") ? Number(val("seating_capacity")) : null;
+        changes.bus_type = val("bus_type") || null;
+        changes.seat_type = val("seat_type") || null;
+        changes.ltfrb_status = val("ltfrb_status") || null;
+        changes.cpc_eov = val("cpc_eov") === "true";
+        changes.cpc_eov_validity = changes.cpc_eov ? val("cpc_eov_validity") || null : null;
+        if (changes.cpc_eov && !changes.cpc_eov_validity) {
+          return showMessage("edit-error", "Enter the EOV validity date, or set Extension of Validity to No.");
+        }
+
+        const saveBtn = document.getElementById("edit-save");
+        saveBtn.disabled = true;
+        const { data, error } = await supabase
+          .from("vehicles")
+          .update(changes)
+          .eq("id", v.id)
+          .select("id");
+        saveBtn.disabled = false;
+        if (error) {
+          return showMessage(
+            "edit-error",
+            error.code === "23505" ? "This operator already has a vehicle with that plate number." : error.message
+          );
+        }
+        if (!data?.length) return showMessage("edit-error", "Nothing was saved - you may not have permission.");
+        document.getElementById("edit-dialog").close();
+        showMessage("message", "Vehicle updated.", "ok");
+        await load();
       }
 
       async function openDetails(vehicleId) {
         const v = vehiclesById.get(vehicleId);
         if (!v) return;
+        detailsVehicleId = vehicleId;
 
         const operatorLabel = v.profiles?.operator_name || v.profiles?.username || "—";
         document.getElementById("details-title").textContent = v.plate_no;

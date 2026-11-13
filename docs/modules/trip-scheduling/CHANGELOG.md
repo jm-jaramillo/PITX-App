@@ -4739,3 +4739,49 @@ null / `active` / `ltfrb_verified`). That is a decision, not a side
 effect of an import.
 
 ---
+
+### 130. The masterlist import can no longer wipe a gate (13 Nov)
+
+#129 filled `route_gates` from the workbook's "Route Database" and "Bay"
+sheets, but `import-vehicle-masterlist.mjs` still rebuilt that table from
+the Database sheet's `Gate Assignment` column alone - so the next
+`--apply` would have deleted all 43 rows and put coverage back to 54 of
+94 destinations. The importer now resolves a gate in four steps, each
+filling only what the step before left blank:
+
+| Step | Source | Gates on the current workbook |
+|---|---|---|
+| 1 | Database sheet's own `Gate Assignment` | 54 |
+| 2 | **Route Database** sheet, by `ROUTE` | 35 |
+| 3 | **Database- City Provl** `CLUSTER`, mapped as the **Bay** sheet groups them | 4 |
+| 4 | rows already in `public.route_gates` | the rest, carried over |
+
+**93 of 94** destinations now get a gate, against 54 before. The one
+without is the workbook's `0` destination, which is a typo rather than a
+place. `CITY` cluster rows are skipped in step 3 - commuter units, not
+this module's traffic.
+
+Step 4 is the actual fix: because every existing `route_gates` row is
+read in and carried through, the `delete`/`insert` that rewrites the
+table can only add routes, never drop one. Verified against the live
+table and the current workbook - 131 rows in, 131 out, none lost and none
+changed.
+
+`gateNo()` also normalises what the sheets hold: they variously record a
+gate as `4`, `"4"` or `"Gate 4"`, and all three now land as `Gate 4`.
+
+---
+
+### 129. Staff can edit the vehicle list (13 Nov)
+
+Vehicles (staff) -> open a vehicle -> **Edit vehicle**: plate, destination (route),
+body number, trade name, MV file #, chassis, year, make, bus type, seating, seat
+configuration, case no., franchise, sticker, LTFRB status, CPC / OR-CR validity,
+CPC extension of validity (+ date) and remarks. Saved straight away through the
+existing `vehicles_staff_update` policy (no new database change); the vehicle's
+approval status is never changed here (approve/reject stays in Approvals). A
+duplicate plate for the same operator is refused with a clear message. Existing
+trips keep the plate they were booked with. An empty LTFRB status stays empty.
+Verified as staff: an edit saved, status unchanged, test value reverted.
+
+---

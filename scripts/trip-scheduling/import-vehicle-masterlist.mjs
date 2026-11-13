@@ -3,9 +3,21 @@
  * Reset the vehicles table from the PITX "Vehicle Masterlist Database"
  * workbook and regenerate the route list that drives trip scheduling.
  *
- * Only the workbook's **Database** sheet is read - the other sheets
- * (Destination List, Bay, Operator and Trade) are working notes, not the
- * source of truth.
+ * Vehicles come from the workbook's **Database** sheet alone - it is the
+ * source of truth for the fleet, and the other sheets are working notes.
+ *
+ * Gates are the exception. The Database sheet leaves `Gate Assignment`
+ * blank for roughly half its destinations, so a gate is resolved in four
+ * steps, each only filling what the one before it left empty:
+ *
+ *   1. the Database sheet's own `Gate Assignment`   (authoritative)
+ *   2. the "Route Database" sheet, which names the gate per ROUTE
+ *   3. the "Database- City Provl" sheet's CLUSTER, mapped to a gate
+ *   4. whatever `public.route_gates` already holds
+ *
+ * Step 4 is what stops a re-import from silently dropping gates that were
+ * set by hand or by an earlier migration: route_gates is only ever added
+ * to, never reduced, by this script (see #129).
  *
  * Route model: `Destination` is the route. Every vehicle's `route` is set
  * to its own `Destination`, so the existing "a vehicle can only be used
@@ -48,6 +60,12 @@ const text = (v) => {
 };
 /** Excel serial date -> YYYY-MM-DD. The workbook stores every date as a
  *  number; day 0 is 1899-12-30 (Excel's 1900 leap-year bug included). */
+/** "4" / 4 / "Gate 4" -> "Gate 4"; blank -> null. */
+const gateNo = (v) => {
+  const s = text(v);
+  if (!s) return null;
+  return /^gate\b/i.test(s) ? s.replace(/^gate\s*/i, "Gate ") : `Gate ${s}`;
+};
 const serialDate = (v) => {
   if (typeof v !== "number" || !Number.isFinite(v)) return null;
   return new Date(Date.UTC(1899, 11, 30) + v * 86400000).toISOString().slice(0, 10);
@@ -59,6 +77,14 @@ if (!wb.SheetNames.includes("Database")) {
   process.exit(1);
 }
 const raw = XLSX.utils.sheet_to_json(wb.Sheets["Database"], { defval: null, raw: true });
+// Optional helper sheets - only used to fill in gates the Database sheet
+// leaves blank. A workbook without them still imports.
+const sheet = (name) =>
+  wb.SheetNames.includes(name)
+    ? XLSX.utils.sheet_to_json(wb.Sheets[name], { defval: null, raw: true })
+    : [];
+const routeDbSheet = sheet("Route Database");
+const cityProvlSheet = sheet("Database- City Provl");
 
 const client = new pg.Client({
   connectionString: process.env.DATABASE_URL,
@@ -70,6 +96,7 @@ const { rows: profiles } = await client.query(
   "select id, username, operator_name from public.profiles where role = 'operator'"
 );
 const { rows: existing } = await client.query("select plate_no, operator_id from public.vehicles");
+const { rows: existingGates } = await client.query("select route, gate from public.route_gates");
 const plateOwner = new Map(existing.map((r) => [normPlate(r.plate_no), r.operator_id]));
 
 /* ------------------------------------------------ operator resolution */
@@ -201,13 +228,61 @@ const list = [...vehicles.values()];
 
 /* ------------------------------------------------------- routes + gates */
 
+/* PITX runs its provincial gates by cluster, and the "Bay" sheet maps the
+ * three clusters to their gates. The City Provl sheet spells a cluster out
+ * more finely than the Bay sheet labels it, so the mapping is written out
+ * rather than parsed: CAVITEX and AGUINALDO are Cavite, which boards at
+ * the same gate as Laguna/Batangas/Mindoro. CITY is deliberately absent -
+ * those are commuter units and this module schedules provincial trips. */
+const CLUSTER_GATE = {
+  BICOL: "Gate 4",
+  VISMIN: "Gate 4",
+  NORTH: "Gate 5",
+  LABAZON: "Gate 2",
+  MIMAROPA: "Gate 2",
+  CAVITEX: "Gate 2",
+  AGUINALDO: "Gate 2",
+};
+
 const gateByDest = new Map();
-for (const r of raw) {
-  const d = text(r["Destination"]);
-  if (!d) continue;
-  const g = text(r["Gate Assignment"]);
-  if (g && !gateByDest.has(d)) gateByDest.set(d, `Gate ${g}`);
+const gateSource = new Map();
+const setGate = (d, g, src) => {
+  if (!d || !g || gateByDest.has(d)) return;
+  gateByDest.set(d, g);
+  gateSource.set(d, src);
+};
+
+// 1. the Database sheet's own column
+for (const r of raw) setGate(text(r["Destination"]), gateNo(r["Gate Assignment"]), "Database");
+
+// 2. the Route Database sheet, keyed by route name
+const routeDbGate = new Map();
+for (const r of routeDbSheet) {
+  const d = text(r["ROUTE"]);
+  const g = gateNo(r["Gate Assignment"] ?? r["GATE ASSIGNMENT"]);
+  if (d && g && !routeDbGate.has(d)) routeDbGate.set(d, g);
 }
+
+// 3. the City Provl sheet's cluster. CITY rows are skipped outright.
+const clusterByDest = new Map();
+for (const r of cityProvlSheet) {
+  const d = text(r["DESTINATION"]);
+  const c = text(r["CLUSTER"]);
+  if (!d || !c) continue;
+  const key = c.toUpperCase();
+  if (key === "CITY" || clusterByDest.has(d)) continue;
+  clusterByDest.set(d, key);
+}
+
+for (const d of new Set(raw.map((r) => text(r["Destination"])).filter(Boolean))) {
+  setGate(d, routeDbGate.get(d), "Route Database");
+  setGate(d, CLUSTER_GATE[clusterByDest.get(d)], `cluster ${clusterByDest.get(d)}`);
+}
+
+// 4. anything already in route_gates that the workbook could not answer,
+//    including routes this workbook no longer lists - those rows are kept
+//    rather than deleted, so an import never loses a gate.
+for (const { route, gate } of existingGates) setGate(route, gate, "route_gates (kept)");
 const routes = [...new Set(raw.map((r) => text(r["Destination"])).filter(Boolean))].sort();
 
 // Three-letter trip-number prefix per route, uniquified with a digit when
@@ -243,7 +318,20 @@ console.log(`  skipped, no operator match: ${skippedNoOperator}`);
 console.log(`  duplicate rows collapsed:   ${deduped}`);
 console.log(`  "EOV Yes" without a date:   ${eovDowngraded} (recorded as no extension)`);
 console.log(`Routes (distinct destinations): ${routes.length}`);
-console.log(`  with a gate: ${gateByDest.size} | without: ${routes.length - gateByDest.size}`);
+const withGate = routes.filter((r) => gateByDest.has(r)).length;
+console.log(`  with a gate: ${withGate} | without: ${routes.length - withGate}`);
+const bySource = {};
+for (const r of routes) {
+  if (!gateByDest.has(r)) continue;
+  const k = gateSource.get(r) ?? "?";
+  bySource[k] = (bySource[k] ?? 0) + 1;
+}
+for (const [k, n] of Object.entries(bySource).sort((a, b) => b[1] - a[1]))
+  console.log(`      ${String(n).padStart(4)} from ${k}`);
+const noGate = routes.filter((r) => !gateByDest.has(r));
+if (noGate.length) console.log(`  no gate from any source: ${noGate.join(", ")}`);
+const carried = [...gateByDest.keys()].filter((r) => !routes.includes(r)).length;
+console.log(`  route_gates rows carried over for routes not in this workbook: ${carried}`);
 
 const accountsWithVehicles = new Set(list.map((v) => v.operator_id)).size;
 console.log(`Operator accounts receiving vehicles: ${accountsWithVehicles} / ${profiles.length}`);
@@ -309,7 +397,9 @@ try {
   console.log(`Rewrote route_trip_codes: ${codes.size} routes.`);
 
   // Same source as ROUTE_GATES in app.js; the database needs it too, to
-  // enforce gate-wide booking transfers (migration 0050).
+  // enforce gate-wide booking transfers (migration 0050). gateByDest already
+  // contains every row that was in route_gates before (resolver step 4), so
+  // this rewrite can only add routes, never drop one.
   await client.query("delete from public.route_gates");
   for (const [route, gate] of gateByDest) {
     await client.query("insert into public.route_gates (route, gate) values ($1,$2)", [route, gate]);

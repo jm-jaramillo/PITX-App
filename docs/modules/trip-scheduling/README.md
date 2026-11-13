@@ -256,10 +256,28 @@ scripts - the site itself has no dependencies to install.
 
 A route **is** a destination. The list of bookable destinations, each
 destination's gate, and every operator's fleet all come from one file -
-the PITX *Vehicle Masterlist Database* workbook - and specifically from
-its **Database** sheet only. The workbook's other sheets (Destination
-List, Bay, Operator and Trade) are working notes and are deliberately
-ignored.
+the PITX *Vehicle Masterlist Database* workbook. The fleet and the route
+list come from its **Database** sheet alone; the other sheets are working
+notes and are not a source of truth for vehicles.
+
+**Gates are the one exception.** The Database sheet leaves `Gate
+Assignment` blank for roughly half its destinations, so the importer
+fills the rest in from the workbook's own working notes and from what the
+database already knows, in this order:
+
+1. the Database sheet's `Gate Assignment` (authoritative)
+2. the **Route Database** sheet, which names a gate per `ROUTE`
+3. the **Database- City Provl** sheet's `CLUSTER`, mapped to a gate the
+   way the **Bay** sheet groups them - CAVITEX and AGUINALDO are Cavite,
+   so Gate 2. Its `CITY` cluster is skipped: those are commuter units and
+   this module schedules provincial trips
+4. whatever `public.route_gates` already holds
+
+Step 4 is why a re-import cannot lose a gate: every row already in
+`route_gates` is carried through, so the table is only ever added to
+(#129, #130). On the current workbook this takes gate coverage from 54 of
+94 destinations to 93 - the only one left is a `0` that is a typo in the
+sheet, not a place.
 
 | Workbook column | Where it lands |
 |---|---|
