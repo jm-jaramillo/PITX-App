@@ -4772,7 +4772,7 @@ gate as `4`, `"4"` or `"Gate 4"`, and all three now land as `Gate 4`.
 
 ---
 
-### 129. Staff can edit the vehicle list (13 Nov)
+### 131. Staff can edit the vehicle list (13 Nov)
 
 Vehicles (staff) -> open a vehicle -> **Edit vehicle**: plate, destination (route),
 body number, trade name, MV file #, chassis, year, make, bus type, seating, seat
