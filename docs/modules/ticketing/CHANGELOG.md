@@ -37,6 +37,22 @@ sections 2 and 3).
 
 ---
 
+## 30 · Sidebar grouped, "Tickets Sold" (16 Nov)
+
+"Tickets" is now **Tickets Sold**, so it doesn't get mixed up with Ticket Availability. The sidebar is also grouped by task, so the PITX Admin's 12 links read as short lists.
+
+| Group | Pages (each role still sees only its own) |
+|---|---|
+| (top) | Overview, Book a Trip (Passenger) |
+| Selling | POS Ticketing, Tickets Sold, Close Sales, Daily Collection, Approvals |
+| Trips | Daily Trips, Unit Assignment, Ticket Availability |
+| Boarding | Manifest, Queue Count, Gate Test |
+| Admin | Reports, Master Data, System Parameters |
+
+- The Tickets page title changed from "Tickets and Bookings" to "Tickets Sold".
+- No pages were merged or removed, and access per role is unchanged.
+- Fix: late at night, when today's trips have all left, a new passenger's "today" sample booking moves to the next trip, so they still get 5 sample bookings.
+
 ## 29 · Passenger view keeps the sample week on the site (12 Nov)
 
 On the site, Book a Trip had almost no trips and My trips was empty. The demo swaps the sample week for real PITX trips on sign-in, but a passenger account only gets the few trips with a seat map (`list_seat_trips`), and the passenger's sample bookings were dropped with the sample trips.

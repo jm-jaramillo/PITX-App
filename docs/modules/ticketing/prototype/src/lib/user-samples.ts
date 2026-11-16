@@ -158,7 +158,12 @@ function passengerHistory(db: Db, name: string, today: string): Db {
     return t.status === "Reserved" && trip?.status === "Scheduled" && !!trip.busId;
   };
 
-  const todayTrip = first(online.filter((t) => upcoming(t) && tripOf(t.tripId)?.date === today));
+  // Today's trip, or late at night when today's trips have all left, the next one after today.
+  const soonest = (a: (typeof online)[number], b: (typeof online)[number]) =>
+    `${tripOf(a.tripId)?.date}${tripOf(a.tripId)?.time}`.localeCompare(`${tripOf(b.tripId)?.date}${tripOf(b.tripId)?.time}`);
+  const todayTrip =
+    first(online.filter((t) => upcoming(t) && tripOf(t.tripId)?.date === today)) ??
+    first(online.filter((t) => upcoming(t) && (tripOf(t.tripId)?.date ?? "") > today).sort(soonest));
   const boarded = first(online.filter((t) => t.status === "Boarded"));
   const refunded = first(online.filter((t) => t.status === "Voided" && t.refundCategory === "Trip cancelled"));
   // Tomorrow, two seats on one booking.

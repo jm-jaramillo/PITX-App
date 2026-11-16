@@ -8,23 +8,28 @@ import type { Role } from "./types";
 //   Passenger      buys online: holds seats, pays, gets the e-ticket
 const OPS: Role[] = ["Operator Admin", "Teller"];
 
-export const NAV: { href: string; label: string; roles: Role[] }[] = [
+// The sidebar groups pages by what the user is doing, so the PITX Admin's dozen links
+// read as four short lists. A link with no group sits on top.
+export const NAV_GROUPS = ["Selling", "Trips", "Boarding", "Admin"] as const;
+export type NavGroup = (typeof NAV_GROUPS)[number];
+
+export const NAV: { href: string; label: string; roles: Role[]; group?: NavGroup }[] = [
   { href: "/", label: "Overview", roles: [...OPS, "PITX Admin"] },
   { href: "/book", label: "Book a Trip", roles: ["Passenger"] },
-  { href: "/pos", label: "POS Ticketing", roles: OPS },
-  { href: "/tickets", label: "Tickets", roles: [...OPS, "PITX Admin"] },
-  { href: "/availability", label: "Ticket Availability", roles: [...OPS, "PITX Admin"] },
-  { href: "/close", label: "Close Sales", roles: OPS },
-  { href: "/collection", label: "Daily Collection", roles: ["PITX Cashier"] },
-  { href: "/units", label: "Unit Assignment", roles: ["Operator Admin"] },
-  { href: "/manifest", label: "Manifest", roles: [...OPS, "PITX Admin"] },
-  { href: "/approvals", label: "Approvals", roles: ["PITX Admin"] },
-  { href: "/queue", label: "Queue Count", roles: ["PITX Admin"] },
-  { href: "/validate", label: "Gate Test", roles: ["PITX Admin"] },
-  { href: "/trips", label: "Daily Trips", roles: ["PITX Admin"] },
-  { href: "/reports", label: "Reports", roles: ["PITX Admin"] },
-  { href: "/master", label: "Master Data", roles: ["PITX Admin"] },
-  { href: "/settings", label: "System Parameters", roles: ["PITX Admin"] },
+  { href: "/pos", label: "POS Ticketing", roles: OPS, group: "Selling" },
+  { href: "/tickets", label: "Tickets Sold", roles: [...OPS, "PITX Admin"], group: "Selling" },
+  { href: "/close", label: "Close Sales", roles: OPS, group: "Selling" },
+  { href: "/collection", label: "Daily Collection", roles: ["PITX Cashier"], group: "Selling" },
+  { href: "/approvals", label: "Approvals", roles: ["PITX Admin"], group: "Selling" },
+  { href: "/trips", label: "Daily Trips", roles: ["PITX Admin"], group: "Trips" },
+  { href: "/units", label: "Unit Assignment", roles: ["Operator Admin"], group: "Trips" },
+  { href: "/availability", label: "Ticket Availability", roles: [...OPS, "PITX Admin"], group: "Trips" },
+  { href: "/manifest", label: "Manifest", roles: [...OPS, "PITX Admin"], group: "Boarding" },
+  { href: "/queue", label: "Queue Count", roles: ["PITX Admin"], group: "Boarding" },
+  { href: "/validate", label: "Gate Test", roles: ["PITX Admin"], group: "Boarding" },
+  { href: "/reports", label: "Reports", roles: ["PITX Admin"], group: "Admin" },
+  { href: "/master", label: "Master Data", roles: ["PITX Admin"], group: "Admin" },
+  { href: "/settings", label: "System Parameters", roles: ["PITX Admin"], group: "Admin" },
 ];
 
 /** Bus company staff only see their own company's data. */

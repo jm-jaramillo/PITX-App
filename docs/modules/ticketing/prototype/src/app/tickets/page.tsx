@@ -112,7 +112,7 @@ export default function TicketsPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3">
         <PageTitle className="mr-auto" sub="Search or scan a ticket. With a QR reader, scanning a pass opens it.">
-          Tickets and Bookings
+          Tickets Sold
         </PageTitle>
         <label>
           Search or scan

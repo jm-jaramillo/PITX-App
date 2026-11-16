@@ -3,7 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { Fragment, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { CompanyLogo } from "@/components/company-logo";
 import { DemoNotice } from "@/components/page-title";
 import { dateTimeManila } from "@/lib/format";
@@ -11,7 +11,7 @@ import { companyIdForOperator, loadLive } from "@/lib/live";
 import { asset } from "@/lib/paths";
 import { SAMPLE_OPERATORS } from "@/lib/operator-routes";
 import { moduleHomeUrl, onPortalSite, portalUrl, portalUser, type PortalUser } from "@/lib/portal";
-import { canAccess, homeFor, isCompanyRole, NAV, sells } from "@/lib/roles";
+import { canAccess, homeFor, isCompanyRole, NAV, NAV_GROUPS, sells } from "@/lib/roles";
 import { getDb, replaceData, resetDemoData, restoreSampleData, saveRecord, signIn, signOut, useDb, useHydrated } from "@/lib/store";
 import { ROLES, type Db, type Role, type Session } from "@/lib/types";
 import PITX_ICONS from "@/lib/pitx-icons.json";
@@ -326,13 +326,22 @@ function Shell({ children }: { children: ReactNode }) {
               All modules
             </a>
           )}
-          {NAV.filter((item) => item.roles.includes(session.role)).map((item) => {
-            const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+          {[undefined, ...NAV_GROUPS].map((group) => {
+            const items = NAV.filter((item) => item.group === group && item.roles.includes(session.role));
+            if (items.length === 0) return null;
             return (
-              <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined}>
-                <Icon name={NAV_ICONS[item.href] ?? "overview"} />
-                {item.label}
-              </Link>
+              <Fragment key={group ?? "top"}>
+                {group && <p className="sidebar-group">{group}</p>}
+                {items.map((item) => {
+                  const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+                  return (
+                    <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined}>
+                      <Icon name={NAV_ICONS[item.href] ?? "overview"} />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </Fragment>
             );
           })}
         </nav>
