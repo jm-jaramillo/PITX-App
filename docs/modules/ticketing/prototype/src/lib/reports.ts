@@ -1,3 +1,4 @@
+import { routeGroupOf } from "./places";
 import type { Db, Ticket } from "./types";
 
 export interface ShiftRemittance {
@@ -18,6 +19,18 @@ const manilaDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" })
 
 export function saleDate(ticket: Ticket): string {
   return manilaDate.format(new Date(ticket.issuedAt));
+}
+
+const manilaTime = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Manila", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
+/** Transaction time, Manila, HH:mm:ss. */
+export function saleTime(ticket: Ticket): string {
+  return manilaTime.format(new Date(ticket.issuedAt));
+}
+
+/** Every route leaves PITX, so the "PITX to" in route names is dropped on screens and reports. */
+export function routeName(description: string): string {
+  return description.replace(/^PITX to /, "");
 }
 
 /**
@@ -87,11 +100,11 @@ export function reportTickets(db: Db, { from, to, companyId }: ExportOptions): T
 }
 
 /** Builds and downloads the report. Contact details and discount IDs stay out of the file. */
-export async function downloadTicketingReport(db: Db, options: ExportOptions): Promise<number> {
+export async function downloadTicketingReport(db: Db, options: ExportOptions, picked?: Ticket[]): Promise<number> {
   const { default: ExcelJS } = await import("exceljs");
   const workbook = new ExcelJS.Workbook();
   const company = db.companies.find((c) => c.id === options.companyId);
-  const tickets = reportTickets(db, options);
+  const tickets = picked ?? reportTickets(db, options);
 
   const sheet = workbook.addWorksheet("Ticketing Report");
   sheet.addRows([
@@ -105,9 +118,9 @@ export async function downloadTicketingReport(db: Db, options: ExportOptions): P
   ]);
   sheet.getCell("A1").font = { bold: true, size: 14 };
   const header = sheet.addRow([
-    "No", "Trip Date", "Trip Time", "Trip No", "Company", "Denomination", "Plate No", "Ticket No", "Booking Ref",
-    "Source", "Seat", "Passenger", "Fare Type", "Fare", "Payment", "Status", "Sold By", "Counter", "Sale Date",
-    "Void Reason", "Refund", "Reprints",
+    "No", "Trip Date", "Trip Time", "Trip No", "Company", "Route Group", "Route", "Boarding Gate", "Plate No", "Ticket No",
+    "Booking Ref", "Source", "Seat", "Passenger", "Passenger Type", "Fare", "Payment Mode", "Status", "Username", "Counter",
+    "Transaction Date", "Transaction Time", "Void Reason", "Refund", "Reprints",
   ]);
   header.font = { bold: true, color: { argb: "FFFFFFFF" } };
   header.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0B2A5B" } };
@@ -120,20 +133,23 @@ export async function downloadTicketingReport(db: Db, options: ExportOptions): P
       trip?.time,
       trip?.tripNo,
       db.companies.find((c) => c.id === route?.companyId)?.code,
+      routeGroupOf(routeName(route?.description ?? "")) ?? "Not provincial",
+      routeName(route?.description ?? ""),
       route?.denomination,
       db.buses.find((b) => b.id === trip?.busId)?.plateNo,
       ticket.ticketNo,
       ticket.bookingRef,
-      ticket.source,
+      ticket.source === "Counter" ? "On-site" : "Online",
       ticket.seatNo,
       ticket.passengerName,
       ticket.fareType,
       ticket.fare,
       ticket.paymentMethod,
       ticket.status,
-      ticket.soldBy,
+      ticket.soldBy ?? ticket.bookedBy,
       db.counters.find((c) => c.id === ticket.counterId)?.code,
       saleDate(ticket),
+      saleTime(ticket),
       ticket.voidReason,
       ticket.refundAmount,
       ticket.reprints?.length ?? 0,
@@ -212,4 +228,29 @@ export function minSec(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return m ? `${m}m ${String(s).padStart(2, "0")}s` : `${s}s`;
+}
+
+/**
+ * Average ticket time for one source: on-site (counter, first seat picked to payment) or
+ * online (first seat held to payment). One payment counts once. Optionally one teller only.
+ */
+export function averageTicketTime(
+  db: Db,
+  from: string,
+  to: string,
+  source: Ticket["source"],
+  { companyId = "", teller = "" }: { companyId?: string; teller?: string } = {},
+): { payments: number; avgSeconds: number } {
+  const payments = new Map<string, number>();
+  for (const ticket of db.tickets) {
+    if (ticket.source !== source || ticket.serviceSeconds === undefined) continue;
+    const sold = saleDate(ticket);
+    if (sold < from || sold > to) continue;
+    if (teller && ticket.soldBy !== teller) continue;
+    const trip = db.trips.find((t) => t.id === ticket.tripId);
+    if (companyId && db.routes.find((r) => r.id === trip?.routeId)?.companyId !== companyId) continue;
+    payments.set(ticket.groupId ?? ticket.id, ticket.serviceSeconds);
+  }
+  const total = [...payments.values()].reduce((a, b) => a + b, 0);
+  return { payments: payments.size, avgSeconds: payments.size ? Math.round(total / payments.size) : 0 };
 }

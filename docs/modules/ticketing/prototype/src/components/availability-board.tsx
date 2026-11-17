@@ -123,8 +123,7 @@ export function AvailabilityBoard({ db }: { db: Db }) {
       </div>
       {counter && !boothCompanies && (
         <p className="text-xs text-slate-600">
-          {counter.description} is open to all bus companies, so it shows every trip. Set its companies in Master Data, Counter
-          Assignment.
+          {counter.description} is open to all bus companies, so it shows every trip.
         </p>
       )}
 

@@ -2,7 +2,7 @@
 
 import { Moved } from "@/components/moved";
 
-// Gate Test is now a tab on the Boarding page.
+// Boarding was removed (entry 35); the manifest shows who boarded.
 export default function GateTestPage() {
   return <Moved from="/validate" />;
 }

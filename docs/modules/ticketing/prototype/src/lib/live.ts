@@ -14,7 +14,7 @@ import type { Bus, BusType, Company, Db, Route, SeatMark, Town, Trip } from "./t
 //   list_seat_trips(date)     approved trips whose bus has a seat map (anyone)
 //   get_trip_seats(booking)   seats passengers requested on a trip (anyone)
 // Fares, PTU/TIN and seat maps for buses without one are not in those modules:
-// they get placeholders the PITX Admin can fix in Master Data. Trips with no sales
+// they get placeholders. Trips with no sales
 // get made-up ones (demo-sales.ts). Sales stay in the browser, like the rest of the demo.
 
 const DAYS = 7; // today and the next six days, the same week as the sample data
@@ -250,7 +250,7 @@ export async function loadLive(base: Db): Promise<LiveResult | null> {
         townId,
         mileage: 0,
         price: placeholderFare(destination),
-        message: "Placeholder fare: set the real fare in Master Data.",
+        message: "Placeholder fare: the real fare is not in Trip Scheduling yet.",
         seatConfirm: true,
         status: "Active",
       };

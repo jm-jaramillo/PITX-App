@@ -1,34 +1,39 @@
 import type { Role } from "./types";
 
 // Five users (team review, 9 Nov):
-//   PITX Admin     runs the module: approvals, reports, trips, master data, parameters
+//   PITX Admin     runs the module: approvals, reports, ticket availability, manifest
 //   PITX Cashier   receives the tellers' remittance (Daily Collection)
-//   Operator Admin the bus company's admin: sells, sets units, sees its own company only
+//   Operator Admin the bus company's admin: sells, sees its own company only
 //   Teller         sells at the company's counter
 //   Passenger      buys online: holds seats, pays, gets the e-ticket
 const OPS: Role[] = ["Operator Admin", "Teller"];
 
-// Ticket Availability is the PIDS board plus the trip list (entry 33), and Boarding holds Queue Count and
-// Gate Test as tabs (entry 31). The old /trips, /queue and /validate links redirect.
+// Entry 35: Tickets Sold and Daily Trips are in Reports. Boarding (queue count, gate test),
+// Unit Assignment, Master Data and System Parameters are gone: trips, operators, routes and
+// vehicles come from Trip Scheduling. Old links redirect (MOVED).
 export const NAV: { href: string; label: string; roles: Role[] }[] = [
   { href: "/", label: "Overview", roles: [...OPS, "PITX Admin"] },
   { href: "/book", label: "Book a Trip", roles: ["Passenger"] },
   { href: "/pos", label: "POS Ticketing", roles: OPS },
-  { href: "/tickets", label: "Tickets Sold", roles: [...OPS, "PITX Admin"] },
   { href: "/availability", label: "Ticket Availability", roles: [...OPS, "PITX Admin"] },
   { href: "/close", label: "Close Sales", roles: OPS },
   { href: "/collection", label: "Daily Collection", roles: ["PITX Cashier"] },
-  { href: "/units", label: "Unit Assignment", roles: ["Operator Admin"] },
   { href: "/manifest", label: "Manifest", roles: [...OPS, "PITX Admin"] },
-  { href: "/boarding", label: "Boarding", roles: ["PITX Admin"] },
   { href: "/approvals", label: "Approvals", roles: ["PITX Admin"] },
-  { href: "/reports", label: "Reports", roles: ["PITX Admin"] },
-  { href: "/master", label: "Master Data", roles: ["PITX Admin"] },
-  { href: "/settings", label: "System Parameters", roles: ["PITX Admin"] },
+  { href: "/reports", label: "Reports", roles: [...OPS, "PITX Admin"] },
 ];
 
 /** Old pages merged into others, and where they open now. */
-export const MOVED: Record<string, string> = { "/trips": "/availability", "/queue": "/boarding", "/validate": "/boarding#gate" };
+export const MOVED: Record<string, string> = {
+  "/trips": "/reports",
+  "/tickets": "/reports",
+  "/boarding": "/manifest",
+  "/queue": "/manifest",
+  "/validate": "/manifest",
+  "/units": "/",
+  "/master": "/",
+  "/settings": "/",
+};
 
 /** Bus company staff only see their own company's data. */
 export function isCompanyRole(role: Role): boolean {

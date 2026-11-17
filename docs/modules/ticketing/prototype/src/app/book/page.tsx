@@ -318,7 +318,7 @@ export default function BookPage() {
     .filter((t) => t.bookedBy === db.session?.name && t.source === "Online")
     .map((t) => ({ ticket: t, trip: db.trips.find((x) => x.id === t.tripId) }))
     .sort((a, b) => `${a.trip?.date}${a.trip?.time}`.localeCompare(`${b.trip?.date}${b.trip?.time}`));
-  const upcoming = mine.filter((m) => m.ticket.status === "Reserved" && m.trip && m.trip.status !== "Departed" && m.trip.status !== "Cancelled");
+  const upcoming = mine.filter((m) => m.ticket.status === "Ticketed" && m.trip && m.trip.status !== "Departed" && m.trip.status !== "Cancelled");
   const past = mine.filter((m) => !upcoming.includes(m)).reverse();
 
   return (
@@ -1107,7 +1107,7 @@ function MyTrips({ db, upcoming, past, onBook }: { db: Db; upcoming: Booked[]; p
                 const route = db.routes.find((r) => r.id === trip?.routeId);
                 const company = db.companies.find((c) => c.id === route?.companyId);
                 const tone =
-                  ticket.status === "Reserved"
+                  ticket.status === "Ticketed"
                     ? "bg-green-100 text-green-800"
                     : ticket.status === "Boarded"
                       ? "bg-slate-200 text-slate-700"

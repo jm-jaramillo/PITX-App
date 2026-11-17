@@ -2,7 +2,8 @@
 
 import { useSyncExternalStore } from "react";
 import { todayManila } from "./format";
-import { shiftRemittance } from "./reports";
+import { routeGroupOf, type RouteGroup } from "./places";
+import { routeName, shiftRemittance } from "./reports";
 import { sells, setsUnits } from "./roles";
 import { getLayout, parseBlockedSeats } from "./seat-layouts";
 import { seedDb } from "./seed";
@@ -39,11 +40,18 @@ function load(): Db {
   if (db) return db;
   try {
     const raw = localStorage.getItem(KEY);
-    db = raw ? freshSample(JSON.parse(raw) as Db) : seedDb();
+    db = raw ? freshSample(renamedStatus(JSON.parse(raw) as Db)) : seedDb();
   } catch {
     db = seedDb();
   }
   return db;
+}
+
+/** Tickets saved before entry 35 say "Reserved", now "Ticketed". */
+function renamedStatus(stored: Db): Db {
+  const old = (t: Db["tickets"][number]) => (t.status as string) === "Reserved";
+  if (!stored.tickets?.some(old)) return stored;
+  return { ...stored, tickets: stored.tickets.map((t) => (old(t) ? { ...t, status: "Ticketed" as const } : t)) };
 }
 
 /**
@@ -291,7 +299,7 @@ export function removeSeatMark(tripId: string, markId: string) {
 /** What a unit change does to sold seats: the same seat number carries over, or staff move the passenger. */
 export function unitChangeImpact(data: Db, trip: Trip, busId: string): { kept: number; manual: number } {
   const { layout, blocked } = tripSeating(data, { ...trip, busId });
-  const sold = data.tickets.filter((t) => t.tripId === trip.id && t.status === "Reserved");
+  const sold = data.tickets.filter((t) => t.tripId === trip.id && t.status === "Ticketed");
   const manual = layout ? sold.filter((t) => t.seatNo > layout.seats || blocked.has(t.seatNo)).length : 0;
   return { kept: sold.length - manual, manual };
 }
@@ -304,39 +312,44 @@ export function seatCapacity(data: Db, trip: Trip): number {
 
 export interface RouteDemand {
   routeId: string;
-  route: string;
+  route: string; // Destination, without "PITX to"
+  group: RouteGroup | null; // Board group (places.ts); null for routes not provincial ticketed
   company: string;
   trips: number;
-  dispatched: number; // Trips that left (Departed)
-  seats: number; // Seats on buses assigned so far
+  seats: number; // Seats available: seats on buses assigned so far
   ticketed: number; // Tickets sold, not voided
   boarded: number;
+  vacant: number; // Seats available less tickets sold
 }
 
 /**
  * Passenger Demand Report (process map: passenger demand data gathering): passengers
- * served per route against trips dispatched and seats offered, for one trip date.
+ * served per route against the seats available, for a trip date range. Load factor is
+ * boarded over seats available. Optionally only the trips that pass `keep`.
  */
-export function routeDemand(data: Db, date: string): RouteDemand[] {
+export function routeDemand(data: Db, from: string, to = from, keep: (trip: Trip) => boolean = () => true): RouteDemand[] {
   const rows = new Map<string, RouteDemand>();
-  for (const trip of scopedTrips(data).filter((t) => t.date === date && t.status !== "Cancelled")) {
+  for (const trip of scopedTrips(data).filter((t) => t.date >= from && t.date <= to && t.status !== "Cancelled" && keep(t))) {
     const route = data.routes.find((r) => r.id === trip.routeId);
+    const name = routeName(route?.description ?? "-");
     const row = rows.get(trip.routeId) ?? {
       routeId: trip.routeId,
-      route: route?.description ?? "-",
+      route: name,
+      group: routeGroupOf(name),
       company: data.companies.find((c) => c.id === route?.companyId)?.code ?? "-",
       trips: 0,
-      dispatched: 0,
       seats: 0,
       ticketed: 0,
       boarded: 0,
+      vacant: 0,
     };
     const tickets = data.tickets.filter((t) => t.tripId === trip.id && t.status !== "Voided");
+    const seats = trip.busId ? seatCapacity(data, trip) : 0;
     row.trips++;
-    if (trip.status === "Departed") row.dispatched++;
-    if (trip.busId) row.seats += seatCapacity(data, trip);
+    row.seats += seats;
     row.ticketed += tickets.length;
     row.boarded += tickets.filter((t) => t.status === "Boarded").length;
+    row.vacant += Math.max(0, seats - tickets.length);
     rows.set(trip.routeId, row);
   }
   return [...rows.values()].sort((a, b) => b.ticketed - a.ticketed);
@@ -371,7 +384,7 @@ export function myHolds(data: Db, trip: Trip) {
 
 /**
  * Picking a seat holds it (booked without pay) so no other teller, counter or online buyer
- * can pick it, until it is paid (Reserved) or the hold runs out.
+ * can pick it, until it is paid (Ticketed) or the hold runs out.
  */
 export function holdSeat(tripId: string, seatNo: number): string | null {
   const current = load();
@@ -559,7 +572,7 @@ export function sellingBlock(data: Db, trip: Trip, today: string): string | null
   const counter = data.counters.find((c) => c.id === data.session?.counterId);
   const tripCompany = tripCompanyId(data, trip);
   if (counter?.companyIds?.length && tripCompany && !counter.companyIds.includes(tripCompany)) {
-    return `${counter.code} isn't assigned to this bus company. See Master Data, Counter Assignment.`;
+    return `${counter.code} isn't assigned to this bus company.`;
   }
   if (sellingClosed(data, trip)) {
     return `Selling closed ${cutoffMinutes(data)} minutes before departure.`;
@@ -608,7 +621,7 @@ export function issueTickets(input: IssueInput, today: string): { tickets?: Tick
   const route = current.routes.find((r) => r.id === trip.routeId);
   const company = current.companies.find((c) => c.id === route?.companyId);
   const counter = current.counters.find((c) => c.id === current.session?.counterId);
-  if (!route || !company) return { error: "This trip's route is missing from Master Data." };
+  if (!route || !company) return { error: "This trip's route is missing from Trip Scheduling." };
   if (!counter) return { error: "Sign in with a counter to sell tickets." };
 
   let total = 0;
@@ -661,7 +674,7 @@ export function issueTickets(input: IssueInput, today: string): { tickets?: Tick
     paymentRef: input.paymentRef.trim() || undefined,
     issuedAt,
     serviceSeconds,
-    status: "Reserved",
+    status: "Ticketed",
   }));
   commit({
     ...current,
@@ -684,7 +697,7 @@ export interface OnlineInput {
   paymentRef: string;
 }
 
-/** A passenger pays online for the seats they hold. The tickets are Reserved at once. */
+/** A passenger pays online for the seats they hold. The tickets are Ticketed at once. */
 export function bookOnline(input: OnlineInput, today: string): { tickets?: Ticket[]; error?: string } {
   const current = load();
   const session = current.session;
@@ -696,7 +709,7 @@ export function bookOnline(input: OnlineInput, today: string): { tickets?: Ticke
   if (input.passengers.length === 0) return { error: "Pick at least one seat." };
   const route = current.routes.find((r) => r.id === trip.routeId);
   const company = current.companies.find((c) => c.id === route?.companyId);
-  if (!route || !company) return { error: "This trip's route is missing from Master Data." };
+  if (!route || !company) return { error: "This trip's route is missing from Trip Scheduling." };
   const taken = takenSeats(current, trip.id);
   for (const p of input.passengers) {
     if (!p.passengerName.trim()) return { error: `Enter the passenger name for seat ${p.seatNo}.` };
@@ -709,6 +722,14 @@ export function bookOnline(input: OnlineInput, today: string): { tickets?: Ticke
 
   const groupId = crypto.randomUUID();
   const issuedAt = new Date().toISOString();
+  // Online ticket time: from the first seat held to payment. A hold starts seatHoldMinutes
+  // before it runs out. Ignored when more than an hour back.
+  const me = holderKey(current.session);
+  const heldFrom = Math.min(
+    ...(trip.holds ?? []).filter((h) => h.holder === me).map((h) => Date.parse(h.until) - current.settings.seatHoldMinutes * 60_000),
+  );
+  const onlineElapsed = Math.round((Date.parse(issuedAt) - heldFrom) / 1000);
+  const onlineSeconds = Number.isFinite(onlineElapsed) && onlineElapsed >= 0 && onlineElapsed <= 3600 ? onlineElapsed : undefined;
   const bookingRef = `PX-${String(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000))}`;
   const tickets: Ticket[] = input.passengers.map((p, index) => ({
     id: crypto.randomUUID(),
@@ -729,7 +750,8 @@ export function bookOnline(input: OnlineInput, today: string): { tickets?: Ticke
     paymentMethod: input.paymentMethod,
     paymentRef: input.paymentRef.trim(),
     issuedAt,
-    status: "Reserved",
+    status: "Ticketed",
+    serviceSeconds: onlineSeconds,
   }));
   commit({
     ...current,
@@ -761,7 +783,7 @@ function stepForMode(mode: ApprovalMode): ApprovalStep {
  */
 export function refundPlan(data: Db, ticket: Ticket, now: number): { block?: string; step: ApprovalStep; note?: string } {
   const step: ApprovalStep = "direct";
-  if (ticket.status !== "Reserved") return { step, block: `A ${ticket.status.toLowerCase()} ticket can't be refunded.` };
+  if (ticket.status !== "Ticketed") return { step, block: `A ${ticket.status.toLowerCase()} ticket can't be refunded.` };
   const session = data.session;
   if (session?.role === "PITX Admin") return { step };
   if (!sells(session?.role)) return { step, block: "Only a Teller of this company or the PITX Admin can refund this ticket." };
@@ -871,7 +893,7 @@ export function refundTicket(id: string, input: RefundInput): { error?: string; 
 
 export function reprintPlan(data: Db, ticket: Ticket): { block?: string; step: ApprovalStep } {
   const step: ApprovalStep = "direct";
-  if (!data.settings.reprintAllowed) return { step, block: "Ticket reprints are turned off in System Parameters." };
+  if (!data.settings.reprintAllowed) return { step, block: "Ticket reprints are turned off." };
   if (ticket.status === "Voided") return { step, block: "A voided ticket can't be reprinted." };
   const trip = data.trips.find((t) => t.id === ticket.tripId);
   if (!canReachTrip(data, trip)) return { step, block: "This ticket belongs to another company." };
@@ -954,7 +976,7 @@ export function decideRequest(id: string, approve: boolean): string | null {
   const request = current.requests.find((r) => r.id === id);
   const ticket = current.tickets.find((t) => t.id === request?.ticketId);
   if (!request || !ticket || request.status !== "Pending") return "This request is no longer open.";
-  if (approve && request.type === "Refund" && ticket.status !== "Reserved") {
+  if (approve && request.type === "Refund" && ticket.status !== "Ticketed") {
     return `This ticket is now ${ticket.status.toLowerCase()}, so it can't be refunded.`;
   }
   let next = current;
@@ -1093,7 +1115,7 @@ export function moveTicket(id: string, tripId: string, seatNo: number, reason: s
   const fromTrip = current.trips.find((t) => t.id === ticket?.tripId);
   if (!ticket || !toTrip || !fromTrip) return "Ticket or trip not found.";
   if (!canReachTrip(current, fromTrip)) return "This ticket belongs to another company.";
-  if (ticket.status !== "Reserved") {
+  if (ticket.status !== "Ticketed") {
     return `A ${ticket.status.toLowerCase()} ticket can't be moved.`;
   }
   if (current.settings.seatTransferCheckRoute && toTrip.routeId !== fromTrip.routeId) {
@@ -1131,7 +1153,7 @@ export interface TicketProblem {
 export function ticketProblems(data: Db, today: string): TicketProblem[] {
   const problems: TicketProblem[] = [];
   for (const ticket of data.tickets) {
-    if (ticket.status !== "Reserved") continue;
+    if (ticket.status !== "Ticketed") continue;
     const trip = data.trips.find((t) => t.id === ticket.tripId);
     if (!trip || trip.date < today || trip.status === "Departed") continue;
     if (!canReachTrip(data, trip)) continue;
@@ -1191,7 +1213,7 @@ export function setBoarded(id: string, boarded: boolean) {
   const current = load();
   const ticket = current.tickets.find((t) => t.id === id);
   if (!ticket || ticket.status === "Voided") return;
-  const status = boarded ? "Boarded" : "Reserved";
+  const status = boarded ? "Boarded" : "Ticketed";
   commit({
     ...current,
     tickets: current.tickets.map((t) => (t.id === id ? { ...t, status } : t)),

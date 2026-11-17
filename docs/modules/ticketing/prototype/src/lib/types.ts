@@ -143,9 +143,10 @@ export type FareType = (typeof FARE_TYPES)[number];
 export const PAYMENT_METHODS = ["Cash", "Card", "E-Wallet"] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
-// Reserved = paid, at the counter or online, so the seat is the passenger's. Booked and
-// Issued were merged into it at the 9 Nov review. Picked but unpaid seats are SeatHolds.
-export type TicketStatus = "Reserved" | "Boarded" | "Voided";
+// Ticketed = paid, at the counter or online, so the seat is the passenger's. Booked and
+// Issued were merged into it at the 9 Nov review (called Reserved until entry 35). Picked
+// but unpaid seats are SeatHolds.
+export type TicketStatus = "Ticketed" | "Boarded" | "Voided";
 export type TicketSource = "Counter" | "Online";
 
 export interface Ticket {
@@ -180,7 +181,7 @@ export interface Ticket {
   printed?: boolean;
   reprints?: TicketReprint[];
   bookedBy?: string; // Passenger account that bought it online
-  serviceSeconds?: number; // Counter sale: first seat picked to payment, for KPI 11
+  serviceSeconds?: number; // First seat picked (counter) or held (online) to payment, for KPI 11
 }
 
 export interface TicketReprint {

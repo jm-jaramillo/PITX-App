@@ -368,7 +368,7 @@ function counterDay(db: Db, today: string, now: number): Pick<Db, "openings" | "
   // Reprints waiting for the PITX Admin, on counter tickets still to depart.
   const open = db.tickets.filter((t) => {
     const trip = db.trips.find((x) => x.id === t.tripId);
-    return t.source === "Counter" && t.status === "Reserved" && trip?.status === "Scheduled" && !trip.stopSelling;
+    return t.source === "Counter" && t.status === "Ticketed" && trip?.status === "Scheduled" && !trip.stopSelling;
   });
   const picks = ["GEN", "DLTB", "JAM"].flatMap((code) => open.find((t) => t.ticketNo.startsWith(code)) ?? []);
   const reasons: [string, string][] = [

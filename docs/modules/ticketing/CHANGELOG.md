@@ -37,6 +37,34 @@ sections 2 and 3).
 
 ---
 
+## 35 · Review 17 Nov: fewer pages, one Reports page, uniform terms (17 Nov)
+
+**Terms**
+
+| Before | Now |
+|---|---|
+| Sales | Farebox revenue |
+| Seats sold | Tickets sold |
+| Reserved (ticket status) | Ticketed. Tickets saved in the browser as Reserved load as Ticketed |
+| Payment | Mode of payment |
+| Fare type | Passenger type |
+| Counter / Online | On-site / Online |
+| "PITX to NAGA CITY" | NAGA CITY: every route leaves PITX |
+
+**Pages**
+
+| Page | Change |
+|---|---|
+| Overview | Today only. KPIs: average ticket time, on-site and online. Trips dispatched and queue count removed (dispatch is Trip Scheduling's). Trips table removed. Passengers served by route grouped by the 6 route groups, click a group for its top 5 routes |
+| Reports | Tickets Sold and Daily Trips merged in, open to Teller and Operator Admin (own company). One set of filters: trip date, departure time, operator, route, region/group, boarding gate, mode of payment, passenger type, source, counter, username, status, search or scan. Tabs: Tickets sold (with transaction date and time, 50 per page), Passengers by route (all routes by group), Breakdowns, Daily trips, Remittance and KPI. Excel export follows the filters |
+| Passengers served by route | Columns: trips, seats available, tickets sold, boarded, vacant seats, load factor. Load factor is now boarded over seats available (was ticketed over seats) |
+| Manifest | Pick route, date and departure time. Every ticket buyer, Boarded or Not boarded. Fare column removed. No Undo. Refunded tickets drop off on their own |
+| Ticket Availability | Board only. The trip list moved to Reports, Daily trips |
+| Removed | Tickets Sold, Boarding (queue count, gate test), Unit Assignment, Master Data, System Parameters. Trips, operators, routes and vehicles come from Trip Scheduling. Old links redirect |
+
+- Average ticket time online: from the first seat held to payment. On-site is unchanged (first seat picked to payment).
+- No user ID filter yet: tickets only record the username.
+
 ## 34 · Ticket Availability board: provincial routes only, PITX and operator logos (17 Nov)
 
 | | Before | Now |

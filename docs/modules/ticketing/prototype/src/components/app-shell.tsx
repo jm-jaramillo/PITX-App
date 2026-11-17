@@ -21,17 +21,12 @@ type IconName = keyof typeof PITX_ICONS;
 const NAV_ICONS: Record<string, IconName> = {
   "/": "overview",
   "/pos": "bus",
-  "/tickets": "check",
   "/close": "check",
   "/collection": "chart",
-  "/units": "bus",
   "/manifest": "users",
   "/approvals": "check",
-  "/boarding": "bays",
   "/availability": "calendar",
   "/reports": "chart",
-  "/master": "building",
-  "/settings": "building",
 };
 
 function Icon({ name }: { name: IconName }) {

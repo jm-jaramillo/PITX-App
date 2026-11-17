@@ -155,7 +155,7 @@ function passengerHistory(db: Db, name: string, today: string): Db {
   };
   const upcoming = (t: (typeof online)[number]) => {
     const trip = tripOf(t.tripId);
-    return t.status === "Reserved" && trip?.status === "Scheduled" && !!trip.busId;
+    return t.status === "Ticketed" && trip?.status === "Scheduled" && !!trip.busId;
   };
 
   // Today's trip, or late at night when today's trips have all left, the next one after today.

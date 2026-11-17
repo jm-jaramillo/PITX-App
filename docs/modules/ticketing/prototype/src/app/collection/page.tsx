@@ -29,7 +29,7 @@ export default function DailyCollectionPage() {
         </>
           }
         >
-          Daily Sales Collection
+          Daily Collection
         </PageTitle>
       </div>
 

@@ -57,9 +57,9 @@ function TicketDetail() {
   const siblings = ticket.groupId ? db.tickets.filter((t) => t.groupId === ticket.groupId) : [ticket];
   const total = siblings.reduce((sum, t) => sum + t.fare + (t.insurance ?? 0), 0);
   const role = db.session?.role;
-  const canManage = role ? canAccess(role, "/tickets") : false;
+  const canManage = role ? canAccess(role, "/reports") : false;
   const canSell = role ? canAccess(role, "/pos") : false;
-  const canMove = canManage && ticket.status === "Reserved";
+  const canMove = canManage && ticket.status === "Ticketed";
   const canPrint = canManage || role === "Passenger";
   // eslint-disable-next-line react-hooks/purity -- the refund cutoff depends on the current time
   const refund = refundPlan(db, ticket, Date.now());

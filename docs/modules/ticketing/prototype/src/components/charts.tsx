@@ -14,7 +14,7 @@ export function BarList({
   format: (v: number) => string;
 }) {
   const max = Math.max(1, ...data.map((d) => d.value));
-  if (data.every((d) => d.value === 0)) return <p className="text-sm text-slate-500">No sales yet today.</p>;
+  if (data.every((d) => d.value === 0)) return <p className="text-sm text-slate-500">No tickets sold yet today.</p>;
   return (
     <ul className="space-y-2 text-sm">
       {data.map((d) => (
@@ -45,7 +45,7 @@ export function HourBars({ data, unit }: { data: Map<number, number>; unit: stri
   const label = (h: number) => `${String(h).padStart(2, "0")}:00`;
   return (
     <div>
-      <div className="flex h-36 items-end gap-0.5 border-b border-slate-200" role="img" aria-label={`Seats sold by departure hour, busiest ${label(peak)}`}>
+      <div className="flex h-36 items-end gap-0.5 border-b border-slate-200" role="img" aria-label={`Tickets sold by departure hour, busiest ${label(peak)}`}>
         {span.map((h) => {
           const v = data.get(h) ?? 0;
           return (

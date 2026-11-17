@@ -2,7 +2,7 @@
 
 import { Moved } from "@/components/moved";
 
-// Queue Count is now a tab on the Boarding page.
+// Queue Count was removed (entry 35).
 export default function QueuePage() {
   return <Moved from="/queue" />;
 }
