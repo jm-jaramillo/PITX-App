@@ -138,7 +138,7 @@ export default function OverviewPage() {
               <div className="kpi-label">Last queue count</div>
               <div className="kpi-value">
                 <strong>{lastQueue?.count ?? "-"}</strong>
-                <span>{lastQueue ? `at ${lastQueue.spot}` : <Link className="text-brand underline" href="/queue">count now</Link>}</span>
+                <span>{lastQueue ? `at ${lastQueue.spot}` : <Link className="text-brand underline" href="/boarding">count now</Link>}</span>
               </div>
             </div>
           )}

@@ -242,16 +242,6 @@ h2 {
   padding: 6px 12px;
 }
 
-/* Section label between sidebar link groups (Selling, Trips, Boarding, Admin). */
-.sidebar-group {
-  margin: 12px 12px 2px;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
-  color: var(--bar-text-dim);
-}
-
 .sidebar-links a {
   display: flex;
   align-items: center;

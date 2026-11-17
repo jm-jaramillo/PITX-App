@@ -37,6 +37,29 @@ sections 2 and 3).
 
 ---
 
+## 31 · Fewer pages: Daily Trips and Boarding merged (17 Nov)
+
+Overlapping pages are merged, and the sidebar groups from entry 30 are removed (a plain list again). The PITX Admin now has 10 links instead of 12.
+
+| Before | Now |
+|---|---|
+| Daily Trips (PITX Admin) and Ticket Availability (everyone) | **Daily Trips** for PITX Admin, Operator Admin and Teller. It shows the bus company, fare, seats sold, seats left with the availability status (Available, Last Few Seats, Sold Out, On-Hold) and the trip status. Filters: All, Still to leave, and each availability status |
+| Queue Count and Gate Test (PITX Admin) | **Boarding**, one page with two tabs: Queue Count and Gate Test |
+
+- Bus company staff see only their own company's trips on Daily Trips, read only. Stop selling, seat blocks and the trip log stay with the PITX Admin.
+- The remark now shows under the trip status instead of in its own column.
+- Old links still work: `/availability` opens Daily Trips, `/queue` opens Boarding, and `/validate` opens Boarding on the Gate Test tab.
+
+Sidebar now:
+
+| Role | Links |
+|---|---|
+| PITX Admin | Overview, Tickets Sold, Daily Trips, Manifest, Boarding, Approvals, Reports, Master Data, System Parameters |
+| Operator Admin | Overview, POS Ticketing, Tickets Sold, Daily Trips, Close Sales, Unit Assignment, Manifest |
+| Teller | Overview, POS Ticketing, Tickets Sold, Daily Trips, Close Sales, Manifest |
+| PITX Cashier | Daily Collection |
+| Passenger | Book a Trip |
+
 ## 30 · Sidebar grouped, "Tickets Sold" (16 Nov)
 
 "Tickets" is now **Tickets Sold**, so it doesn't get mixed up with Ticket Availability. The sidebar is also grouped by task, so the PITX Admin's 12 links read as short lists.
