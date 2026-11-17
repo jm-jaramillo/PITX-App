@@ -28,7 +28,7 @@ const NAV_ICONS: Record<string, IconName> = {
   "/manifest": "users",
   "/approvals": "check",
   "/boarding": "bays",
-  "/trips": "calendar",
+  "/availability": "calendar",
   "/reports": "chart",
   "/master": "building",
   "/settings": "building",

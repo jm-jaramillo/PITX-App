@@ -37,6 +37,22 @@ sections 2 and 3).
 
 ---
 
+## 33 · Daily Trips is now Ticket Availability, in the PIDS board format (17 Nov)
+
+The page opens on a board that looks like the booth screens: red header, legend, live Manila clock, a navy band per destination, then Company (logo), Aircon, Time, Available Tickets and Status.
+
+| | Before | Now |
+|---|---|---|
+| Name and link | Daily Trips, /trips | Ticket Availability, /availability (old /trips links redirect) |
+| Default view | Table of every trip on a date | Board of today's trips still to leave, one route group at a time |
+| Route groups | None | Bicol, Labazon, Mindoro, Visayas, Mindanao, Northern Routes (Other shows only when a destination isn't on the list yet) |
+| Booth filter | None | Pick a booth to show only the bus companies assigned to it in Master Data, Counter Assignment. A booth open to all shows every trip |
+| Status words | Available, Last Few Seats, Sold Out, On-Hold | As on the PIDS: Available, Selling Fast, Not Available (Sold Out in red), On Hold |
+| Admin tools | Stop selling, seat marks, log | Same, under the Trip list view |
+
+- Groups follow the destination's province (places.ts). Labazon covers Laguna, Batangas and Quezon, plus Cavite and Metro Manila. Confirm with Ops.
+- Full screen button for showing the board on a monitor.
+
 ## 32 · Sample data always covers today and this week (17 Nov)
 
 The sample week was made once, on the day the browser first opened the demo (about 11 Nov), and saved. By 17 Nov those trips were all in the past, so today and this week had no trips, sales or bookings.

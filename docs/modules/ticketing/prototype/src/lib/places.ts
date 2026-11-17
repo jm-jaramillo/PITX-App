@@ -167,3 +167,24 @@ export function regionOf(province: string): Region {
 
 /** Every listed destination, for checks. */
 export const LISTED_DESTINATIONS = Object.keys(DESTINATION_PROVINCE);
+
+// Route groups on the Ticket Availability board (PIDS), as Ops groups the boards at the
+// booths. Labazon is Laguna, Batangas and Quezon, with Cavite and Metro Manila added here.
+export const ROUTE_GROUPS = ["Bicol", "Labazon", "Mindoro", "Visayas", "Mindanao", "Northern Routes", "Other"] as const;
+export type RouteGroup = (typeof ROUTE_GROUPS)[number];
+
+const REGION_GROUP: Record<Region, RouteGroup> = {
+  Bicol: "Bicol",
+  "South Luzon": "Labazon",
+  "Metro Manila": "Labazon",
+  MIMAROPA: "Mindoro",
+  Visayas: "Visayas",
+  Mindanao: "Mindanao",
+  "North Luzon": "Northern Routes",
+  Other: "Other",
+};
+
+/** The board group of a destination. Unlisted destinations go to Other. */
+export function routeGroupOf(destination: string): RouteGroup {
+  return REGION_GROUP[regionOf(provinceOf(destination))];
+}

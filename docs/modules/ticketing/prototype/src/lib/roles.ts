@@ -8,14 +8,14 @@ import type { Role } from "./types";
 //   Passenger      buys online: holds seats, pays, gets the e-ticket
 const OPS: Role[] = ["Operator Admin", "Teller"];
 
-// Daily Trips includes ticket availability (seats left), and Boarding holds Queue Count and
-// Gate Test as tabs (entry 31). The old /availability, /queue and /validate links redirect.
+// Ticket Availability is the PIDS board plus the trip list (entry 33), and Boarding holds Queue Count and
+// Gate Test as tabs (entry 31). The old /trips, /queue and /validate links redirect.
 export const NAV: { href: string; label: string; roles: Role[] }[] = [
   { href: "/", label: "Overview", roles: [...OPS, "PITX Admin"] },
   { href: "/book", label: "Book a Trip", roles: ["Passenger"] },
   { href: "/pos", label: "POS Ticketing", roles: OPS },
   { href: "/tickets", label: "Tickets Sold", roles: [...OPS, "PITX Admin"] },
-  { href: "/trips", label: "Daily Trips", roles: [...OPS, "PITX Admin"] },
+  { href: "/availability", label: "Ticket Availability", roles: [...OPS, "PITX Admin"] },
   { href: "/close", label: "Close Sales", roles: OPS },
   { href: "/collection", label: "Daily Collection", roles: ["PITX Cashier"] },
   { href: "/units", label: "Unit Assignment", roles: ["Operator Admin"] },
@@ -28,7 +28,7 @@ export const NAV: { href: string; label: string; roles: Role[] }[] = [
 ];
 
 /** Old pages merged into others, and where they open now. */
-export const MOVED: Record<string, string> = { "/availability": "/trips", "/queue": "/boarding", "/validate": "/boarding#gate" };
+export const MOVED: Record<string, string> = { "/trips": "/availability", "/queue": "/boarding", "/validate": "/boarding#gate" };
 
 /** Bus company staff only see their own company's data. */
 export function isCompanyRole(role: Role): boolean {
