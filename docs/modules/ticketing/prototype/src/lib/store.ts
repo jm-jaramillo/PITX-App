@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { todayManila } from "./format";
 import { shiftRemittance } from "./reports";
 import { sells, setsUnits } from "./roles";
 import { getLayout, parseBlockedSeats } from "./seat-layouts";
@@ -38,11 +39,31 @@ function load(): Db {
   if (db) return db;
   try {
     const raw = localStorage.getItem(KEY);
-    db = raw ? (JSON.parse(raw) as Db) : seedDb();
+    db = raw ? freshSample(JSON.parse(raw) as Db) : seedDb();
   } catch {
     db = seedDb();
   }
   return db;
+}
+
+/**
+ * The sample week is made for the day it's created. On a later day its trips are all in the
+ * past, so it's made again for today and the next six days. Kept: who is signed in (with
+ * their own samples) and System Parameters. Sales made in the browser on earlier days go.
+ * Real PITX data (live.ts) is read again on every page load, so it's left alone.
+ */
+function freshSample(stored: Db): Db {
+  const today = todayManila();
+  if (stored.source === "pitx" || stored.seededOn === today) return stored;
+  const seeded = seedDb();
+  const base = { ...seeded, settings: { ...seeded.settings, ...stored.settings } };
+  const next = stored.session ? { ...withUserSamples(base, stored.session), session: stored.session } : base;
+  try {
+    localStorage.setItem(KEY, JSON.stringify(next));
+  } catch {
+    // Storage blocked or full: the session keeps working from memory.
+  }
+  return next;
 }
 
 function commit(next: Db) {

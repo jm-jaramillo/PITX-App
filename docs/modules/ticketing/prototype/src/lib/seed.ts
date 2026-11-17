@@ -306,6 +306,7 @@ export function seedDb(): Db {
     openings: [],
     queueCounts: [],
     source: "sample",
+    seededOn: today,
   };
 
   // Passengers, payments and refunds (demo-sales.ts), then the day's counter work around them.

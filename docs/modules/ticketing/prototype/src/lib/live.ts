@@ -17,7 +17,7 @@ import type { Bus, BusType, Company, Db, Route, SeatMark, Town, Trip } from "./t
 // they get placeholders the PITX Admin can fix in Master Data. Trips with no sales
 // get made-up ones (demo-sales.ts). Sales stay in the browser, like the rest of the demo.
 
-const DAYS = 3; // today and the next two days
+const DAYS = 7; // today and the next six days, the same week as the sample data
 
 interface FeedTrip {
   booking_id: string;

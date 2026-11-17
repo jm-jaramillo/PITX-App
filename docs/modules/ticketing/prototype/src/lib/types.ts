@@ -330,4 +330,5 @@ export interface Db {
   queueCounts: QueueCount[];
   source?: "sample" | "pitx"; // pitx: masterfiles and trips read from the other modules (live.ts)
   loadedAt?: string; // ISO timestamp of the last read from PITX
+  seededOn?: string; // Manila date the sample week was made: a new day makes a new week
 }

@@ -37,6 +37,18 @@ sections 2 and 3).
 
 ---
 
+## 32 · Sample data always covers today and this week (17 Nov)
+
+The sample week was made once, on the day the browser first opened the demo (about 11 Nov), and saved. By 17 Nov those trips were all in the past, so today and this week had no trips, sales or bookings.
+
+| | Before | Now |
+|---|---|---|
+| Sample data | Made once and kept, so it went stale | Made again on the first visit of each day: today plus the next six days of trips, sales, counter work and the signed-in user's own samples |
+| Kept across days | Everything | Who is signed in, and System Parameters. Sales and changes made in the browser on earlier days start over |
+| Real PITX data (site, staff views) | Today and the next 2 days | Today and the next 6 days, the same week as the sample data |
+
+- Next.js updated from 16.4.3 to 16.4.6. The build was stopping on Next.js's security check (advisory GHSA-mfr8-8qww-v76h).
+
 ## 31 · Fewer pages: Daily Trips and Boarding merged (17 Nov)
 
 Overlapping pages are merged, and the sidebar groups from entry 30 are removed (a plain list again). The PITX Admin now has 10 links instead of 12.
