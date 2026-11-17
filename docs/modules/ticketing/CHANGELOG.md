@@ -37,6 +37,17 @@ sections 2 and 3).
 
 ---
 
+## 34 · Ticket Availability board: provincial routes only, PITX and operator logos (17 Nov)
+
+| | Before | Now |
+|---|---|---|
+| Cavite and Metro Manila trips | In Labazon | Off the board, since they aren't provincial ticketed. Labazon is Laguna, Batangas and Quezon |
+| Board header | "PITX" in text | The PITX logo |
+| Operator logos (real PITX data) | DLTB only | The logo each operator uploaded in its Trip Scheduling profile. Operators with no upload show their code, and DLTB keeps its file |
+
+- Logos are read as the signed-in PITX staff user (operator_profiles and the private operator-docs bucket, links valid 12 hours, refreshed on each load).
+- Sample data still has only the DLTB logo: no other logo files are in the repo.
+
 ## 33 · Daily Trips is now Ticket Availability, in the PIDS board format (17 Nov)
 
 The page opens on a board that looks like the booth screens: red header, legend, live Manila clock, a navy band per destination, then Company (logo), Aircon, Time, Available Tickets and Status.

@@ -169,14 +169,15 @@ export function regionOf(province: string): Region {
 export const LISTED_DESTINATIONS = Object.keys(DESTINATION_PROVINCE);
 
 // Route groups on the Ticket Availability board (PIDS), as Ops groups the boards at the
-// booths. Labazon is Laguna, Batangas and Quezon, with Cavite and Metro Manila added here.
+// booths. Labazon is Laguna, Batangas and Quezon. Cavite and Metro Manila are not provincial
+// ticketed routes, so they are left off the board (entry 34).
 export const ROUTE_GROUPS = ["Bicol", "Labazon", "Mindoro", "Visayas", "Mindanao", "Northern Routes", "Other"] as const;
 export type RouteGroup = (typeof ROUTE_GROUPS)[number];
 
-const REGION_GROUP: Record<Region, RouteGroup> = {
+const REGION_GROUP: Record<Region, RouteGroup | null> = {
   Bicol: "Bicol",
   "South Luzon": "Labazon",
-  "Metro Manila": "Labazon",
+  "Metro Manila": null,
   MIMAROPA: "Mindoro",
   Visayas: "Visayas",
   Mindanao: "Mindanao",
@@ -184,7 +185,10 @@ const REGION_GROUP: Record<Region, RouteGroup> = {
   Other: "Other",
 };
 
-/** The board group of a destination. Unlisted destinations go to Other. */
-export function routeGroupOf(destination: string): RouteGroup {
-  return REGION_GROUP[regionOf(provinceOf(destination))];
+/** The board group of a destination: null when not provincial ticketed. Unlisted ones go to Other. */
+const NOT_TICKETED = new Set(["Cavite", "Metro Manila"]);
+export function routeGroupOf(destination: string): RouteGroup | null {
+  const province = provinceOf(destination);
+  if (NOT_TICKETED.has(province)) return null;
+  return REGION_GROUP[regionOf(province)];
 }

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CompanyLogo } from "@/components/company-logo";
 import { todayManila } from "@/lib/format";
+import { asset } from "@/lib/paths";
 import { routeGroupOf, ROUTE_GROUPS, type RouteGroup } from "@/lib/places";
 import { departurePassed, scopedTrips, ticketAvailability, tripCompanyId, type AvailabilityStatus } from "@/lib/store";
 import type { Db, Trip } from "@/lib/types";
@@ -130,9 +131,9 @@ export function AvailabilityBoard({ db }: { db: Db }) {
       <div ref={screen} className="overflow-x-auto bg-white" style={{ background: RED }}>
         <div className="min-w-[720px] p-2 text-white">
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-1 pb-2">
-            <div className="leading-tight">
-              <div className="text-3xl font-black tracking-widest">PITX</div>
-              <div className="text-[10px] font-semibold uppercase">Parañaque Integrated Terminal Exchange</div>
+            <div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={asset("/brand/pitx-horizontal-on-dark.png")} alt="PITX, Parañaque Integrated Terminal Exchange" className="h-12 w-auto" />
             </div>
             <div className="text-center">
               <div className="text-3xl font-black uppercase tracking-tight sm:text-4xl">Tickets Availability</div>

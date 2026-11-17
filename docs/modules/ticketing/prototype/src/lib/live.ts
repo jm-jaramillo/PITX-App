@@ -57,6 +57,41 @@ async function rpc<T>(name: string, args: Record<string, unknown> = {}): Promise
   }
 }
 
+/**
+ * Operator logos uploaded in Trip Scheduling (operator_profiles.logo_path, private
+ * operator-docs bucket, PITX staff can read). Returns operator id to a signed URL.
+ */
+async function operatorLogos(): Promise<Map<string, string>> {
+  const token = portalAccessToken();
+  const logos = new Map<string, string>();
+  if (!token) return logos;
+  const headers = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/operator_profiles?select=operator_id,logo_path&logo_path=not.is.null`, {
+      headers,
+    });
+    if (!res.ok) return logos;
+    const profiles = (await res.json()) as { operator_id: string; logo_path: string | null }[];
+    const paths = [...new Set(profiles.map((p) => p.logo_path).filter((p): p is string => Boolean(p)))];
+    if (paths.length === 0) return logos;
+    const signed = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/operator-docs`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ paths, expiresIn: 12 * 3600 }),
+    });
+    if (!signed.ok) return logos;
+    const urls = (await signed.json()) as { path: string; signedURL?: string | null; error?: string | null }[];
+    const byPath = new Map(urls.filter((u) => u.signedURL && !u.error).map((u) => [u.path, `${SUPABASE_URL}/storage/v1${u.signedURL}`]));
+    for (const p of profiles) {
+      const url = p.logo_path ? byPath.get(p.logo_path) : undefined;
+      if (url) logos.set(p.operator_id, url);
+    }
+  } catch {
+    // No logos: the board shows the company code instead.
+  }
+  return logos;
+}
+
 function addDays(date: string, days: number): string {
   return new Date(Date.parse(date) + days * 86_400_000).toISOString().slice(0, 10);
 }
@@ -92,10 +127,11 @@ export async function loadLive(base: Db): Promise<LiveResult | null> {
   const today = todayManila();
   const dates = Array.from({ length: DAYS }, (_, i) => addDays(today, i));
 
-  const [feeds, seatTrips, vehicles] = await Promise.all([
+  const [feeds, seatTrips, vehicles, logos] = await Promise.all([
     Promise.all(dates.map((d) => rpc<FeedTrip>("tos_trip_feed", { p_date: d }))),
     Promise.all(dates.map((d) => rpc<FeedTrip>("list_seat_trips", { p_date: d }))),
     rpc<FeedVehicle>("tos_vehicle_masterfile"),
+    operatorLogos(),
   ]);
   const staffFeed = feeds.some((f) => f && f.length > 0);
   const seatRows = seatTrips.flatMap((r) => r ?? []);
@@ -122,7 +158,7 @@ export async function loadLive(base: Db): Promise<LiveResult | null> {
         code,
         name,
         description: operatorName && operatorName !== name ? operatorName : undefined,
-        logo: sample?.logo,
+        logo: (operatorId ? logos.get(operatorId) : undefined) ?? sample?.logo,
         registrationNo: "Not set",
         ptuNo: "Not set",
         tin: "Not set",
