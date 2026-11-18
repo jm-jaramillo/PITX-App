@@ -841,8 +841,10 @@
       const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
       let operatorList = null;
       bookSlot.innerHTML = slotOptionsHtml();
-      bookRoute.innerHTML =
-        `<option value="" disabled selected>Select a destination</option>` + routeOptionsHtml(null);
+      const NO_OPERATOR_ROUTE = `<option value="" disabled selected>Select an operator first</option>`;
+      bookRoute.innerHTML = NO_OPERATOR_ROUTE;
+      bookRoute.disabled = true;
+      let bookVehicles = []; // the chosen operator's vehicles that can be booked right now
       document.getElementById("book-days").innerHTML = WEEKDAYS.map(
         (l, i) => `<button type="button" class="repeat-day" data-bookday="${i}">${l}</button>`
       ).join("");
@@ -868,23 +870,55 @@
           : "";
       }
 
-      async function loadBookPlates() {
+      const NO_PLATE = `<option value="">No plate yet</option>`;
+
+      // The destination list is limited to routes the chosen operator has a
+      // bookable vehicle for (approved, LTFRB active/verified or unset, CPC and
+      // any extension of validity not expired) - the same rule the database
+      // enforces for a plate on that route, and the same list the operator
+      // sees when they book for themselves.
+      async function loadBookOperator() {
+        bookVehicles = [];
+        bookPlate.innerHTML = NO_PLATE;
         const opId = bookOperator.value;
-        const route = bookRoute.value;
-        bookPlate.innerHTML = `<option value="">No plate yet</option>`;
-        if (!opId || !route) return;
+        if (!opId) {
+          bookRoute.innerHTML = NO_OPERATOR_ROUTE;
+          bookRoute.disabled = true;
+          return;
+        }
+        bookRoute.disabled = true;
+        bookRoute.innerHTML = `<option value="" disabled selected>Loading…</option>`;
+        const today = todayISO();
         const { data } = await supabase
           .from("vehicles")
-          .select("plate_no, body_number, route, cpc_validity")
+          .select("plate_no, body_number, route")
           .eq("operator_id", opId)
           .eq("status", "approved")
-          .eq("route", route)
+          .or("ltfrb_status.is.null,ltfrb_status.in.(active,ltfrb_verified)")
+          .or(`cpc_validity.is.null,cpc_validity.gte.${today}`)
+          .or(`cpc_eov.eq.false,cpc_eov_validity.is.null,cpc_eov_validity.gte.${today}`)
           .order("plate_no");
-        const today = todayISO();
+        if (bookOperator.value !== opId) return; // another operator was picked meanwhile
+        bookVehicles = data ?? [];
+        const routes = ROUTES.filter((r) => bookVehicles.some((v) => v.route === r));
+        // a vehicle route that isn't in the canonical list is still bookable
+        for (const v of bookVehicles) if (v.route && !routes.includes(v.route)) routes.push(v.route);
+        if (routes.length === 0) {
+          bookRoute.innerHTML = `<option value="" disabled selected>No bookable vehicles for this operator</option>`;
+          return;
+        }
+        bookRoute.innerHTML =
+          `<option value="" disabled selected>Select a destination</option>` +
+          routes.map((r) => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join("");
+        bookRoute.disabled = false;
+      }
+
+      function refreshBookPlates() {
+        const route = bookRoute.value;
         bookPlate.innerHTML =
-          `<option value="">No plate yet</option>` +
-          (data ?? [])
-            .filter((v) => !v.cpc_validity || v.cpc_validity >= today)
+          NO_PLATE +
+          bookVehicles
+            .filter((v) => v.route === route)
             .map(
               (v) =>
                 `<option value="${escapeHtml(v.plate_no)}">${escapeHtml(v.plate_no)}${v.body_number ? " · " + escapeHtml(v.body_number) : ""}</option>`
@@ -909,11 +943,14 @@
             .join("");
         bookDate.min = todayISO();
         bookDate.value = currentDate >= todayISO() ? currentDate : todayISO();
-        bookPlate.innerHTML = `<option value="">No plate yet</option>`;
+        bookVehicles = [];
+        bookRoute.innerHTML = NO_OPERATOR_ROUTE;
+        bookRoute.disabled = true;
+        bookPlate.innerHTML = NO_PLATE;
         bookDialog.showModal();
       });
-      bookOperator.addEventListener("change", loadBookPlates);
-      bookRoute.addEventListener("change", loadBookPlates);
+      bookOperator.addEventListener("change", loadBookOperator);
+      bookRoute.addEventListener("change", refreshBookPlates);
       bookDate.addEventListener("change", updateBookPreview);
       bookUntil.addEventListener("change", updateBookPreview);
       bookRepeat.addEventListener("change", () => {

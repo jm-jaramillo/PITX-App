@@ -4885,3 +4885,17 @@ with all columns on fits at 1280 and 1100px. The Approvals tables use the same r
 their pending lists were empty when I measured, so those were not measured directly.
 
 ---
+
+### 135. Admin "Book a trip": destinations follow the chosen operator (18 Nov)
+
+On Schedule -> Book a trip, the Destination list is empty until an operator is
+picked ("Select an operator first"), then lists only the routes that operator has a
+bookable vehicle for - approved, LTFRB active/verified or unset, CPC and any
+extension of validity not expired - the same rule the database enforces and the same
+list the operator sees when booking for themselves. An operator with no bookable
+vehicle shows "No bookable vehicles for this operator". Changing the operator resets
+the destination and plate; the plate list still shows only that operator's vehicles on
+the chosen route. Checked as staff: ALPS offers 6 destinations, Genesis 3, and
+switching operators clears the destination.
+
+---
