@@ -4899,3 +4899,61 @@ the chosen route. Checked as staff: ALPS offers 6 destinations, Genesis 3, and
 switching operators clears the destination.
 
 ---
+
+### 136. Operator/Trade codes loaded from the masterlist (18 Nov)
+
+`operator_profiles.operator_code` has existed since #37's profile redesign
+and is already shown in the staff Operator profiles dialog and editable on
+the operator's own form - but it was **null on all 74 rows**, so it
+rendered as `—` for everyone. It is now filled from the masterlist
+workbook's separate **"Company Code"** sheet (70 rows, all populated).
+`60 of 78` accounts now carry a code.
+
+Note the codes live only on that sheet: the `Database` sheet's own
+`Company Code` column is empty on all 1,910 rows, which is why the vehicle
+importer never picked them up.
+
+**Matching.** Reused `import-vehicle-masterlist.mjs`'s own `nameScore()` /
+`coreName()` so operators resolve the same way they do everywhere else.
+That matched 55 outright, but name matching is unreliable here (the same
+reason #88 matches vehicles by plate), so the result was reviewed before
+anything was written:
+
+- **3 auto-matches were wrong** and were dropped - `AOM` (AOM Trans) and
+  `DTRAN` (Dingalan Trans) both landed on Twinhearts, and `FRTN` (Fortune
+  Star) on Diamond Star. All three are companies with no account here;
+  they matched only because `TRANS` / `STAR` survive suffix-stripping.
+  Two codes colliding on one account is what exposed them.
+- **6 were missed and added by inspection**: `TWIN` → Twinhearts (scores
+  zero: "TWIN HEARTS" vs "Twinhearts"), `SSTAR` → Silver Star, `DLTB` →
+  Del Monte Motor Works, `CUL` → C.U.L. Transport (the initials of
+  "Carolina U Lam"), `CHER` → Cher Transport and `RMB` → RMB Bicol
+  Express (the last two scored 0.33, under the threshold).
+- **3 of 4 flagged ambiguous were clear**: `FLOR` → GV Florida, `RDIAZ` →
+  RU Diaz, `SAGAB` → St. Gabriel.
+
+**Not applied, left for a decision:**
+
+| Code | Workbook name | Why |
+|---|---|---|
+| `JMCR` | JAM/CHER | spans two operators - Jam Liner and Cher Transport |
+| `LLI` | LLI BUS CO., INC. | duplicate: `JAMLL` ("JAM/LLI") already covers that account |
+
+**Codes with no account (5):** `APPLE` Apple City Trans, `ARMJ` ARMJ
+Transport Services, `MRR` MRR Transport Inc, `PINDS` Pintados Corporation,
+`STAR` Regal Starliner - plus the three dropped above. These are commuter
+operators, the same population as the CITY cluster excluded in #129.
+
+**Accounts with no code (18):** Philtranco, Ceres/Vallacar, Pangasinan
+Five Star, RRCG, Bataan Transit, AAB Bus Lines, St. Anthony of Padua,
+Metro Manila Bus, Golden Bee, Dela Rosa Express, CEM Transport, J Binas,
+Saint Rose Transit, Eastern Metropolitan, Rizal Metrolink, Elavil Transit,
+Bicol Magayon and Tabaco Women's. The Company Code sheet simply does not
+list them.
+
+Verified after loading: 60 codes set, **no code used twice**, none with
+stray whitespace (the sheet stores `" A&B "` padded).
+
+No migration - the column and its UI already existed; this is a data load.
+
+---
