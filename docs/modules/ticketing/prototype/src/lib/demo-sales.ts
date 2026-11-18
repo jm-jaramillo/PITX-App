@@ -19,6 +19,17 @@ export function sampleName(n: number): string {
 
 const SEAT_FALLBACK = 45; // buses whose seat count isn't known yet
 
+/**
+ * Prefix of this generation of sample tickets (entry 36: fuller sales today, mostly sold on
+ * the day). Older sample tickets kept with real PITX data are made again with it (live.ts).
+ */
+export const DEMO_TICKET_PREFIX = "demo-d2-";
+
+/** A sample ticket from before entry 36, to be made again. */
+export const isOldDemoTicket = (id: string) => id.startsWith("demo-") && !id.startsWith(DEMO_TICKET_PREFIX);
+
+const DAY_OPENS = "04:00"; // when the first booths open
+
 /** Small deterministic generator, so a trip's sales don't change on every refresh. */
 export function seeded(text: string) {
   let h = 2166136261;
@@ -33,7 +44,8 @@ export function seeded(text: string) {
 export function addDemoSales(db: Db): Db {
   const sold = new Set(db.tickets.map((t) => t.tripId));
   const now = Date.now();
-  const today = Date.parse(`${todayManila()}T00:00:00+08:00`);
+  const todayDate = todayManila();
+  const today = Date.parse(`${todayDate}T00:00:00+08:00`);
   const booths = db.counters.filter((c) => !c.kiosk && c.status === "Active");
   const tickets: Ticket[] = [];
   const audit: AuditEntry[] = [];
@@ -56,14 +68,30 @@ export function addDemoSales(db: Db): Db {
     const departs = Date.parse(`${trip.date}T${trip.time}:00+08:00`);
     const departed = trip.status === "Departed";
     const cancelled = trip.status === "Cancelled";
-    // Departed trips sold well; later trips are still filling up, and trips days away have
-    // only advance bookings. A cancelled trip's few sales were all refunded.
+    // Departed trips sold well. Today the trips about to leave are nearly full and the later
+    // ones are filling up. Trips days away have only advance bookings. A cancelled trip's few
+    // sales were all refunded.
     const daysAway = Math.max(0, Math.floor((departs - today) / 86_400_000));
+    const isToday = trip.date === todayDate;
+    const hoursAway = Math.max(0, (departs - now) / 3_600_000);
     const advance = [1, 0.35, 0.2, 0.15][daysAway] ?? 0.1;
-    const share = cancelled ? 0.1 : departed ? 0.55 + rand() * 0.4 : (0.1 + rand() * 0.6) * advance;
+    const share = cancelled
+      ? 0.1
+      : departed
+        ? 0.6 + rand() * 0.35
+        : trip.status === "Boarding"
+          ? 0.55 + rand() * 0.35
+          : isToday
+            ? 0.3 + rand() * 0.4 + Math.max(0, 0.25 - hoursAway * 0.025)
+            : (0.1 + rand() * 0.6) * advance;
     const count = Math.min(Math.round(capacity * share), capacity - blocked.size);
-    const saleStart = departs - 3 * 86_400_000;
     const saleEnd = Math.min(now, departs) - 60_000;
+    // Selling starts 3 days before the trip, or for trips further off, 2 days before now.
+    const saleStart = Math.min(departs - 3 * 86_400_000, saleEnd - 2 * 86_400_000);
+    // Today's trips: about three in four tickets sold on the day, from when the booths open.
+    const dayOpens = Date.parse(`${trip.date}T${DAY_OPENS}:00+08:00`);
+    const onTheDay = isToday && saleEnd > dayOpens;
+    const advanceEnd = onTheDay ? dayOpens : saleEnd;
 
     let seat = 0;
     for (let i = 0; i < count; i++) {
@@ -82,12 +110,13 @@ export function addDemoSales(db: Db): Db {
       const boarded = !voided && (departed || (trip.status === "Boarding" && i < count / 2));
       const teller = rand() < 0.5 ? 1 : 0;
       const counter = online ? undefined : booths[(Math.max(companyIndex, 0) * 2 + teller) % booths.length];
-      const issuedAt = new Date(saleStart + ((saleEnd - saleStart) * (i + 1)) / (count + 1)).toISOString();
+      const [from, to] = onTheDay && rand() < 0.75 ? [dayOpens, saleEnd] : [saleStart, advanceEnd];
+      const issuedAt = new Date(from + ((to - from) * (i + 1)) / (count + 1)).toISOString();
       const soldBy = online ? undefined : `${company.code} Teller ${teller + 1}`;
       const passengerName = sampleName(sequence);
       const refundCategory = cancelled ? "Trip cancelled" : "Passenger changed plans";
       const ticket: Ticket = {
-        id: `demo-${trip.id}-${seat}`,
+        id: `${DEMO_TICKET_PREFIX}${trip.id}-${seat}`,
         ticketNo: `${company.ticketCode}${online ? "W" : (counter?.ticketCode ?? "A")}-${String(sequence).padStart(6, "0")}`,
         source: online ? "Online" : "Counter",
         bookingRef: online ? `DEMO-BK-${String(sequence).padStart(5, "0")}` : undefined,

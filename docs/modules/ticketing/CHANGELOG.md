@@ -37,6 +37,25 @@ sections 2 and 3).
 
 ---
 
+## 36 · Fuller sample sales today (18 Nov)
+
+Made-up ticketing data for today, so Overview, Reports, Manifest and Close Sales have a full day to show. Dummy data only (names, ids "demo-d2-", refs "DEMO-").
+
+| Today's trips | Sample sales |
+|---|---|
+| Departed | 60 to 95% of seats sold, all boarded |
+| Boarding now | 55 to 90% sold, half boarded |
+| Later today | 30 to 70% sold, up to 25% more for trips leaving within the next 10 hours |
+| When sold | About 3 in 4 tickets sold today from 04:00, the rest in the 3 days before |
+
+- Sample week (as of 18 Nov, 10:30): 51 trips today, 1,704 tickets sold, 929 boarded, 27 voided, farebox revenue P1.97M, 330 online.
+- Real PITX trips: sample tickets made before this entry are made again on the next load. Tickets sold in the browser stay. A signed-in Teller gets their share of today's sample sales again.
+- Sample week: made again once, so sales made in the browser on the sample week today go.
+- Fixed: trips more than 3 days away had sample sale times later than now. Their sales now start 2 days back.
+- Only trips that Trip Scheduling has for today get sales. No trips are made up for real PITX data.
+
+---
+
 ## 35 · Review 17 Nov: fewer pages, one Reports page, uniform terms (17 Nov)
 
 **Terms**

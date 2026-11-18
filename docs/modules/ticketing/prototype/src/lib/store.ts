@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { isOldDemoTicket } from "./demo-sales";
 import { todayManila } from "./format";
 import { routeGroupOf, type RouteGroup } from "./places";
 import { routeName, shiftRemittance } from "./reports";
@@ -62,7 +63,9 @@ function renamedStatus(stored: Db): Db {
  */
 function freshSample(stored: Db): Db {
   const today = todayManila();
-  if (stored.source === "pitx" || stored.seededOn === today) return stored;
+  // Sample tickets from before entry 36 also mean a new sample week, with today's fuller sales.
+  const oldSamples = stored.tickets?.some((t) => isOldDemoTicket(t.id));
+  if (stored.source === "pitx" || (stored.seededOn === today && !oldSamples)) return stored;
   const seeded = seedDb();
   const base = { ...seeded, settings: { ...seeded.settings, ...stored.settings } };
   const next = stored.session ? { ...withUserSamples(base, stored.session), session: stored.session } : base;

@@ -1,4 +1,5 @@
-import { addDemoSales } from "./demo-sales";
+import { addDemoSales, isOldDemoTicket } from "./demo-sales";
+import { withUserSamples } from "./user-samples";
 import { todayManila } from "./format";
 import { baseCode, SAMPLE_OPERATORS } from "./operator-routes";
 import { portalAccessToken, SUPABASE_ANON_KEY, SUPABASE_URL } from "./portal";
@@ -294,9 +295,12 @@ export async function loadLive(base: Db): Promise<LiveResult | null> {
   );
 
   const tripIds = new Set(trips.map((t) => t.id));
-  const tickets = base.tickets.filter((t) => tripIds.has(t.tripId));
+  // Sample tickets from an older generator are made again (entry 36). Real sales stay.
+  const kept = base.tickets.filter((t) => tripIds.has(t.tripId));
+  const tickets = kept.filter((t) => !isOldDemoTicket(t.id));
+  const remade = tickets.length < kept.length;
   const ticketIds = new Set(tickets.map((t) => t.id));
-  const db: Db = addDemoSales({
+  const made: Db = addDemoSales({
     ...base,
     source: "pitx",
     loadedAt: new Date().toISOString(),
@@ -309,7 +313,9 @@ export async function loadLive(base: Db): Promise<LiveResult | null> {
     trips: trips.sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`)),
     tickets,
     requests: base.requests.filter((r) => ticketIds.has(r.ticketId)),
-    audit: base.audit.filter((a) => !a.tripId || tripIds.has(a.tripId)),
+    audit: base.audit.filter((a) => (!a.tripId || tripIds.has(a.tripId)) && !(a.ticketId && isOldDemoTicket(a.ticketId))),
   });
+  // Remade samples: give the signed-in teller their share of today's sales again.
+  const db = remade && base.session ? withUserSamples(made, base.session) : made;
   return { db, trips: trips.length, staffFeed };
 }
