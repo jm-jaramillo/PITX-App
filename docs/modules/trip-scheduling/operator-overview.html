@@ -134,7 +134,7 @@
           <button type="button" class="mode-tab" data-filter="needplate">Needs plate</button>
         </div>
         <div class="toolbar" style="margin: 0">
-          <details class="row-menu"><summary class="menu-btn" aria-label="More">&#8943;</summary><div class="row-menu-pop"><button type="button" class="btn-link" id="export-csv">Export CSV</button></div></details>
+          <button type="button" class="btn-outline" id="export-csv">Export CSV</button>
           <button type="button" class="btn-primary" id="new-request">+ New request</button>
         </div>
       </div>
@@ -227,7 +227,7 @@
           <button type="button" class="btn-outline" id="hist-prev-month">&larr; Prev month</button>
           <input type="month" id="hist-month-input" />
           <button type="button" class="btn-outline" id="hist-next-month">Next month &rarr;</button>
-          <details class="row-menu"><summary class="menu-btn" aria-label="More">&#8943;</summary><div class="row-menu-pop"><button type="button" class="btn-link" id="hist-export-csv">Export CSV</button></div></details>
+          <button type="button" class="btn-outline" id="hist-export-csv">Export CSV</button>
         </div>
       </div>
 
@@ -350,6 +350,9 @@
         bookingOperatorHtml,
         showMessage,
         downloadCsv,
+        toast,
+        askDialog,
+        countdownText,
       } from "./assets/app.js";
 
       const profile = await guardPage("operator");
@@ -1327,6 +1330,31 @@
         );
         document.getElementById("slot").value = "";
         renderSlotPicker("slot-picker", "slot", available);
+        markBusySlots(bookingDate);
+      }
+
+      // Flags slots other operators already hold on this date (a dot) so
+      // operators can steer toward quieter times. Informational only.
+      async function markBusySlots(bookingDate) {
+        if (!bookingDate) return;
+        const picker = document.getElementById("slot-picker");
+        const { data } = await supabase.rpc("list_bookings_for_date", { p_date: bookingDate });
+        if (document.getElementById("booking_date").value !== bookingDate) return;
+        const counts = new Map();
+        for (const r of data ?? []) counts.set(r.slot, (counts.get(r.slot) ?? 0) + 1);
+        picker.querySelectorAll("[data-slot]").forEach((btn) => {
+          const c = counts.get(Number(btn.dataset.slot)) ?? 0;
+          btn.classList.toggle("is-busy", c > 0);
+          btn.title = c > 0 ? `${c} other trip${c === 1 ? "" : "s"} at this time` : "No other trips";
+        });
+        let legend = document.getElementById("slot-legend");
+        if (!legend) {
+          legend = document.createElement("p");
+          legend.id = "slot-legend";
+          legend.className = "slot-legend";
+          legend.textContent = "• = other operators already have a trip at this time";
+          picker.after(legend);
+        }
       }
 
       async function submitBooking(event) {
@@ -1609,7 +1637,60 @@
         });
       }
 
+      // Submitted -> Under review -> Approved (or the terminal outcome).
+      function stepperHtml(b) {
+        const dots =
+          b.status === "pending"
+            ? ["on", "on", ""]
+            : b.status === "approved"
+              ? ["on", "on", "on"]
+              : ["on", "on", "bad"];
+        const label =
+          b.status === "pending"
+            ? "Under review"
+            : b.status === "approved"
+              ? `Approved${b.bays?.name ? ` - ${b.bays.name}` : ""}`
+              : b.status === "rejected"
+                ? "Declined"
+                : "Cancelled";
+        const live = b.status === "approved" || b.status === "pending";
+        return `<div class="stepper" aria-label="${escapeHtml(label)}">${dots
+          .map((d) => `<i class="${d}"></i>`)
+          .join("")}<span>${escapeHtml(label)}${
+          live ? ` · departs ${escapeHtml(countdownText(b.booking_date, b.slot))}` : ""
+        }</span></div>`;
+      }
+
+      // Counts above the list; each chip applies the matching filter.
+      function renderSummaryStrip() {
+        let host = document.getElementById("summary-strip");
+        if (!host) {
+          host = document.createElement("div");
+          host.id = "summary-strip";
+          host.className = "summary-strip";
+          document.getElementById("requests").before(host);
+        }
+        const n = (f) => allBookings.filter(f).length;
+        const needPlate = n((b) => b.status === "approved" && !b.plate_no);
+        host.innerHTML = [
+          ["pending", `${n((b) => b.status === "pending")} pending`, false],
+          ["approved", `${n((b) => b.status === "approved")} approved`, false],
+          ["needplate", `${needPlate} need a plate`, needPlate > 0],
+        ]
+          .map(
+            ([f, label, alert]) =>
+              `<button type="button" class="summary-chip${alert ? " is-alert" : ""}" data-sumfilter="${f}">${label}</button>`
+          )
+          .join("");
+        host.querySelectorAll("[data-sumfilter]").forEach((btn) =>
+          btn.addEventListener("click", () =>
+            document.querySelector(`#status-filter [data-filter="${btn.dataset.sumfilter}"]`)?.click()
+          )
+        );
+      }
+
       function renderRequestsTable() {
+        renderSummaryStrip();
         const filtered =
           allBookings.filter(matchesStatusFilter);
         // Client-side, not re-fetched - allBookings is already loaded, and
@@ -1623,11 +1704,17 @@
         const host = document.getElementById("requests");
 
         if (bookings.length === 0) {
-          host.innerHTML = `<p class="empty">${
+          host.innerHTML = `<div class="empty">${
             allBookings.length === 0
-              ? "No booking requests yet."
-              : "No requests match this filter."
-          }</p>`;
+              ? `No booking requests yet.<br /><button type="button" class="btn-primary empty-cta" id="empty-new">+ Request a trip</button>`
+              : `No requests match this filter.<br /><button type="button" class="btn-outline empty-cta" id="empty-clear">Show all</button>`
+          }</div>`;
+          host.querySelector("#empty-new")?.addEventListener("click", () =>
+            document.getElementById("new-request").click()
+          );
+          host.querySelector("#empty-clear")?.addEventListener("click", () =>
+            document.querySelector('#status-filter [data-filter="all"]')?.click()
+          );
           return;
         }
 
@@ -1701,7 +1788,7 @@
                           ? `<span class="plate-needed">⚠ Plate needed</span>`
                           : `<span class="subtle">Not set yet</span>`
                     }</td>
-                    <td data-label="Status">${statusBadge(b.status)}${extra}${
+                    <td data-label="Status">${statusBadge(b.status)}${extra}${stepperHtml(b)}${
                       b.rejection_reason
                         ? `<span class="cell-sub">${escapeHtml(b.rejection_reason)}</span>`
                         : ""
@@ -2055,27 +2142,43 @@
         const what = b
           ? `${b.booking_date}, ${formatSlotStart(b.slot)} to ${b.route}`
           : "this request";
-        if (!confirm(`Cancel ${what}?\n\nThis can't be undone - you'd have to submit a new request, and the slot may be taken by then.`)) {
-          return;
-        }
+        const ans = await askDialog({
+          title: `Cancel ${what}?`,
+          message:
+            "This can't be undone - you'd have to submit a new request, and the slot may be taken by then.",
+          confirmLabel: "Cancel request",
+          danger: true,
+        });
+        if (!ans.ok) return;
         await supabase
           .from("bookings")
           .update({ status: "cancelled" })
           .eq("id", bookingId)
           .eq("operator_id", profile.id)
           .eq("status", "pending");
+        toast("Request cancelled.");
         await loadRequests();
       }
 
       async function requestCancellation(bookingId) {
-        const reason = prompt("Reason for cancelling (optional):") ?? "";
+        const ans = await askDialog({
+          title: "Request cancellation?",
+          message: "PITX staff review this before the slot is released.",
+          confirmLabel: "Send request",
+          danger: true,
+          reasonLabel: "Reason (optional)",
+          reasons: ["Bus unavailable", "Schedule changed", "Booked by mistake"],
+        });
+        if (!ans.ok) return;
         const { error } = await supabase.rpc("request_booking_cancellation", {
           p_booking_id: bookingId,
-          p_reason: reason,
+          p_reason: ans.reason,
         });
         if (error) {
           showMessage("form-error", error.message, "error");
           document.getElementById("form-error").scrollIntoView({ block: "center" });
+        } else {
+          toast("Cancellation requested - awaiting PITX staff.");
         }
         await loadRequests();
       }

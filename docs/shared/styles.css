@@ -3202,3 +3202,64 @@ td.row-actions-cell {
 .public-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
 .public-brand img { height: 30px; width: auto; max-width: 100%; }
 .public-brand span { font-weight: 800; color: var(--title); }
+
+/* ===================================================== UX pass (ux-1) */
+#toast-host { position: fixed; right: 16px; bottom: 16px; z-index: 9999; display: grid; gap: 8px; max-width: min(92vw, 380px); }
+.toast { display: flex; align-items: center; gap: 12px; justify-content: space-between; padding: 11px 14px; border-radius: 12px; font-size: 13px; font-weight: 600; background: #1f2430; color: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+.toast-error { background: #b42318; }
+.toast-undo { font: inherit; font-weight: 700; color: #9db8ff; background: none; border: 0; cursor: pointer; text-decoration: underline; }
+dialog.ask-dialog { max-width: 440px; width: calc(100vw - 32px); }
+.ask-reason { margin-top: 10px; display: grid; gap: 8px; }
+.ask-input { width: 100%; }
+.reason-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.reason-chip { font: inherit; font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--border, #d7dbe3); background: var(--surface, #fff); color: var(--text, #1f2430); cursor: pointer; }
+.reason-chip:hover { border-color: var(--blue, #2f5fd0); }
+
+/* Status badges: icon + colour so status is not colour-only. */
+.badge-pending::before { content: "\25D4\00a0"; }
+.badge-approved::before { content: "\2713\00a0"; }
+.badge-rejected::before { content: "\2715\00a0"; }
+.badge-cancelled::before { content: "\2298\00a0"; }
+
+/* Visible keyboard focus everywhere. */
+:where(button, a, input, select, summary, [tabindex]):focus-visible { outline: 2px solid var(--blue, #2f5fd0); outline-offset: 2px; }
+
+/* Urgency / countdown chips and "now" markers. */
+.urgency { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #eef0f3; color: #4b5563; }
+.urgency.is-soon { background: #fde8e6; color: #b42318; }
+.urgency.is-today { background: #fff4d6; color: #8a5a00; }
+tr.is-now td { background: color-mix(in srgb, var(--blue, #2f5fd0) 10%, transparent); font-weight: 700; }
+tr.is-now td:first-child { box-shadow: inset 3px 0 0 var(--blue, #2f5fd0); }
+tr.is-departed { opacity: .55; }
+
+/* Status stepper on operator request rows. */
+.stepper { display: flex; gap: 4px; align-items: center; margin-top: 4px; font-size: 10.5px; color: var(--label, #6b7280); }
+.stepper i { width: 7px; height: 7px; border-radius: 50%; background: #cbd0d9; display: inline-block; }
+.stepper i.on { background: var(--blue, #2f5fd0); }
+.stepper i.bad { background: #b42318; }
+
+/* Busy-slot marker in the time picker. */
+.slot-tick.is-busy::after { content: " \2022"; color: #b45309; }
+.slot-legend { font-size: 11px; color: var(--label, #6b7280); margin: 4px 0 0; }
+
+/* Summary strip filters. */
+.summary-strip { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.summary-chip { font: inherit; font-size: 13px; font-weight: 600; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border, #d7dbe3); background: var(--surface, #fff); color: inherit; cursor: pointer; }
+.summary-chip.is-alert { border-color: #b45309; color: #8a5a00; background: #fff8e6; }
+.empty .empty-cta { display: inline-block; margin-top: 12px; }
+
+/* Kiosk mode (?kiosk=1): large text, no chrome, for display screens. */
+body.kiosk { font-size: 20px; }
+body.kiosk .sidebar, body.kiosk .toolbar, body.kiosk .mode-switch { display: none; }
+
+/* Touch targets on phones. */
+@media (max-width: 640px) {
+  .btn-primary, .btn-outline, .btn-approve, .btn-danger-outline, .btn-alert, .mode-tab, .menu-btn, .slot-tick, .reason-chip, .btn-link { min-height: 44px; }
+  dialog { max-width: 100vw; width: 100vw; margin: auto 0 0; border-radius: 18px 18px 0 0; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .toast { animation: toast-in .18s ease-out; }
+  @keyframes toast-in { from { transform: translateY(8px); opacity: 0; } }
+}
+
+.request-card.is-focused { outline: 2px solid var(--blue, #2f5fd0); outline-offset: 2px; }

@@ -659,3 +659,138 @@ export function applyVehicleHighlightFromQuery(openDetails) {
 }`;
   document.head.appendChild(style);
 })();
+
+/* ------------------------------------------------------ UX helpers (ux-1) */
+
+// Toast: non-blocking confirmation after an action, with optional Undo.
+// aria-live so screen readers announce it.
+export function toast(message, { kind = "ok", undo = null, ms = 5000 } = {}) {
+  let host = document.getElementById("toast-host");
+  if (!host) {
+    host = document.createElement("div");
+    host.id = "toast-host";
+    host.setAttribute("role", "status");
+    host.setAttribute("aria-live", "polite");
+    document.body.appendChild(host);
+  }
+  const el = document.createElement("div");
+  el.className = `toast toast-${kind}`;
+  const text = document.createElement("span");
+  text.textContent = message;
+  el.appendChild(text);
+  const close = () => el.remove();
+  if (undo) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "toast-undo";
+    btn.textContent = "Undo";
+    btn.addEventListener("click", () => {
+      close();
+      undo();
+    });
+    el.appendChild(btn);
+  }
+  host.appendChild(el);
+  setTimeout(close, ms);
+}
+
+// Styled replacement for window.confirm()/prompt(). Resolves to
+// { ok: boolean, reason: string }. `reasons` adds one-click preset chips
+// that fill the optional free-text field (rejection / cancellation reasons).
+export function askDialog({
+  title,
+  message = "",
+  confirmLabel = "Confirm",
+  danger = false,
+  reasonLabel = null,
+  reasons = [],
+}) {
+  return new Promise((resolve) => {
+    const dlg = document.createElement("dialog");
+    dlg.className = "ask-dialog";
+    dlg.setAttribute("aria-labelledby", "ask-title");
+    dlg.innerHTML = `
+      <h2 class="dialog-title" id="ask-title"></h2>
+      <p class="subtle ask-msg"></p>
+      ${
+        reasonLabel !== null
+          ? `<div class="ask-reason">
+               <div class="reason-chips"></div>
+               <input class="ask-input" placeholder="${escapeHtml(reasonLabel)}" aria-label="${escapeHtml(reasonLabel)}" />
+             </div>`
+          : ""
+      }
+      <div class="dialog-actions">
+        <button type="button" class="btn-outline" data-ask="cancel">Cancel</button>
+        <button type="button" class="${danger ? "btn-danger-outline" : "btn-primary"}" data-ask="ok"></button>
+      </div>`;
+    dlg.querySelector("#ask-title").textContent = title;
+    dlg.querySelector(".ask-msg").textContent = message;
+    dlg.querySelector("[data-ask=ok]").textContent = confirmLabel;
+    const input = dlg.querySelector(".ask-input");
+    const chips = dlg.querySelector(".reason-chips");
+    if (chips) {
+      for (const r of reasons) {
+        const c = document.createElement("button");
+        c.type = "button";
+        c.className = "reason-chip";
+        c.textContent = r;
+        c.addEventListener("click", () => {
+          input.value = r;
+          input.focus();
+        });
+        chips.appendChild(c);
+      }
+    }
+    let result = { ok: false, reason: "" };
+    dlg.addEventListener("click", (e) => {
+      const a = e.target.closest?.("[data-ask]")?.dataset.ask;
+      if (a === "ok") {
+        result = { ok: true, reason: input ? input.value.trim() : "" };
+        dlg.close();
+      } else if (a === "cancel" || e.target === dlg) dlg.close();
+    });
+    dlg.addEventListener("close", () => {
+      dlg.remove();
+      resolve(result);
+    });
+    document.body.appendChild(dlg);
+    dlg.showModal(); // Esc closes (native) and focus stays inside the modal.
+    (input ?? dlg.querySelector("[data-ask=ok]")).focus();
+  });
+}
+
+// "in 3h 20m" / "in 45m" / "departed" - used for urgency chips.
+export function countdownText(bookingDate, slot, now = Date.now()) {
+  const diff = slotStartMillis(bookingDate, slot) - now;
+  if (diff <= 0) return "departed";
+  const m = Math.round(diff / 60000);
+  if (m < 60) return `in ${m}m`;
+  const h = Math.floor(m / 60);
+  return h < 24 ? `in ${h}h ${m % 60}m` : `in ${Math.floor(h / 24)}d ${h % 24}h`;
+}
+
+// Accessibility: the many "..." row menus share one generic label, so name
+// each after its row and keep aria-expanded in sync. Observes later renders.
+function labelRowMenus() {
+  document.querySelectorAll("summary.menu-btn:not([data-a11y])").forEach((s) => {
+    s.dataset.a11y = "1";
+    const ctx = s
+      .closest("tr, .request-card")
+      ?.innerText?.replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 60);
+    if (ctx) s.setAttribute("aria-label", `More actions: ${ctx}`);
+    const d = s.parentElement;
+    s.setAttribute("aria-expanded", String(d.open));
+    d.addEventListener("toggle", () => s.setAttribute("aria-expanded", String(d.open)));
+  });
+}
+if (typeof document !== "undefined") {
+  const start = () => {
+    labelRowMenus();
+    new MutationObserver(labelRowMenus).observe(document.body, { childList: true, subtree: true });
+  };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
+  else start();
+}

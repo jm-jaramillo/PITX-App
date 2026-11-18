@@ -167,7 +167,7 @@
           <button type="button" class="btn-outline" id="prev">&larr; Prev day</button>
           <input type="date" id="date" />
           <button type="button" class="btn-outline" id="next">Next day &rarr;</button>
-          <details class="row-menu"><summary class="menu-btn" aria-label="More">&#8943;</summary><div class="row-menu-pop"><button type="button" class="btn-link" id="export-csv">Export CSV</button></div></details>
+          <button type="button" class="btn-outline" id="export-csv">Export CSV</button>
         </div>
       </div>
 
@@ -372,6 +372,15 @@
       await load();
       onLiveChange(["bookings", "bays"], load);
 
+      // Keep the board current without a reload (departed rows dim, the
+      // "next up" time block highlights), and offer a large-text kiosk
+      // mode for display screens: open this page with ?kiosk=1.
+      setInterval(renderBoard, 60 * 1000);
+      if (new URLSearchParams(location.search).get("kiosk") === "1") {
+        document.body.classList.add("kiosk");
+        setInterval(load, 5 * 60 * 1000);
+      }
+
       async function load() {
         let query = supabase
           .from("bookings")
@@ -492,6 +501,8 @@
                           const isMine = b.operator_id === profile.id;
                           return `
                         <tr class="pids-row${status.key === "cancelled" ? " is-cancelled" : ""}${
+                            status.key === "departed" ? " is-departed" : ""
+                          }${
                             isMine && viewMode === "all" ? " is-mine" : ""
                           }">
                           <td>

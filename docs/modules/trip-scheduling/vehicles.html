@@ -146,7 +146,7 @@
           <button type="button" class="btn-outline" id="columns-toggle">Columns</button>
           <div class="columns-popover hidden" id="columns-popover"></div>
         </div>
-        <details class="row-menu"><summary class="menu-btn" aria-label="More">&#8943;</summary><div class="row-menu-pop"><button type="button" class="btn-link" id="export-csv">Export CSV</button></div></details>
+        <button type="button" class="btn-outline" id="export-csv">Export CSV</button>
       </div>
 
       <div id="filter-note"></div>
@@ -578,6 +578,7 @@
         todayISO,
         addDays,
         ROUTES,
+        askDialog,
       } from "./assets/app.js";
       import { extractOrCr } from "./assets/orcr-parser.js";
 
@@ -1998,7 +1999,13 @@
 
       async function deleteVehicle() {
         if (!editingId) return;
-        if (!confirm("Remove this vehicle from your registered list?")) return;
+        const ans = await askDialog({
+          title: "Remove this vehicle?",
+          message: "It will be removed from your registered list.",
+          confirmLabel: "Remove",
+          danger: true,
+        });
+        if (!ans.ok) return;
 
         await supabase
           .from("vehicles")

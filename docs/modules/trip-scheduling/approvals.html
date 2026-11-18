@@ -146,7 +146,7 @@
           </button>
           <button type="button" class="btn-outline" id="veh-columns-toggle">Columns</button>
           <div class="notif-panel hidden" id="veh-columns-panel"></div>
-          <details class="row-menu"><summary class="menu-btn" aria-label="More">&#8943;</summary><div class="row-menu-pop"><button type="button" class="btn-link" id="veh-export-csv">Export CSV</button></div></details>
+          <button type="button" class="btn-outline" id="veh-export-csv">Export CSV</button>
         </div>
       </div>
 
@@ -213,6 +213,10 @@
         showMessage,
         escapeHtml,
         bookingOperatorHtml,
+        toast,
+        askDialog,
+        countdownText,
+        slotStartMillis,
         expiryCell,
         busTypeLabel,
         downloadCsv,
@@ -553,9 +557,18 @@
           return;
         }
 
+        // Soonest departure first, so the requests nearest their cutoff
+        // are never buried at the bottom of the queue.
+        requests.sort(
+          (a, b) =>
+            slotStartMillis(a.booking_date, a.slot) - slotStartMillis(b.booking_date, b.slot)
+        );
+
         host.innerHTML = requests
           .map((b) => {
             const { gate, suggested, other, autoPick, proposed } = bayChoicesFor(b);
+            const msLeft = slotStartMillis(b.booking_date, b.slot) - Date.now();
+            const urgencyCls = msLeft < 4 * 3600e3 ? "is-soon" : msLeft < 24 * 3600e3 ? "is-today" : "";
             const none = suggested.length + other.length === 0;
 
             const optionsHtml = (list) =>
@@ -596,7 +609,7 @@
                   </div>
                   <p class="request-when">${escapeHtml(
                     b.booking_date
-                  )} &middot; ${escapeHtml(formatSlotStart(b.slot))}</p>
+                  )} &middot; ${escapeHtml(formatSlotStart(b.slot))}<span class="urgency ${urgencyCls}">${escapeHtml(countdownText(b.booking_date, b.slot))}</span></p>
                 </div>
                 <div class="request-actions">
                   <form data-approve="${escapeHtml(b.id)}">
@@ -608,7 +621,7 @@
                       }
                       ${
                         suggested.length
-                          ? `<optgroup label="Suggested (${escapeHtml(gate)})">${optionsHtml(
+                          ? `<optgroup label="Suggested (${escapeHtml(gate)}) - ${suggested.length} free">${optionsHtml(
                               suggested
                             )}</optgroup>`
                           : ""
@@ -668,6 +681,27 @@
         updateBulkButtons();
       }
 
+      // Keyboard triage: J / K move between pending requests, A approves
+      // the focused one with its pre-selected bay. Ignored while typing.
+      document.addEventListener("keydown", (e) => {
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        if (/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName ?? "")) return;
+        if (document.querySelector("dialog[open]")) return;
+        const cards = [...document.querySelectorAll("#requests .request-card")];
+        if (cards.length === 0) return;
+        const cur = cards.findIndex((c) => c.classList.contains("is-focused"));
+        const focus = (i) => {
+          cards.forEach((c) => c.classList.remove("is-focused"));
+          const c = cards[Math.max(0, Math.min(cards.length - 1, i))];
+          c.classList.add("is-focused");
+          c.scrollIntoView({ block: "nearest" });
+        };
+        const k = e.key.toLowerCase();
+        if (k === "j") focus(cur + 1);
+        else if (k === "k") focus(cur < 0 ? 0 : cur - 1);
+        else if (k === "a" && cur >= 0) cards[cur].querySelector("[data-approve] .btn-approve")?.click();
+      });
+
       function updateBulkButtons() {
         const anySelected = selectedIds.size > 0;
         document.getElementById("approve-selected").disabled = !anySelected;
@@ -691,7 +725,9 @@
         showMessage("message", "");
         const ids = Array.from(selectedIds);
         if (ids.length === 0) return;
-        const reason = prompt("Rejection reason for all selected requests (optional):") ?? "";
+        const ans = await askDialog({ title: "Reject selected requests?", confirmLabel: "Reject", danger: true, reasonLabel: "Reason (optional)", reasons: ["Slot full", "Vehicle not approved", "Wrong route", "Incomplete details"] });
+        if (!ans.ok) return;
+        const reason = ans.reason;
         for (const id of ids) {
           await supabase
             .from("bookings")
@@ -1434,7 +1470,9 @@
         if (selectedIds.size === 0) return;
         // One shared reason for the whole batch, prompted once up front -
         // matches the single-row Reject form's optional free-text reason.
-        const reason = prompt("Rejection reason (optional, applied to all selected):", "") ?? "";
+        const ans = await askDialog({ title: "Reject selected vehicles?", confirmLabel: "Reject", danger: true, reasonLabel: "Reason (optional)", reasons: ["Slot full", "Vehicle not approved", "Wrong route", "Incomplete details"] });
+        if (!ans.ok) return;
+        const reason = ans.reason;
         showMessage("veh-message", "");
         const ids = [...selectedIds];
         let rejected = 0;
@@ -1836,10 +1874,9 @@
         const ids = [...selectedIds];
         if (ids.length === 0) return;
 
-        const reason = prompt("Reason for rejecting the selected transfers (optional):", "");
-        // A prompt Cancel (null) backs out entirely; an empty string means
-        // "reject with no reason", which is a normal choice to proceed with.
-        if (reason === null) return;
+        const ans = await askDialog({ title: "Reject selected transfers?", confirmLabel: "Reject", danger: true, reasonLabel: "Reason (optional)", reasons: ["Slot full", "Vehicle not approved", "Wrong route", "Incomplete details"] });
+        if (!ans.ok) return;
+        const reason = ans.reason;
 
         showMessage("xfer-message", "");
 
@@ -2098,8 +2135,12 @@
 
         async function decide(id, approve) {
           showMessage("prof-message", "");
-          const reason = approve ? null : prompt("Reason for declining (optional):", "") ?? null;
-          if (!approve && reason === null) return;
+          let reason = null;
+          if (!approve) {
+            const ans = await askDialog({ title: "Decline this change?", confirmLabel: "Decline", danger: true, reasonLabel: "Reason (optional)", reasons: ["Slot full", "Vehicle not approved", "Wrong route", "Incomplete details"] });
+            if (!ans.ok) return;
+            reason = ans.reason;
+          }
           const { error } = await supabase.rpc("decide_operator_profile_change", {
             p_change_id: id,
             p_approve: approve,
