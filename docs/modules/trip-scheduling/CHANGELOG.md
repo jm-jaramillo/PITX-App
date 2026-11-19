@@ -4980,6 +4980,6 @@ is retained; adopted from the source only if the kept one has none) and
   `delete-account` Edge Function (checkbox, on by default).
 - The kept account gets an "Operator accounts merged" notification.
 
-**Not applied to the live database yet** - run `npm run migrate` (or paste
+**Applied to the live database (PITX App project) on 19 Nov via the Supabase MCP.** If rebuilding, run `npm run migrate` (or paste
 the file into the SQL editor) before using the button.
 
