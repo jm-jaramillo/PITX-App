@@ -5059,3 +5059,8 @@ name is the account holder's. Vehicles/trips: Superlines 54/11, Jac Liner
 saulogtransit) still exist, empty - delete them from Accounts. Pre-change
 values are kept in `public._backup_operator_merge_20261119` (RLS on, no
 policies) for undo; drop it once satisfied.
+
+The six emptied accounts from #139 were deleted on 19 Nov (login and profile).
+Their profile rows, company profiles and login emails are kept in
+`public._backup_deleted_operator_accounts_20261119` (RLS on, no policies);
+passwords are not kept - recreate an account via Accounts if ever needed.
