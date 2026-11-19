@@ -290,6 +290,8 @@
         downloadCsv,
         ROUTES,
         SLOTS,
+        groupedByTradeHtml,
+        routesByTradeHtml,
       } from "./assets/app.js";
 
       const profile = await guardPage("staff");
@@ -721,14 +723,14 @@
             : username
             ? `<option value="" disabled selected>Select a vehicle</option>`
             : "") +
-          vehicles
-            .map(
-              (v) =>
-                `<option value="${escapeHtml(v.plate_no)}"${
-                  !username && norm(v.plate_no) === norm(currentPlate) ? " selected" : ""
-                }>${escapeHtml(v.plate_no)}${v.body_number ? " · " + escapeHtml(v.body_number) : ""}</option>`
-            )
-            .join("");
+          (() => {
+            const optionHtml = (v) =>
+              `<option value="${escapeHtml(v.plate_no)}"${
+                !username && norm(v.plate_no) === norm(currentPlate) ? " selected" : ""
+              }>${escapeHtml(v.plate_no)}${v.body_number ? " · " + escapeHtml(v.body_number) : ""}</option>`;
+            // merged accounts: group the vehicles by trade name
+            return groupedByTradeHtml(vehicles, (v) => v.trade_name, optionHtml) ?? vehicles.map(optionHtml).join("");
+          })();
         tripPlate.disabled = false;
       }
 
@@ -891,7 +893,7 @@
         const today = todayISO();
         const { data } = await supabase
           .from("vehicles")
-          .select("plate_no, body_number, route")
+          .select("plate_no, body_number, route, trade_name")
           .eq("operator_id", opId)
           .eq("status", "approved")
           .or("ltfrb_status.is.null,ltfrb_status.in.(active,ltfrb_verified)")
@@ -907,23 +909,21 @@
           bookRoute.innerHTML = `<option value="" disabled selected>No bookable vehicles for this operator</option>`;
           return;
         }
+        // a merged account holds several trades: group destinations by trade name
         bookRoute.innerHTML =
+          routesByTradeHtml(bookVehicles, null)?.replace("Select a route", "Select a destination") ??
           `<option value="" disabled selected>Select a destination</option>` +
-          routes.map((r) => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join("");
+            routes.map((r) => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join("");
         bookRoute.disabled = false;
       }
 
       function refreshBookPlates() {
         const route = bookRoute.value;
+        const pool = bookVehicles.filter((v) => v.route === route);
+        const optionHtml = (v) =>
+          `<option value="${escapeHtml(v.plate_no)}">${escapeHtml(v.plate_no)}${v.body_number ? " · " + escapeHtml(v.body_number) : ""}</option>`;
         bookPlate.innerHTML =
-          NO_PLATE +
-          bookVehicles
-            .filter((v) => v.route === route)
-            .map(
-              (v) =>
-                `<option value="${escapeHtml(v.plate_no)}">${escapeHtml(v.plate_no)}${v.body_number ? " · " + escapeHtml(v.body_number) : ""}</option>`
-            )
-            .join("");
+          NO_PLATE + (groupedByTradeHtml(pool, (v) => v.trade_name, optionHtml) ?? pool.map(optionHtml).join(""));
       }
 
       document.getElementById("book-trip").addEventListener("click", async () => {

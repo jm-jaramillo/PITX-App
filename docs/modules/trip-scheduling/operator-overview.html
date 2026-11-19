@@ -353,6 +353,8 @@
         toast,
         askDialog,
         countdownText,
+        groupedByTradeHtml,
+        routesByTradeHtml,
       } from "./assets/app.js";
 
       const profile = await guardPage("operator");
@@ -858,7 +860,7 @@
         const today = todayISO();
         const { data } = await supabase
           .from("vehicles")
-          .select("plate_no, body_number, route")
+          .select("plate_no, body_number, route, trade_name")
           .eq("operator_id", profile.id)
           .eq("status", "approved")
           .or("ltfrb_status.is.null,ltfrb_status.in.(active,ltfrb_verified)")
@@ -1114,7 +1116,8 @@
           selected ? "" : " selected"
         }>Select a vehicle</option>`;
 
-        return placeholder + pool.map(optionHtml).join("");
+        // a merged account's vehicles are grouped by trade name
+        return placeholder + (groupedByTradeHtml(pool, (v) => v.trade_name, optionHtml) ?? pool.map(optionHtml).join(""));
       }
 
       // Grouped by gate (matching how staff assign bays). `routes`
@@ -1122,6 +1125,12 @@
       // to routesWithRegisteredVehicle() - the operator's own routes are
       // the only ones they can actually book anyway (#51).
       function routeOptionsHtml(selected, routes = ROUTES) {
+        // vehicles of several trades (merged account): group destinations by trade name
+        const byTrade = routesByTradeHtml(
+          approvedVehicles.filter((v) => routes.includes(v.route)),
+          selected
+        );
+        if (byTrade) return byTrade;
         const byGate = new Map();
         for (const r of routes) {
           const gate = ROUTE_GATES[r] ?? "Other";
@@ -1160,16 +1169,13 @@
         const pool = route
           ? approvedVehicles.filter((v) => vehicleMatchesRoute(v, route))
           : [];
+        const optionHtml = (v) =>
+          `<option value="${escapeHtml(v.plate_no)}">${escapeHtml(v.plate_no)}${
+            v.body_number ? ` - Body No. ${escapeHtml(v.body_number)}` : ""
+          }</option>`;
         select.innerHTML =
           `<option value="">No plate yet</option>` +
-          pool
-            .map(
-              (v) =>
-                `<option value="${escapeHtml(v.plate_no)}">${escapeHtml(v.plate_no)}${
-                  v.body_number ? ` - Body No. ${escapeHtml(v.body_number)}` : ""
-                }</option>`
-            )
-            .join("");
+          (groupedByTradeHtml(pool, (v) => v.trade_name, optionHtml) ?? pool.map(optionHtml).join(""));
       }
 
       function initForm() {

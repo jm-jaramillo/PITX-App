@@ -794,3 +794,59 @@ if (typeof document !== "undefined") {
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
   else start();
 }
+
+/* ------------------------------------------------- group by trade name */
+
+// Merged accounts (#137) hold vehicles of several trades under one login, and each
+// vehicle keeps its own trade name. When a list of vehicles (or the routes they
+// serve) spans more than one trade, dropdowns group by trade name so the
+// operator or staff can tell the lines apart. With a single trade (or none)
+// they stay flat / grouped as before.
+
+/** [{label, entries}] per trade (A-Z, unnamed last), or null when grouping adds nothing. */
+export function tradeGroups(entries, tradeOf) {
+  const name = (e) => String(tradeOf(e) ?? "").trim();
+  const named = [...new Set(entries.map(name).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const hasBlank = entries.some((e) => !name(e));
+  if (named.length < 2 && !(named.length === 1 && hasBlank)) return null;
+  const groups = named.map((label) => ({ label, entries: entries.filter((e) => name(e) === label) }));
+  if (hasBlank) groups.push({ label: "No trade name", entries: entries.filter((e) => !name(e)) });
+  return groups;
+}
+
+/** <optgroup>s of options per trade, or null if the items don't span trades. */
+export function groupedByTradeHtml(items, tradeOf, optionHtml) {
+  const groups = tradeGroups(items, tradeOf);
+  if (!groups) return null;
+  return groups
+    .map((g) => `<optgroup label="${escapeHtml(g.label)}">${g.entries.map(optionHtml).join("")}</optgroup>`)
+    .join("");
+}
+
+/**
+ * Destination options grouped by the trade of the vehicle that serves them, or
+ * null when the vehicles are of one trade only. A route served by two trades
+ * appears under both.
+ */
+export function routesByTradeHtml(vehicles, selected) {
+  const groups = tradeGroups(vehicles, (v) => v.trade_name);
+  if (!groups) return null;
+  const order = (r) => {
+    const i = ROUTES.indexOf(r);
+    return i < 0 ? ROUTES.length : i;
+  };
+  const html = groups
+    .map((g) => {
+      const routes = [...new Set(g.entries.map((v) => v.route).filter(Boolean))].sort(
+        (a, b) => order(a) - order(b) || a.localeCompare(b)
+      );
+      return `<optgroup label="${escapeHtml(g.label)}">${routes
+        .map(
+          (r) =>
+            `<option value="${escapeHtml(r)}"${r === selected ? " selected" : ""}>${escapeHtml(r)}</option>`
+        )
+        .join("")}</optgroup>`;
+    })
+    .join("");
+  return `<option value="" disabled${selected ? "" : " selected"}>Select a route</option>` + html;
+}

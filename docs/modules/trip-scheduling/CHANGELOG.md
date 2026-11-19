@@ -5064,3 +5064,24 @@ The six emptied accounts from #139 were deleted on 19 Nov (login and profile).
 Their profile rows, company profiles and login emails are kept in
 `public._backup_deleted_operator_accounts_20261119` (RLS on, no policies);
 passwords are not kept - recreate an account via Accounts if ever needed.
+
+### 141. Merged accounts: destinations and plates grouped by trade name (migration 202611191200, 19 Nov)
+
+After accounts are merged (#137) one login holds vehicles of several trades, each
+keeping its own `vehicles.trade_name`. Everywhere a trip is booked or a plate is
+picked, the dropdowns now group by trade name when the vehicles span more than one
+trade:
+- **Operator** request form and its Edit dialog: Destination grouped by trade name
+  (a route served by two trades appears under both), Plate No. grouped by trade
+  name for the chosen destination; the set/change-plate dialogs too.
+- **Staff Schedule -> Book a trip**: Destination and Plate grouped by trade name once
+  an operator is chosen. **Edit trip**: its plate list is grouped the same way
+  (`staff_list_booking_vehicles` now also returns `trade_name`).
+- An account with a single trade (or none) is unchanged: destinations stay grouped by
+  gate and plates stay flat. Vehicles with no trade name sit under "No trade name" when
+  others have one.
+Verified with JAC LINER (3 trades): Destination shows JAC LINER / JAM LINER INC / LLI BUS
+CO., INC.; BOAC, MARINDUQUE splits its plates JAM LINER INC (4) / LLI BUS CO., INC. (2) as
+both staff and operator. Migration applied by hand with a `_schema_migrations` row.
+
+---
