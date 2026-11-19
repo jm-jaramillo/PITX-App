@@ -401,6 +401,7 @@ Commits `cc8b40c`, `7dd16ea`, `e6b2986`
 | `202611121100_terminal-operating-system_bay_add_rename.sql` | 16 |
 | `202611121000_terminal-operating-system_bay_service.sql` | 17 |
 | `202611121200_terminal-operating-system_overview_punctuality.sql` | 18 |
+| `202611191000_terminal-operating-system_commuter_tracking.sql` | 19 |
 
 ## Open items
 
@@ -491,5 +492,56 @@ Commits `cc8b40c`, `7dd16ea`, `e6b2986`
 - **Migration** `202611121200_terminal-operating-system_overview_punctuality.sql`:
   `tos_overview_range` returns these counts per period, day and hour. The
   signature is unchanged.
+
+---
+
+## 19 · Commuter dispatch: ANPR tracking only (19 Nov)
+
+- **Commuter is separate from provincial.** Everything before this entry is
+  for provincial operations: booked trips, gate rules, barriers and staff
+  decisions. Commuter buses don't go through any of that. The same ANPR
+  cameras only log their plates, to count dispatches per commuter route.
+- **Commuter lanes:** gates now have a *mode*. Two commuter lanes were added,
+  **CE1 Commuter entry** and **CX1 Commuter exit**, each with an LPR camera
+  (shown under Devices & keys). They don't appear on Gate monitor, because
+  there is no barrier to control.
+- **Device endpoint:** a read sent for a commuter gate is logged in
+  `tos.commuter_reads`.
+  - The answer is always `action: "open"`, decision `TRACKED`, and the route
+    shows on the gate board.
+  - Retries with the same `read_id` count once, as before.
+  - Provincial gates are unchanged. See [DEVICE-API.md](DEVICE-API.md) §2.6
+    (v1.2).
+- **New page, Commuter dispatch** (sidebar), for Today, any Day or any Month:
+  - Totals: dispatches (commuter exit reads), entries, buses seen, and plates
+    with no route.
+  - **Dispatches per route:** entries, buses, busiest hour, and first and last
+    dispatch. Export CSV.
+  - Dispatches per hour, or per day for a month. Click a day to open it.
+  - **Plates with no route:** staff tag a plate to a route once (and its
+    operator, optionally), and its earlier reads move to that route too.
+    Plates in Trip Scheduling's vehicle masterfile use their route from there.
+  - Latest reads, *Test a commuter read*, and *Clear commuter test reads*.
+- **Counting rule:** the same plate at the same camera within 10 minutes
+  counts once, so a bus idling in view is not counted twice.
+- **Tested** in a rolled-back transaction on live data:
+  - masterfile plate AWD434 at CX1 → logged as ALABANG, barrier open, board
+    shows ALABANG / SAFE TRIP;
+  - the same read sent twice → one record;
+  - read again 5 min later → still 1 dispatch; 28 min later → 2;
+  - unknown plate → "no route yet", then tagged to PACITA COMPLEX and its read
+    moved there;
+  - a provincial read at G1 → still goes through the gate rules;
+  - a commuter test read sent to G1 → refused.
+
+  The page was checked locally with fake data.
+- **Migration** `202611191000_terminal-operating-system_commuter_tracking.sql`:
+  - `tos.gates.mode`, plus the CE1 / CX1 gates and their cameras
+  - `tos.commuter_reads`, `tos.commuter_plates`, `tos.commuter_read_core`
+  - `tos_device_read` routes commuter gates to the log
+  - `tos_device_bundle` gates include `mode`
+  - `tos_commuter_dispatch`, `tos_tag_commuter_plate`,
+    `tos_commuter_test_read`, `tos_clear_commuter_tests`
+- Pages bumped to `?v=20261119-1`.
 
 ---

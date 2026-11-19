@@ -45,6 +45,10 @@ Boom barrier ◀─SDK── Gate controller ◀──JSON── { "action": "op
 | `G1` | Entry Gate 1 | entry | `G1-LPR`, `G1-RFID`, `G1-BAR` |
 | `G2` | Entry Gate 2 | entry | `G2-LPR`, `G2-BAR` |
 | `X1` | Exit Gate | exit | `X1-LPR`, `X1-BAR`, `X1-RFID` |
+| `CE1` | Commuter entry | entry, **commuter** | `CE1-LPR` |
+| `CX1` | Commuter exit | exit, **commuter** | `CX1-LPR` |
+
+Commuter lanes (`mode: commuter` in `/bundle`) are log-only: see §2.6.
 
 The current list is also in the `gates` part of `GET /bundle`.
 
@@ -184,6 +188,28 @@ Refresh at least **every 5 minutes** and at the start of each day. About 300 KB 
 
 ---
 
+### 2.6 Commuter lanes (ANPR tracking only)
+
+Commuter buses don't go through the gate rules or the barriers. The same ANPR cameras on the commuter lanes
+send their reads to the same `POST /read` (or `/reads`) with the commuter gate ID (`CE1`, `CX1`). TOS only
+logs the plate. It never holds the bus, and the answer is always:
+
+```json
+{ "event_id": 812, "commuter": true, "duplicate": false, "gate": "CX1", "plate": "AWD434",
+  "decision": "TRACKED", "category": "Commuter", "reason": "Commuter bus logged · ALABANG",
+  "action": "open", "open_barrier": true, "route": "ALABANG",
+  "display": { "line1": "ALABANG", "line2": "SAFE TRIP", "color": "green" },
+  "read_at": "…", "test": false }
+```
+
+* If a commuter lane has a barrier, keep it open (or don't fit one). Never wait for staff on these lanes.
+* `read_id`, `read_at`, offline queueing and retries work exactly as in §3–§4.
+* A **dispatch** is a read at a commuter **exit** camera. The same plate at the same camera within 10 minutes
+  counts once, so a bus idling in view is not counted twice.
+* `route` comes from Trip Scheduling's vehicle masterfile, or from staff tagging the plate on the TOS
+  *Commuter dispatch* page. It can be `null` for a plate TOS doesn't know yet; the read is still logged.
+* `/event` polling is not used for commuter reads.
+
 ## 3. Reliability rules
 
 1. **Timeouts:** wait at most **3 seconds** for `/read`. If no answer, treat TOS as offline (§4).
@@ -260,3 +286,4 @@ version agreed with IT and the vendor.
 | --- | --- | --- |
 | 1.0 | 2026-11-03 | First version: read, batch reads, event poll, heartbeat, bundle |
 | 1.1 | 2026-11-11 | Answers add `bay`, `trip.etd` and `display` (driver directions for the gate board) |
+| 1.2 | 2026-11-19 | Commuter lanes `CE1` / `CX1`: log-only ANPR reads (§2.6); `/bundle` gates carry `mode` |

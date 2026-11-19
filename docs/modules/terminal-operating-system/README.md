@@ -26,6 +26,7 @@ it in Trip Scheduling first.
 | `board.html` | Concourse departures board in PITX blue and red, with All / Provincial / Commuter tabs |
 | `feed.html` | What TOS receives from Trip Scheduling: approved trips for a day, the vehicle masterfile, and vehicles with expired documents |
 | `analytics.html` | Four sheets for a date range of up to 62 days, each exportable to CSV: bay utilization from booked trips, late arrivals, early arrivals (staging), and unregistered plates |
+| `commuter.html` | Commuter dispatch: ANPR-only tracking on the commuter lanes (no rules, no barrier). Dispatches per route for Today / Day / Month, per-hour or per-day chart, plates with no route (tag once), latest reads, test reads, CSV |
 | `rules.html` | Gate rules (saved to the database), bays in service, devices, device keys, clearing test reads, and which destinations are commuter or provincial |
 
 **Commuter or provincial:** Trip Scheduling stores no service type, so TOS
@@ -119,6 +120,7 @@ Migrations:
 | `tos_create_device_key` / `tos_revoke_device_key` / `tos_device_keys` | Devices & rules → Device keys |
 | `tos_late_bay_options(event)` / `tos_move_late_trip(event, bay, slot)` | Late bus on Gate monitor / Bay timeline: vacant bays in order (same bay later, same gate, same floor), then move the trip and open the barrier (`202611111300_…_late_bay_finder.sql`) |
 | `tos_set_bay_floor(bay, floor)` | Devices & rules › Bays: floor per bay, used by the late-bus search |
+| `tos_commuter_dispatch(from, to, include_tests)` / `tos_tag_commuter_plate(plate, route, operator)` / `tos_commuter_test_read(gate, plate)` / `tos_clear_commuter_tests()` | Commuter dispatch page. Commuter gates (`tos.gates.mode = 'commuter'`) only log reads in `tos.commuter_reads`; device reads for them are answered "open" (`202611191000_…_commuter_tracking.sql`) |
 | `tos_set_bay_service(bay, service, route_label)` | Devices & rules › Bays: provincial or commuter, and a free-text route label; the late-bus search stays within the same service (`202611121000_…_bay_service.sql`) |
 | `tos_bays()` / `tos_set_bay_active(bay, active, note)` | Devices & rules → Bays in service. TOS is the only place bays are switched on or off; a trigger on `public.bays` blocks direct changes (`202611111000_…_bay_activation.sql`) |
 | `tos_device_read` / `_event` / `_heartbeat` / `_bundle` | the `tos-device` Edge Function only (service role) |

@@ -11,7 +11,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="../../shared/styles.css" />
-    <link rel="stylesheet" href="assets/tos.css?v=20261111-1" />
+    <link rel="stylesheet" href="assets/tos.css?v=20261119-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -55,7 +55,7 @@
         swapFormActive,
         handleSwapForms,
         handleLateMoves,
-      } from "./assets/tos.js?v=20261111-1";
+      } from "./assets/tos.js?v=20261119-1";
 
       const profile = await guardPage("staff");
       if (!profile) throw new Error("unauthorised");
@@ -105,7 +105,8 @@
         if (!M) return;
         // Staff are typing a plate for a substitute bus: don't redraw under them.
         if (swapFormActive()) return;
-        const gateIds = Object.keys(M.gates);
+        // Commuter lanes only log plates (Commuter dispatch page); no barrier to show here.
+        const gateIds = Object.keys(M.gates).filter((id) => M.gates[id].mode !== "commuter");
         document.getElementById("view").innerHTML = `
           ${M.trips.length ? "" : `<p class="tos-note">No approved trips in Trip Scheduling for today. Until there are, every registered bus is read as "No booking".</p>`}
           <div class="tos-gates">${gateIds.map(gateTile).join("")}</div>

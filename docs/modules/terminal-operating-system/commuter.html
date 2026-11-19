@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Commuter dispatch · PITX Terminal Operations</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../../shared/styles.css" />
+    <link rel="stylesheet" href="assets/tos.css?v=20261119-1" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" id="nav"></aside>
+      <div class="app-content">
+        <main class="wrap">
+          <div class="page-head">
+            <div>
+              <p class="eyebrow" id="eyebrow">Terminal Operations &middot; Commuter</p>
+              <h1>Commuter dispatch</h1>
+              <p class="subtle" id="sub">
+                Commuter buses don't go through the barriers or the gate rules. The ANPR cameras on the commuter lanes
+                only log their plates, so dispatches can be counted per route.
+              </p>
+            </div>
+            <div class="tos-head-right">
+              <span id="live"></span>
+              <button type="button" class="btn-outline" data-act="refresh">Refresh</button>
+            </div>
+          </div>
+
+          <div class="toolbar" style="margin-bottom: 14px; flex-wrap: wrap; gap: 10px; align-items: center">
+            <div class="tos-seg" role="group" aria-label="Period" id="mode"></div>
+            <div class="tos-actions" id="pick" style="align-items: center"></div>
+            <label class="subtle" style="display: inline-flex; gap: 6px; align-items: center">
+              <input type="checkbox" id="tests" /> Include test reads
+            </label>
+          </div>
+
+          <div class="hidden" id="message"></div>
+          <p class="subtle hidden" id="note" style="margin: 0 0 12px"></p>
+          <div class="kpis" id="kpis"></div>
+
+          <div class="tos-split" style="grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr)">
+            <section class="table-wrap">
+              <div class="tos-panel-head">
+                <h3>Dispatches per route</h3>
+                <button type="button" class="btn-outline" data-act="csv">Export CSV</button>
+              </div>
+              <div id="routes" style="overflow-x: auto"></div>
+            </section>
+            <section class="table-wrap">
+              <div class="tos-panel-head"><h3 id="chart-title">Dispatches per hour</h3></div>
+              <div class="tos-chart" id="chart" style="padding: 14px 16px"></div>
+            </section>
+          </div>
+
+          <section class="table-wrap" style="margin-top: 18px">
+            <div class="tos-panel-head">
+              <h3>Plates with no route</h3>
+              <span class="subtle">Not in Trip Scheduling's vehicle masterfile. Tag each plate once; earlier reads move to that route too.</span>
+            </div>
+            <datalist id="route-options"></datalist>
+            <div id="noroute" style="overflow-x: auto"></div>
+          </section>
+
+          <div class="tos-split" style="margin-top: 18px; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr)">
+            <section class="table-wrap">
+              <div class="tos-panel-head"><h3>Latest reads</h3><span class="subtle">Newest first, up to 50</span></div>
+              <div id="recent" style="overflow-x: auto"></div>
+            </section>
+            <section class="card" style="margin-top: 0; align-self: start">
+              <p class="card-label">Test a commuter read</p>
+              <p class="subtle" style="margin-top: -6px">
+                Sends a plate as if a commuter camera read it, marked as a test. Tests are left out of the counts
+                unless "Include test reads" is ticked.
+              </p>
+              <form class="tos-actions" id="test-form" style="flex-wrap: wrap; gap: 8px">
+                <select id="test-gate" aria-label="Commuter lane"></select>
+                <input id="test-plate" type="text" maxlength="12" placeholder="Plate, e.g. ABC 1234" aria-label="Plate" required style="max-width: 180px" />
+                <button type="submit" class="btn-primary">Send test read</button>
+              </form>
+              <div class="tos-actions" style="margin-top: 10px">
+                <button type="button" class="btn-outline" data-act="clear-tests">Clear commuter test reads</button>
+              </div>
+            </section>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script type="module">
+      import { guardPage, renderNav, escapeHtml, showMessage, liveText, supabase, manilaToday, act, downloadCsv, formatDateTime } from "./assets/tos.js?v=20261119-1";
+
+      const profile = await guardPage("staff");
+      if (!profile) throw new Error("unauthorised");
+      renderNav(profile);
+
+      /* ---- period: Today (refreshes every 20 s), one Day, or one Month. Kept in the link. */
+      const today = manilaToday();
+      const q = new URLSearchParams(location.search);
+      let mode = q.get("month") ? "month" : q.get("day") && q.get("day") !== today ? "day" : "today";
+      let day = q.get("day") || today;
+      let month = q.get("month") || today.slice(0, 7);
+      let includeTests = q.get("tests") === "1";
+      let R = null; // tos_commuter_dispatch result
+      let updatedAt = null;
+      let loadError = null;
+      let clearArmed = false;
+
+      const MODES = [["today", "Today"], ["day", "Day"], ["month", "Month"]];
+      const pad = (n) => String(n).padStart(2, "0");
+      const monthEnd = (m) => { const [y, mo] = m.split("-").map(Number); return `${m}-${pad(new Date(Date.UTC(y, mo, 0)).getUTCDate())}`; };
+      const shiftDay = (d, n) => new Date(Date.parse(`${d}T12:00:00Z`) + n * 864e5).toISOString().slice(0, 10);
+      const shiftMonth = (m, n) => { const [y, mo] = m.split("-").map(Number); const t = new Date(Date.UTC(y, mo - 1 + n, 1)); return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}`; };
+      const dayLabel = (d) => new Date(`${d}T12:00:00+08:00`).toLocaleDateString("en-PH", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+      const monthLabel = (m) => new Date(`${m}-15T12:00:00+08:00`).toLocaleDateString("en-PH", { month: "long", year: "numeric" });
+      const hhmm = (iso) => (iso ? new Date(iso).toLocaleTimeString("en-GB", { timeZone: "Asia/Manila", hour: "2-digit", minute: "2-digit" }) : "—");
+      const range = () => (mode === "month" ? [`${month}-01`, monthEnd(month)] : mode === "day" ? [day, day] : [today, today]);
+
+      function saveUrl() {
+        const p = new URLSearchParams();
+        if (mode === "day") p.set("day", day);
+        if (mode === "month") p.set("month", month);
+        if (includeTests) p.set("tests", "1");
+        history.replaceState(null, "", p.toString() ? `?${p}` : location.pathname);
+      }
+
+      function renderControls() {
+        document.getElementById("mode").innerHTML = MODES.map(
+          ([k, l]) => `<button type="button" data-mode="${k}" aria-pressed="${k === mode}">${l}</button>`
+        ).join("");
+        const pick = document.getElementById("pick");
+        if (mode === "today") pick.innerHTML = "";
+        else if (mode === "day")
+          pick.innerHTML = `<button type="button" class="btn-outline" data-step="-1" aria-label="Previous day">‹</button>
+            <input type="date" id="day" value="${day}" max="${today}" />
+            <button type="button" class="btn-outline" data-step="1" aria-label="Next day">›</button>`;
+        else
+          pick.innerHTML = `<button type="button" class="btn-outline" data-step="-1" aria-label="Previous month">‹</button>
+            <input type="month" id="month" value="${month}" />
+            <button type="button" class="btn-outline" data-step="1" aria-label="Next month">›</button>`;
+        document.getElementById("tests").checked = includeTests;
+        document.getElementById("live").classList.toggle("hidden", mode !== "today");
+        const period = mode === "today" ? "Today" : mode === "day" ? dayLabel(day) : monthLabel(month);
+        document.getElementById("eyebrow").textContent = `Terminal Operations · Commuter · ${period}`;
+      }
+
+      async function load() {
+        const [from, to] = range();
+        const { data, error } = await supabase.rpc("tos_commuter_dispatch", { p_from: from, p_to: to, p_include_tests: includeTests });
+        if (error) {
+          loadError = error;
+          showMessage("message", `Could not load commuter reads: ${error.message}`);
+        } else {
+          R = data;
+          loadError = null;
+          updatedAt = new Date();
+          showMessage("message", "");
+        }
+        render();
+      }
+
+      async function setPeriod() {
+        if (mode === "day" && day === today) mode = "today";
+        saveUrl();
+        renderControls();
+        document.getElementById("kpis").innerHTML = `<p class="tos-none">Loading…</p>`;
+        await load();
+      }
+
+      const kpi = (label, value, sub) =>
+        `<div class="kpi"><div class="kpi-label">${label}</div><div class="kpi-value"><strong style="font-size:26px">${value}</strong></div><div class="subtle">${sub}</div></div>`;
+      const routeName = (r) => (r ? escapeHtml(r) : `<span class="subtle">No route yet</span>`);
+
+      function drawBars(bars, aria, labelEvery) {
+        const W = 720, H = 230, pl = 34, pb = 26, pt = 10;
+        const ymax = Math.max(5, Math.ceil(Math.max(...bars.map((d) => d.v)) / 5) * 5);
+        const bw = (W - pl - 6) / bars.length;
+        const y = (v) => pt + (H - pt - pb) * (1 - v / ymax);
+        let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${aria}">`;
+        [0, ymax / 2, ymax].forEach((v) => {
+          svg += `<line x1="${pl}" x2="${W - 4}" y1="${y(v)}" y2="${y(v)}" stroke="var(--divider)"/><text x="${pl - 6}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--label)">${v}</text>`;
+        });
+        bars.forEach((d, i) => {
+          const x = pl + i * bw + bw * 0.18, w = bw * 0.64;
+          if (d.day) svg += `<rect data-day="${d.day}" x="${pl + i * bw}" y="${pt}" width="${bw}" height="${H - pt - pb}" fill="transparent" style="cursor:pointer"><title>${d.day}: ${d.v} dispatches. Click to open the day.</title></rect>`;
+          if (d.v) svg += `<rect x="${x}" y="${y(d.v)}" width="${w}" height="${y(0) - y(d.v)}" rx="2" fill="var(--blue)" pointer-events="none"><title>${d.v}</title></rect>`;
+          if (i % labelEvery === 0 || d.hl)
+            svg += `<text x="${pl + i * bw + bw / 2}" y="${H - 8}" text-anchor="middle" font-size="11" fill="${d.hl ? "var(--text)" : "var(--label)"}" font-weight="${d.hl ? 700 : 500}" pointer-events="none">${d.label}</text>`;
+        });
+        return svg + "</svg>";
+      }
+
+      function render() {
+        document.getElementById("live").innerHTML = liveText(updatedAt, loadError);
+        if (!R) return;
+        const t = R.totals;
+        document.getElementById("kpis").innerHTML = [
+          kpi("Dispatches", t.dispatches, "commuter buses out through the commuter exit"),
+          kpi("Entries", t.entries, "commuter buses in through the commuter entry"),
+          kpi("Buses seen", t.buses, `on ${t.routes} route${t.routes === 1 ? "" : "s"}`),
+          kpi("Plates with no route", t.no_route_plates, t.no_route_plates ? "tag them below" : "every plate has a route"),
+        ].join("");
+        const note = document.getElementById("note");
+        note.classList.toggle("hidden", !!(t.dispatches || t.entries));
+        note.textContent = `No commuter reads in this period. The commuter cameras (${R.gates.map((g) => g.name).join(", ")}) are not connected yet; use "Test a commuter read" to try the page.`;
+
+        // Per route
+        document.getElementById("routes").innerHTML = R.routes.length
+          ? `<table><thead><tr><th>Route</th><th class="tos-num">Dispatches</th><th class="tos-num">Entries</th><th class="tos-num">Buses</th><th>Busiest hour</th><th>First / last dispatch</th></tr></thead><tbody>${R.routes
+              .map(
+                (r) => `<tr><td class="cell-strong">${routeName(r.route)}</td><td class="tos-num">${r.dispatches}</td><td class="tos-num">${r.entries}</td><td class="tos-num">${r.buses}</td>
+                  <td>${r.busiest_hour == null ? "—" : `${pad(r.busiest_hour)}:00`}</td>
+                  <td>${r.first_at ? `${mode === "month" ? formatDateTime(r.first_at) : hhmm(r.first_at)} – ${mode === "month" ? formatDateTime(r.last_at) : hhmm(r.last_at)}` : "—"}</td></tr>`
+              )
+              .join("")}</tbody></table>`
+          : `<p class="tos-none">No commuter reads in this period.</p>`;
+
+        // Chart
+        const perDay = mode === "month";
+        document.getElementById("chart-title").textContent = perDay ? "Dispatches per day" : "Dispatches per hour";
+        const cur = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Manila", hour: "2-digit", hourCycle: "h23" }).format(new Date()));
+        const bars = perDay
+          ? R.daily.map((d) => ({ label: String(+d.day.slice(8)), day: d.day, v: +d.dispatches, hl: d.day === today }))
+          : R.hourly.filter((h) => h.hour >= 4 || h.dispatches > 0).map((h) => ({ label: pad(h.hour), v: +h.dispatches, hl: mode === "today" && h.hour === cur }));
+        document.getElementById("chart").innerHTML = drawBars(bars, document.getElementById("chart-title").textContent, perDay ? 3 : 2);
+
+        // Plates with no route
+        document.getElementById("route-options").innerHTML = R.route_options.map((r) => `<option value="${escapeHtml(r)}"></option>`).join("");
+        document.getElementById("noroute").innerHTML = R.no_route.length
+          ? `<table><thead><tr><th>Plate</th><th class="tos-num">Reads</th><th>Last seen</th><th style="min-width:420px">Tag to a route</th></tr></thead><tbody>${R.no_route
+              .map(
+                (p) => `<tr><td class="cell-strong">${escapeHtml(p.plate)}</td><td class="tos-num">${p.reads}</td><td>${formatDateTime(p.last_at)}</td>
+                  <td><form class="tos-actions" data-tag="${escapeHtml(p.plate)}" style="gap:6px; flex-wrap:wrap">
+                    <input name="route" list="route-options" required maxlength="80" placeholder="Route, e.g. ALABANG" aria-label="Route for ${escapeHtml(p.plate)}" style="max-width:180px" />
+                    <input name="operator" maxlength="80" placeholder="Operator (optional)" aria-label="Operator for ${escapeHtml(p.plate)}" style="max-width:160px" />
+                    <button type="submit" class="btn-primary">Save</button></form></td></tr>`
+              )
+              .join("")}</tbody></table>`
+          : `<p class="tos-none">Every plate read in this period has a route.</p>`;
+
+        // Latest reads
+        const laneName = (id) => R.gates.find((g) => g.id === id)?.name ?? id;
+        document.getElementById("recent").innerHTML = R.recent.length
+          ? `<table><thead><tr><th>Time</th><th>Lane</th><th>Plate</th><th>Route</th></tr></thead><tbody>${R.recent
+              .map(
+                (r) => `<tr><td>${mode === "month" ? formatDateTime(r.created_at) : hhmm(r.created_at)}</td><td>${escapeHtml(laneName(r.gate_id))}</td>
+                  <td class="cell-strong">${escapeHtml(r.plate)}${r.is_test ? ' <span class="tos-pill s-muted">Test</span>' : ""}</td>
+                  <td>${routeName(r.route)}${r.route_from === "tagged" ? '<span class="cell-sub">tagged by staff</span>' : ""}</td></tr>`
+              )
+              .join("")}</tbody></table>`
+          : `<p class="tos-none">No commuter reads in this period.</p>`;
+
+        // Test form lanes
+        const sel = document.getElementById("test-gate");
+        if (!sel.options.length) sel.innerHTML = R.gates.map((g) => `<option value="${escapeHtml(g.id)}">${escapeHtml(g.name)}</option>`).join("");
+        document.querySelector('[data-act="clear-tests"]').textContent = clearArmed ? "Delete all commuter test reads" : "Clear commuter test reads";
+        document.querySelector('[data-act="clear-tests"]').className = clearArmed ? "btn-danger-outline" : "btn-outline";
+      }
+
+      document.addEventListener("click", async (e) => {
+        if (e.target.closest('[data-act="refresh"]')) return load();
+        if (e.target.closest('[data-act="csv"]') && R) {
+          const [from, to] = range();
+          return downloadCsv(`commuter-dispatch-${from}${from === to ? "" : "-to-" + to}.csv`,
+            ["Route", "Dispatches", "Entries", "Buses", "Busiest hour", "First dispatch", "Last dispatch"],
+            R.routes.map((r) => [r.route || "No route yet", r.dispatches, r.entries, r.buses, r.busiest_hour == null ? "" : `${pad(r.busiest_hour)}:00`, r.first_at ?? "", r.last_at ?? ""]));
+        }
+        if (e.target.closest('[data-act="clear-tests"]')) {
+          if (!clearArmed) { clearArmed = true; return render(); }
+          clearArmed = false;
+          await act("tos_clear_commuter_tests", {}, (n) => `Removed ${n} commuter test read${n === 1 ? "" : "s"}.`);
+          return load();
+        }
+        const m = e.target.closest("[data-mode]");
+        if (m) {
+          mode = m.dataset.mode;
+          if (mode === "day" && day === today) day = shiftDay(today, -1);
+          return setPeriod();
+        }
+        const step = e.target.closest("[data-step]");
+        if (step) {
+          const n = Number(step.dataset.step);
+          if (mode === "day") day = shiftDay(day, n);
+          else month = shiftMonth(month, n);
+          return setPeriod();
+        }
+        const bar = e.target.closest("[data-day]");
+        if (bar) {
+          mode = "day";
+          day = bar.dataset.day;
+          return setPeriod();
+        }
+      });
+      document.addEventListener("submit", async (e) => {
+        const tag = e.target.closest("[data-tag]");
+        if (tag) {
+          e.preventDefault();
+          const f = new FormData(tag);
+          tag.querySelector("button").disabled = true;
+          await act("tos_tag_commuter_plate", { p_plate: tag.dataset.tag, p_route: f.get("route"), p_operator: f.get("operator") },
+            (r) => `${r.plate} is now on ${r.route}. Its reads count there.`);
+          return load();
+        }
+        if (e.target.id === "test-form") {
+          e.preventDefault();
+          const plate = document.getElementById("test-plate").value.trim();
+          if (!plate) return;
+          const done = await act("tos_commuter_test_read", { p_gate: document.getElementById("test-gate").value, p_plate: plate },
+            (r) => `${r.plate}: ${r.reason} (test).`);
+          if (done) document.getElementById("test-plate").value = "";
+          if (done && !includeTests) { includeTests = true; return setPeriod(); }
+          return load();
+        }
+      });
+      document.getElementById("pick").addEventListener("change", (e) => {
+        if (e.target.id === "day" && e.target.value) day = e.target.value;
+        else if (e.target.id === "month" && e.target.value) month = e.target.value;
+        else return;
+        setPeriod();
+      });
+      document.getElementById("tests").addEventListener("change", (e) => {
+        includeTests = e.target.checked;
+        setPeriod();
+      });
+      // Today keeps itself current while the page is visible (not while staff are typing a tag).
+      setInterval(() => {
+        if (mode === "today" && document.visibilityState === "visible" && !document.activeElement?.closest?.("form")) load();
+      }, 20000);
+      setPeriod();
+    </script>
+  </body>
+</html>
