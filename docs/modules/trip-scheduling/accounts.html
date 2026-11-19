@@ -87,6 +87,7 @@
         showMessage,
         escapeHtml,
         fetchAllRows,
+        toast,
       } from "./assets/app.js";
       import { SUPABASE_URL } from "../../shared/config.js";
 
@@ -165,6 +166,13 @@
                         p.id
                       )}" data-username="${escapeHtml(p.username)}">Reset password</button>
                       ${
+                        p.role === "operator"
+                          ? `<button type="button" class="btn-link" data-merge="${escapeHtml(
+                              p.id
+                            )}">Merge into…</button>`
+                          : ""
+                      }
+                      ${
                         p.id === profile.id
                           ? ""
                           : `<button type="button" class="btn-link danger" data-delete="${escapeHtml(
@@ -184,6 +192,9 @@
           btn.addEventListener("click", () =>
             deleteAccount(btn.dataset.delete, btn.dataset.username)
           );
+        });
+        document.getElementById("list").querySelectorAll("[data-merge]").forEach((btn) => {
+          btn.addEventListener("click", () => mergeAccount(btn.dataset.merge));
         });
         document.getElementById("list").querySelectorAll("[data-reset]").forEach((btn) => {
           btn.addEventListener("click", () =>
@@ -244,6 +255,138 @@
         }
 
         showMessage("message", `Password for "${result.username}" reset.`, "ok");
+      }
+
+      // Some operators hold several lines/trades under separate accounts but
+      // one person runs the fleet. Merging moves the chosen account's
+      // vehicles, trips, transfers and notifications into another operator
+      // account (staff_merge_operators, migration 202611191000), then
+      // optionally deletes the now-empty account through the same
+      // delete-account Edge Function the Delete button uses.
+      function mergeAccount(sourceId) {
+        const source = allProfiles.find((p) => p.id === sourceId);
+        const label = (p) =>
+          p.operator_name ? `${p.operator_name} (${p.username})` : p.username;
+        const targets = allProfiles
+          .filter((p) => p.role === "operator" && p.id !== sourceId)
+          .sort((a, b) => label(a).localeCompare(label(b)));
+        if (!source || !targets.length) {
+          showMessage("message", "There is no other operator account to merge into.");
+          return;
+        }
+
+        const dlg = document.createElement("dialog");
+        dlg.className = "ask-dialog";
+        dlg.innerHTML = `
+          <h2 class="dialog-title">Merge operator account</h2>
+          <p class="subtle">
+            Move everything owned by <strong>${escapeHtml(label(source))}</strong>
+            (vehicles, trips, transfers, notifications) into the account below.
+            The company profile of the account you keep is retained.
+          </p>
+          <div class="field">
+            <label for="merge-target">Merge into (the account to keep)</label>
+            <select id="merge-target">
+              <option value="">Select an operator account…</option>
+              ${targets
+                .map((t) => `<option value="${escapeHtml(t.id)}">${escapeHtml(label(t))}</option>`)
+                .join("")}
+            </select>
+          </div>
+          <p class="subtle" id="merge-preview" aria-live="polite"></p>
+          <label style="display:flex;gap:8px;align-items:center;margin-top:8px">
+            <input type="checkbox" id="merge-delete" checked />
+            Delete the empty "${escapeHtml(source.username)}" account afterwards
+          </label>
+          <div class="dialog-actions">
+            <button type="button" class="btn-outline" data-act="cancel">Cancel</button>
+            <button type="button" class="btn-primary" data-act="ok" disabled>Merge accounts</button>
+          </div>`;
+        document.body.appendChild(dlg);
+        const sel = dlg.querySelector("#merge-target");
+        const prev = dlg.querySelector("#merge-preview");
+        const ok = dlg.querySelector("[data-act=ok]");
+        dlg.addEventListener("close", () => dlg.remove());
+
+        sel.addEventListener("change", async () => {
+          ok.disabled = true;
+          prev.textContent = "";
+          if (!sel.value) return;
+          prev.textContent = "Checking…";
+          const { data, error } = await supabase.rpc("staff_merge_operators_preview", {
+            p_source: sourceId,
+            p_target: sel.value,
+          });
+          if (error) {
+            prev.textContent = error.message;
+            return;
+          }
+          const dups = data.duplicate_plates ?? [];
+          if (dups.length) {
+            prev.textContent =
+              `Can't merge: both accounts have a vehicle with the same plate (${dups.join(", ")}). ` +
+              `Remove the duplicate from one account first.`;
+            return;
+          }
+          prev.textContent =
+            `${data.vehicles} vehicle(s) and ${data.bookings} trip(s) will move to ${data.target}. ` +
+            `This can't be undone.`;
+          ok.disabled = false;
+        });
+
+        dlg.addEventListener("click", async (e) => {
+          const act = e.target.closest?.("[data-act]")?.dataset.act;
+          if (act === "cancel" || e.target === dlg) return dlg.close();
+          if (act !== "ok") return;
+          ok.disabled = true;
+          ok.textContent = "Merging…";
+          const { data, error } = await supabase.rpc("staff_merge_operators", {
+            p_source: sourceId,
+            p_target: sel.value,
+          });
+          if (error) {
+            prev.textContent = error.message;
+            ok.textContent = "Merge accounts";
+            return;
+          }
+          const wantDelete = dlg.querySelector("#merge-delete").checked;
+          dlg.close();
+          let note = "";
+          let failed = false;
+          if (wantDelete) {
+            const err = await deleteAccountQuietly(sourceId);
+            failed = !!err;
+            note = err
+              ? ` The old account couldn't be deleted (${err}); delete it manually.`
+              : " The old account was deleted.";
+          }
+          toast(
+            `Merged ${data.source} into ${data.target}: ${data.vehicles} vehicle(s), ${data.bookings} trip(s).${note}`,
+            { kind: failed ? "error" : "ok", ms: 9000 }
+          );
+          await load();
+        });
+
+        dlg.showModal();
+        sel.focus();
+      }
+
+      async function deleteAccountQuietly(userId) {
+        const { data: sessionData } = await supabase.auth.getSession();
+        try {
+          const response = await fetch(`${SUPABASE_URL}/functions/v1/delete-account`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${sessionData?.session?.access_token}`,
+            },
+            body: JSON.stringify({ user_id: userId }),
+          });
+          const result = await response.json();
+          return result?.error ?? null;
+        } catch {
+          return "delete-account service unreachable";
+        }
       }
 
       async function deleteAccount(userId, username) {

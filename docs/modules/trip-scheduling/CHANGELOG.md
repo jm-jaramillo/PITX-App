@@ -4957,3 +4957,29 @@ stray whitespace (the sheet stores `" A&B "` padded).
 No migration - the column and its UI already existed; this is a data load.
 
 ---
+
+---
+
+### 137. Admin can merge operator accounts (19 Nov)
+
+Some operators own several lines/trades but only one person manages the
+fleet, so they ended up with several accounts. **Accounts → "Merge into…"**
+(operator rows, staff only) folds one account into another.
+
+Migration `202611191000_trip-scheduling_merge_operators.sql` adds two staff-only
+functions: `staff_merge_operators_preview(source, target)` (counts + duplicate
+plates, no writes) and `staff_merge_operators(source, target)`, one
+transaction that re-points vehicles, bookings (operator name snapshot follows
+the kept account), booking transfers (a pending hand-off between the two is
+rejected as moot), notifications, the operator profile (the kept account's
+is retained; adopted from the source only if the kept one has none) and
+`ticketing.companies.operator_id` when that schema exists.
+
+- Refuses to merge if both accounts hold the same plate, and says which.
+- The emptied account is deleted afterwards through the existing
+  `delete-account` Edge Function (checkbox, on by default).
+- The kept account gets an "Operator accounts merged" notification.
+
+**Not applied to the live database yet** - run `npm run migrate` (or paste
+the file into the SQL editor) before using the button.
+
