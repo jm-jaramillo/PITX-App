@@ -5007,3 +5007,22 @@ receiving account already has one of those plates.
 
 **Applied to the live database (PITX App project) on 19 Nov via the Supabase MCP.** If rebuilding, run `npm run migrate` or
 paste the file into the SQL editor before using the button.
+
+### 139. Operator profile photo (19 Nov)
+
+- **Operator profile -> Profile photo**: a round photo with **Change photo** and
+  **Remove photo** (initials show when there is none). Picking a file previews it at
+  once; JPG, PNG, WebP or SVG up to 5 MB (anything else is refused with a message).
+  It is saved with Save profile and, like every profile change, goes live once PITX
+  staff approve it (#126); the photo is the same field as the old "Logo" (`logo_path`),
+  so staff see it on Operator profiles as before. Each upload is a new file, so the
+  live photo is never replaced before approval.
+- **Top bar**: an operator's approved photo replaces the initials in the account
+  avatar on every page (small additive change in `docs/shared/platform.js`,
+  best-effort - initials stay if it can't load).
+- Verified as genesis.ops: preview after picking, a text file refused, saving created
+  a pending change with the new path, the header showed the live photo; I rejected my
+  test change and removed the test file, so the live profile is unchanged.
+  **@Jcbllanto16 / @victoriaronald:** `platform.js` was touched (additive).
+
+---

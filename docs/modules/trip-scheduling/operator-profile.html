@@ -49,6 +49,31 @@
         color: var(--faint, #9ca3af);
         text-align: center;
       }
+      /* profile photo: a round avatar with Change / Remove beside it */
+      .photo-circle {
+        position: relative;
+        width: 96px;
+        height: 96px;
+        border-radius: 50%;
+        overflow: hidden;
+        flex-shrink: 0;
+        border: 1px solid var(--border, #d7dbe3);
+        background: var(--blue-wash, #e8eefc);
+        color: var(--blue-ink, #1f3b8f);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 30px;
+        font-weight: 800;
+      }
+      .photo-circle img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .photo-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
       .contact-card {
         border: 1px solid var(--border, #d7dbe3);
@@ -106,12 +131,18 @@
       <form class="card grid grid-2" id="profile-form">
         <p class="field-group-heading span-all">Operator identity</p>
         <div class="field span-all">
-          <label>Logo</label>
+          <label>Profile photo</label>
           <div class="logo-row">
-            <img class="logo-preview is-empty" id="logo-preview" alt="Operator logo" />
+            <div class="photo-circle" id="logo-preview" role="img" aria-label="Profile photo">
+              <span id="photo-initials"></span>
+            </div>
             <div>
-              <input type="file" id="logo-input" accept="image/*" />
-              <p class="fineprint" id="logo-file-name"></p>
+              <div class="photo-actions">
+                <button type="button" class="btn-outline" id="photo-change">Change photo</button>
+                <button type="button" class="btn-link danger hidden" id="photo-remove">Remove photo</button>
+              </div>
+              <input type="file" id="logo-input" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="hidden" />
+              <p class="fineprint" id="logo-file-name">JPG, PNG, WebP or SVG, up to 5 MB. Shown on your profile and next to your name; goes live once PITX staff approve it.</p>
             </div>
           </div>
         </div>
@@ -172,6 +203,7 @@
         renderNav,
         showMessage,
         escapeHtml,
+        initials,
       } from "./assets/app.js";
 
       const profile = await guardPage("operator");
@@ -206,15 +238,52 @@
         contacts.push({ name: "", position: "", number: "", email: "" });
         renderContacts();
       });
-      document.getElementById("logo-input").addEventListener("change", (e) => {
-        pendingLogoFile = e.target.files?.[0] ?? null;
-        document.getElementById("logo-file-name").textContent =
-          pendingLogoFile ? pendingLogoFile.name : "";
-        if (pendingLogoFile) {
-          const preview = document.getElementById("logo-preview");
-          preview.src = URL.createObjectURL(pendingLogoFile);
-          preview.classList.remove("is-empty");
+      // Profile photo: pick a file, see it at once, and it is saved (for staff
+      // approval, like every profile change) with Save profile.
+      const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+      function photoName() {
+        return profile.operator_name || profile.username || "";
+      }
+
+      function setPhoto(url) {
+        const box = document.getElementById("logo-preview");
+        box.querySelector("img")?.remove();
+        document.getElementById("photo-initials").textContent = url ? "" : initials(photoName());
+        if (url) {
+          const img = document.createElement("img");
+          img.alt = "";
+          img.src = url;
+          box.appendChild(img);
         }
+        document.getElementById("photo-remove").classList.toggle("hidden", !url);
+      }
+      document.getElementById("photo-change").addEventListener("click", () =>
+        document.getElementById("logo-input").click()
+      );
+      document.getElementById("photo-remove").addEventListener("click", () => {
+        pendingLogoFile = null;
+        existingLogoPath = null;
+        document.getElementById("logo-input").value = "";
+        document.getElementById("logo-file-name").textContent =
+          "Photo removed - press Save profile to submit the change.";
+        setPhoto(null);
+      });
+      document.getElementById("logo-input").addEventListener("change", (e) => {
+        const file = e.target.files?.[0] ?? null;
+        if (!file) return;
+        if (!/^image\/(png|jpeg|webp|svg\+xml)$/.test(file.type)) {
+          e.target.value = "";
+          return showMessage("message", "Choose a JPG, PNG, WebP or SVG image.");
+        }
+        if (file.size > MAX_PHOTO_BYTES) {
+          e.target.value = "";
+          return showMessage("message", "That photo is over 5 MB. Choose a smaller one.");
+        }
+        showMessage("message", "");
+        pendingLogoFile = file;
+        document.getElementById("logo-file-name").textContent =
+          file.name + " - press Save profile to submit it for approval.";
+        setPhoto(URL.createObjectURL(file));
       });
 
       // Reads whatever's currently in the contact-card inputs back into
@@ -316,11 +385,7 @@
         const { data: signed } = await supabase.storage
           .from("operator-docs")
           .createSignedUrl(path, 300);
-        if (signed?.signedUrl) {
-          const preview = document.getElementById("logo-preview");
-          preview.src = signed.signedUrl;
-          preview.classList.remove("is-empty");
-        }
+        if (signed?.signedUrl) setPhoto(signed.signedUrl);
       }
 
       async function load() {
@@ -341,7 +406,10 @@
 
         // the requested values win while a change is pending
         const source = change?.status === "pending" ? { ...(data ?? {}), ...change.changes } : data;
-        if (!source) return; // Nothing saved yet - leave the form blank.
+        if (!source) {
+          setPhoto(null);
+          return;
+        } // Nothing saved yet - leave the form blank.
 
         for (const field of FIELDS) {
           document.getElementById(field).value = source[field] ?? "";
@@ -352,6 +420,7 @@
 
         existingLogoPath = source.logo_path ?? null;
         if (existingLogoPath) await signedLogo(existingLogoPath);
+        else setPhoto(null);
       }
 
       // a decision (or a staff edit) shows up here without a reload; only the
@@ -388,7 +457,7 @@
               contentType: pendingLogoFile.type || "image/jpeg",
             });
           if (uploadError) {
-            showMessage("message", `Logo upload failed: ${uploadError.message}`);
+            showMessage("message", `Photo upload failed: ${uploadError.message}`);
             saveBtn.disabled = false;
             saveBtn.textContent = "Save profile";
             return;

@@ -156,11 +156,38 @@ export function renderNav(profile, { brand = "PITX", links = [] } = {}) {
   if (window.innerWidth < 860) host.classList.add("is-collapsed");
 
   tidyPageHead();
+  if (profile.role === "operator") showHeaderPhoto(profile);
   document.getElementById("sign-out").addEventListener("click", signOut);
   document.getElementById("sidebar-toggle").addEventListener("click", () => {
     host.classList.toggle("is-collapsed");
   });
   initNotifications(profile);
+}
+
+/* ----------------------------------------------------------- header photo */
+
+// An operator's approved profile photo (operator_profiles.logo_path) replaces
+// the initials in the top-bar avatar. Best-effort: with no photo, or if
+// anything fails, the initials stay.
+async function showHeaderPhoto(profile) {
+  try {
+    const { data } = await supabase
+      .from("operator_profiles")
+      .select("logo_path")
+      .eq("operator_id", profile.id)
+      .maybeSingle();
+    if (!data?.logo_path) return;
+    const { data: signed } = await supabase.storage
+      .from("operator-docs")
+      .createSignedUrl(data.logo_path, 3600);
+    const btn = document.querySelector(".avatar-btn");
+    if (!signed?.signedUrl || !btn) return;
+    btn.style.overflow = "hidden";
+    btn.style.padding = "0";
+    btn.innerHTML = `<img src="${signed.signedUrl}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block" />`;
+  } catch {
+    /* keep the initials */
+  }
 }
 
 /* ------------------------------------------------------------ live updates */
