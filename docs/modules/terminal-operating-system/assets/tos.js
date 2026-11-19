@@ -20,6 +20,7 @@ const LINKS = [
   { href: "board.html", label: "Passenger board", icon: ICONS.calendar },
   { href: "feed.html", label: "Trip feed", icon: ICONS.bus },
   { href: "analytics.html", label: "Analytics", icon: ICONS.chart },
+  { href: "commuter.html", label: "Commuter dispatch", icon: ICONS.users },
   { href: "rules.html", label: "Devices & rules", icon: ICONS.building },
 ];
 
