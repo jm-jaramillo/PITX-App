@@ -5043,3 +5043,19 @@ paste the file into the SQL editor before using the button.
   follow-up entry; a `docs/shared/` change also needs `docs/shared/CHANGELOG.md`).
 
 ---
+
+---
+
+### 139. First operator merges loaded (19 Nov)
+
+Four groups merged by hand in one transaction (data only, no migration):
+Superlines <- Daet Express; Jac Liner <- JAM Liner Inc, LLI Bus Co.;
+Bicol Isarog <- Legaspi St. Jude, Penafrancia; Genesis <- Saulog Transit.
+Each merged account's vehicles got a single clean trade name (the former
+operator's name from the grouping sheet) and the kept account's operator
+name is the account holder's. Vehicles/trips: Superlines 54/11, Jac Liner
+170/104, Bicol Isarog 175/126, Genesis 72/103. The emptied accounts
+(daetexpress, jamliner, jamlinerlli, legaspistjude, penafranciatours,
+saulogtransit) still exist, empty - delete them from Accounts. Pre-change
+values are kept in `public._backup_operator_merge_20261119` (RLS on, no
+policies) for undo; drop it once satisfied.
