@@ -5026,3 +5026,20 @@ paste the file into the SQL editor before using the button.
   **@Jcbllanto16 / @victoriaronald:** `platform.js` was touched (additive).
 
 ---
+
+### 140. Admin can change an operator's profile photo (migration 202611191100, 19 Nov)
+
+- **Operator profiles -> open an operator -> Edit profile** now has the **Profile photo**
+  (round photo with Change photo / Remove photo; JPG, PNG, WebP or SVG up to 5 MB),
+  next to the fields staff could already edit. Like the other staff edits it is applied
+  at once - no approval - and supersedes any change the operator had waiting.
+- Storage: staff can now add and delete files in the `operator-docs` bucket (policies
+  `operator_docs_staff_insert` / `operator_docs_staff_delete`); until now only an
+  operator could write to their own folder. Reading was already open to staff. Applied by
+  hand with a `_schema_migrations` row.
+- Verified as staff on A. Arandia Line: picked a photo (preview), Save -> `logo_path` set to
+  the new file; then restored it to none and removed the test file.
+- The changelog check itself was fixed the same day (it now waits a few minutes for a
+  follow-up entry; a `docs/shared/` change also needs `docs/shared/CHANGELOG.md`).
+
+---

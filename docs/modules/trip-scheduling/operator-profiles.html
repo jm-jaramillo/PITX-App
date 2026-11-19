@@ -11,6 +11,16 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="../../shared/styles.css" />
+      <style>
+      .photo-row { display: flex; align-items: center; gap: 16px; }
+      .photo-circle {
+        position: relative; width: 84px; height: 84px; border-radius: 50%; overflow: hidden; flex-shrink: 0;
+        border: 1px solid var(--border, #d7dbe3); background: var(--blue-wash, #e8eefc); color: var(--blue-ink, #1f3b8f);
+        display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 800;
+      }
+      .photo-circle img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      .photo-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    </style>
   </head>
   <body>
     <div class="app-shell">
@@ -77,6 +87,20 @@
       <h2 class="dialog-title" id="edit-title">Edit operator profile</h2>
       <p class="subtle">Changes you save here go live immediately - they don't need approval. An operator's own edits do.</p>
       <form id="edit-form" class="grid grid-2">
+        <div class="field span-all">
+          <label>Profile photo</label>
+          <div class="photo-row">
+            <div class="photo-circle" id="pe_photo" role="img" aria-label="Profile photo"><span id="pe_photo_initials"></span></div>
+            <div>
+              <div class="photo-actions">
+                <button type="button" class="btn-outline" id="pe_photo_change">Change photo</button>
+                <button type="button" class="btn-link danger hidden" id="pe_photo_remove">Remove photo</button>
+              </div>
+              <input type="file" id="pe_photo_input" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="hidden" />
+              <p class="fineprint" id="pe_photo_note">JPG, PNG, WebP or SVG, up to 5 MB.</p>
+            </div>
+          </div>
+        </div>
         <div class="field span-all"><label for="pe_company_name">Operator</label><input id="pe_company_name" /></div>
         <div class="field"><label for="pe_trade_name">Trade name</label><input id="pe_trade_name" /></div>
         <div class="field"><label for="pe_operator_code">Operator/Trade code</label><input id="pe_operator_code" /></div>
@@ -315,7 +339,54 @@
       // a row left blank is dropped. The logo is not editable here.
       const EDIT_FIELDS = ["company_name", "trade_name", "operator_code", "company_owner", "booking_system_name"];
 
-      function openEdit() {
+      // Profile photo (staff edit): upload into the operator's own folder
+      // (storage policy operator_docs_staff_insert) when Save is pressed.
+      let editPhotoFile = null;
+      let editLogoPath = null;
+      const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+
+      function setEditPhoto(url, label) {
+        const box = document.getElementById("pe_photo");
+        box.querySelector("img")?.remove();
+        document.getElementById("pe_photo_initials").textContent = url ? "" : initials(label || "");
+        if (url) {
+          const img = document.createElement("img");
+          img.alt = "";
+          img.src = url;
+          box.appendChild(img);
+        }
+        document.getElementById("pe_photo_remove").classList.toggle("hidden", !url);
+      }
+
+      document.getElementById("pe_photo_change").addEventListener("click", () =>
+        document.getElementById("pe_photo_input").click()
+      );
+      document.getElementById("pe_photo_remove").addEventListener("click", () => {
+        const r = rowsById.get(detailsOperatorId);
+        editPhotoFile = null;
+        editLogoPath = null;
+        document.getElementById("pe_photo_input").value = "";
+        document.getElementById("pe_photo_note").textContent = "Photo removed - press Save to apply.";
+        setEditPhoto(null, r?.operator_name || r?.username);
+      });
+      document.getElementById("pe_photo_input").addEventListener("change", (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!/^image\/(png|jpeg|webp|svg\+xml)$/.test(file.type)) {
+          e.target.value = "";
+          return showMessage("edit-error", "Choose a JPG, PNG, WebP or SVG image.");
+        }
+        if (file.size > MAX_PHOTO_BYTES) {
+          e.target.value = "";
+          return showMessage("edit-error", "That photo is over 5 MB. Choose a smaller one.");
+        }
+        showMessage("edit-error", "");
+        editPhotoFile = file;
+        document.getElementById("pe_photo_note").textContent = file.name + " - press Save to apply.";
+        setEditPhoto(URL.createObjectURL(file));
+      });
+
+      async function openEdit() {
         const r = rowsById.get(detailsOperatorId);
         if (!r) return;
         const p = r.companyProfile ?? {};
@@ -335,8 +406,21 @@
             </div>`;
         }).join("");
         showMessage("edit-error", "");
+        editPhotoFile = null;
+        editLogoPath = p.logo_path ?? null;
+        document.getElementById("pe_photo_input").value = "";
+        document.getElementById("pe_photo_note").textContent = "JPG, PNG, WebP or SVG, up to 5 MB.";
+        setEditPhoto(null, r.operator_name || r.username);
         document.getElementById("details-dialog").close();
         document.getElementById("edit-dialog").showModal();
+        if (editLogoPath) {
+          let url = logoUrlByPath.get(editLogoPath);
+          if (!url) {
+            const { data } = await supabase.storage.from("operator-docs").createSignedUrl(editLogoPath, 3600);
+            url = data?.signedUrl;
+          }
+          if (url && editLogoPath === (p.logo_path ?? null)) setEditPhoto(url);
+        }
       }
 
       async function saveEdit(event) {
@@ -344,7 +428,7 @@
         showMessage("edit-error", "");
         const r = rowsById.get(detailsOperatorId);
         if (!r) return;
-        const changes = { logo_path: r.companyProfile?.logo_path ?? null };
+        const changes = { logo_path: editLogoPath };
         for (const f of EDIT_FIELDS) changes[f] = document.getElementById("pe_" + f).value.trim() || null;
         const byIndex = {};
         document.querySelectorAll("#pe_contacts [data-c]").forEach((el) => {
@@ -354,6 +438,18 @@
 
         const saveBtn = document.getElementById("edit-save");
         saveBtn.disabled = true;
+        if (editPhotoFile) {
+          const ext = (editPhotoFile.name.split(".").pop() || "jpg").toLowerCase();
+          const path = `${detailsOperatorId}/logo-${Date.now()}.${ext}`;
+          const { error: uploadError } = await supabase.storage
+            .from("operator-docs")
+            .upload(path, editPhotoFile, { contentType: editPhotoFile.type || "image/jpeg" });
+          if (uploadError) {
+            saveBtn.disabled = false;
+            return showMessage("edit-error", "Photo upload failed: " + uploadError.message);
+          }
+          changes.logo_path = path;
+        }
         const { error } = await supabase.rpc("staff_update_operator_profile", {
           p_operator_id: detailsOperatorId,
           p_changes: changes,
