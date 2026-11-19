@@ -2,6 +2,14 @@
 # the shared platform or a migration must be logged in that module's CHANGELOG.md
 # in the same push (or pull request). Direct pushes cannot be blocked without
 # branch protection; a failing run here is the signal to add the entry.
+#
+# Pushes: the check waits a few minutes and then looks at everything pushed to
+# main since this push's parent, not just this one commit. Code and its changelog
+# entry are often pushed a minute apart (code first, log second); judged
+# instantly the first push always showed red even though the entry followed. If
+# the entry still isn't there after the wait, it fails as before.
+# Remember: a change to docs/shared/ (or supabase/functions, core migrations)
+# needs an entry in docs/shared/CHANGELOG.md as well as the module's own log.
 name: changelog-check
 on:
   push:
@@ -19,6 +27,12 @@ jobs:
             BASE="${{ github.event.pull_request.base.sha }}"; HEAD="${{ github.event.pull_request.head.sha }}"
           else
             BASE="${{ github.event.before }}"; HEAD="${{ github.sha }}"
+            # grace period for a changelog entry pushed right after the code
+            sleep 240
+            git fetch --quiet origin main
+            LATEST=$(git rev-parse origin/main)
+            # only widen the range when main moved forward from this push
+            if git merge-base --is-ancestor "$HEAD" "$LATEST"; then HEAD="$LATEST"; fi
           fi
           if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then BASE="$HEAD~1"; fi
           files=$(git diff --name-only "$BASE" "$HEAD")

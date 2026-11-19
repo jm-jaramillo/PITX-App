@@ -3,6 +3,26 @@
 Changes to `docs/shared/`, `supabase/functions/` and `core` migrations.
 Newest first. Owners: @jm-jaramillo @Jcbllanto16 @victoriaronald
 
+## 2026-11-19 - Operator photo in the top bar (@jm-jaramillo)
+- `platform.js`: for operators, `renderNav` now calls `showHeaderPhoto`, which replaces the
+  initials in the account avatar with the operator's approved profile photo
+  (`operator_profiles.logo_path`, signed URL from the `operator-docs` bucket). Best-effort:
+  with no photo, or on any error, the initials stay. Staff and other roles are unchanged.
+  See Trip Scheduling CHANGELOG 139.
+
+## 2026-11-18 - Styles for the Trip Scheduling UX pass (@jm-jaramillo)
+- `styles.css`: +61 lines of additive rules (toasts, styled dialogs, request stepper and
+  summary strip, busy-slot markers, kiosk mode). No existing selector changed. See Trip
+  Scheduling CHANGELOG for the UX pass.
+
+## 2026-11-11 - `onLiveChange` live-update helper (@jm-jaramillo)
+- `platform.js`: new export `onLiveChange(tables, refresh)`, built on Supabase Realtime. Bursts
+  are merged, a refresh is held back while a dialog is open or someone is typing in a row, and
+  the page refreshes when the tab wakes or reconnects. The notification bell now updates live
+  through it. Migration `202611121000_trip-scheduling_admin_booking_profile_approval_realtime`
+  put the tables in the `supabase_realtime` publication. Only Trip Scheduling pages use it so
+  far; TOS and Ticketing can call it the same way. See Trip Scheduling CHANGELOG 127.
+
 ## 2026-11-13 - `.badge-duplicate` for the fifth LTFRB status (@jm-jaramillo)
 - `styles.css`: new `.badge-duplicate`, added alongside the existing `.badge-no_record`
   rules in both badge blocks so it inherits the same amber. Additive only - no existing
