@@ -169,7 +169,10 @@
                         p.role === "operator"
                           ? `<button type="button" class="btn-link" data-merge="${escapeHtml(
                               p.id
-                            )}">Merge into…</button>`
+                            )}">Merge into…</button>
+                            <button type="button" class="btn-link" data-split="${escapeHtml(
+                              p.id
+                            )}">Split trade…</button>`
                           : ""
                       }
                       ${
@@ -195,6 +198,9 @@
         });
         document.getElementById("list").querySelectorAll("[data-merge]").forEach((btn) => {
           btn.addEventListener("click", () => mergeAccount(btn.dataset.merge));
+        });
+        document.getElementById("list").querySelectorAll("[data-split]").forEach((btn) => {
+          btn.addEventListener("click", () => splitTrade(btn.dataset.split));
         });
         document.getElementById("list").querySelectorAll("[data-reset]").forEach((btn) => {
           btn.addEventListener("click", () =>
@@ -369,6 +375,137 @@
 
         dlg.showModal();
         sel.focus();
+      }
+
+      // Reverse of a merge: one account runs several trades (vehicles.trade_name);
+      // split the chosen trade(s) - vehicles plus their trips - into a brand-new
+      // operator account (staff_split_operator_trade, migration 202611191100).
+      async function splitTrade(sourceId) {
+        const source = allProfiles.find((p) => p.id === sourceId);
+        const { data: vehicles, error: vErr } = await supabase
+          .from("vehicles")
+          .select("plate_no, trade_name")
+          .eq("operator_id", sourceId);
+        if (vErr) {
+          showMessage("message", vErr.message);
+          return;
+        }
+        const trades = new Map();
+        for (const v of vehicles ?? []) {
+          const t = (v.trade_name ?? "").trim();
+          if (t) trades.set(t, (trades.get(t) ?? 0) + 1);
+        }
+        if (!trades.size) {
+          showMessage(
+            "message",
+            `"${source.username}" has no vehicles with a trade name, so there is nothing to split. ` +
+              `Set trade names on its vehicles first.`
+          );
+          return;
+        }
+
+        const dlg = document.createElement("dialog");
+        dlg.className = "ask-dialog";
+        dlg.innerHTML = `
+          <h2 class="dialog-title">Split a trade into its own account</h2>
+          <p class="subtle">
+            Tick the trade(s) of <strong>${escapeHtml(source.operator_name ?? source.username)}</strong>
+            to move, with their vehicles and trips, into a new operator account.
+          </p>
+          <fieldset style="border:0;padding:0;margin:0 0 8px">
+            ${[...trades]
+              .map(
+                ([name, n]) => `<label style="display:flex;gap:8px;align-items:center;margin:4px 0">
+                  <input type="checkbox" name="trade" value="${escapeHtml(name)}" />
+                  ${escapeHtml(name)} <span class="subtle">(${n} vehicle${n === 1 ? "" : "s"})</span>
+                </label>`
+              )
+              .join("")}
+          </fieldset>
+          <div class="field"><label for="split-username">New username</label>
+            <input id="split-username" /></div>
+          <div class="field"><label for="split-password">Temporary password</label>
+            <input id="split-password" type="text" minlength="8" /></div>
+          <div class="field"><label for="split-name">Display name</label>
+            <input id="split-name" placeholder="Defaults to the trade name" /></div>
+          <p class="subtle" id="split-msg" aria-live="polite"></p>
+          <div class="dialog-actions">
+            <button type="button" class="btn-outline" data-act="cancel">Cancel</button>
+            <button type="button" class="btn-primary" data-act="ok">Create account &amp; split</button>
+          </div>`;
+        document.body.appendChild(dlg);
+        const msg = dlg.querySelector("#split-msg");
+        const ok = dlg.querySelector("[data-act=ok]");
+        dlg.addEventListener("close", () => dlg.remove());
+
+        dlg.addEventListener("click", async (e) => {
+          const act = e.target.closest?.("[data-act]")?.dataset.act;
+          if (act === "cancel" || e.target === dlg) return dlg.close();
+          if (act !== "ok") return;
+
+          const picked = [...dlg.querySelectorAll("[name=trade]:checked")].map((c) => c.value);
+          const username = dlg.querySelector("#split-username").value.trim();
+          const password = dlg.querySelector("#split-password").value;
+          const name = dlg.querySelector("#split-name").value.trim() || picked.join(" / ");
+          if (!picked.length) return void (msg.textContent = "Tick at least one trade.");
+          if (!username) return void (msg.textContent = "Enter a username for the new account.");
+          if (password.length < 8)
+            return void (msg.textContent = "Password must be at least 8 characters.");
+
+          ok.disabled = true;
+          msg.textContent = "Creating account…";
+          const { data: sessionData } = await supabase.auth.getSession();
+          let created;
+          try {
+            const response = await fetch(`${SUPABASE_URL}/functions/v1/create-account`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${sessionData?.session?.access_token}`,
+              },
+              body: JSON.stringify({ username, password, role: "operator", operator_name: name }),
+            });
+            created = await response.json();
+          } catch {
+            created = { error: "Could not reach the account-creation service." };
+          }
+          if (created?.error) {
+            msg.textContent = created.error;
+            ok.disabled = false;
+            return;
+          }
+
+          const { data: newProfile } = await supabase
+            .from("profiles")
+            .select("id")
+            .ilike("username", created.username)
+            .maybeSingle();
+          msg.textContent = "Moving vehicles and trips…";
+          const { data, error } = newProfile
+            ? await supabase.rpc("staff_split_operator_trade", {
+                p_source: sourceId,
+                p_target: newProfile.id,
+                p_trade_names: picked,
+              })
+            : { error: { message: "New account not found." } };
+          if (error) {
+            msg.textContent =
+              `Account "${created.username}" was created but the split failed: ${error.message}. ` +
+              `Delete that account or try again with it as the target.`;
+            ok.disabled = false;
+            await load();
+            return;
+          }
+          dlg.close();
+          toast(
+            `Split ${picked.join(", ")} into "${created.username}": ${data.vehicles} vehicle(s), ${data.bookings} trip(s).`,
+            { ms: 9000 }
+          );
+          await load();
+        });
+
+        dlg.showModal();
+        dlg.querySelector("[name=trade]").focus();
       }
 
       async function deleteAccountQuietly(userId) {

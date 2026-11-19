@@ -4983,3 +4983,27 @@ is retained; adopted from the source only if the kept one has none) and
 **Applied to the live database (PITX App project) on 19 Nov via the Supabase MCP.** If rebuilding, run `npm run migrate` (or paste
 the file into the SQL editor) before using the button.
 
+
+---
+
+### 138. Split a trade out of a merged account (19 Nov)
+
+The reverse of #137. **Accounts -> "Split trade..."** (operator rows, staff
+only) lists the trade names found on the account's vehicles
+(`vehicles.trade_name`, 0036); tick one or more, enter a username, password and
+display name, and a new operator account is created (existing `create-account`
+function) and the ticked trades move to it.
+
+Migration `202611191100_trip-scheduling_split_operator_trade.sql` adds
+`staff_split_operator_trade(source, target, trade_names[])`: one transaction that
+moves the matching vehicles and their bookings (matched by plate; operator name
+snapshot follows the new account) and notifies both accounts. Refuses if the
+receiving account already has one of those plates.
+
+- Merges aren't recorded, so a split works from trade names, not from a
+  merge history - an account's vehicles need a trade name set to be splittable.
+- Notifications and the company profile are not copied; the new account fills
+  in its own profile.
+
+**Migration not applied to the live database yet** - run `npm run migrate` or
+paste the file into the SQL editor before using the button.
