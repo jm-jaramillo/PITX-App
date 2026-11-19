@@ -37,6 +37,24 @@ sections 2 and 3).
 
 ---
 
+## 37 · Company codes match Supabase (19 Nov)
+
+- The demo's company codes were invented before the real codes existed. They now come
+  from `operator_profiles.operator_code` in Supabase, matched by each operator's portal
+  username, so a code shown in Ticketing is the same code Trip Scheduling shows.
+- 17 of the 27 demo operators changed. Examples: Bicol Isarog `BIS` to `ISARG`,
+  Goldtrans `GBT` to `GOLD`, A. Arandia `ARL` to `ARDIA`, Eastern Goldtrans `EGT` to
+  `GTRAN`, GV Florida `GVF` to `FLOR`, Lucena Lines `LLI` to `JAMLL`, A&B Liner `ABL`
+  to `A&B`. 9 were already correct (ALPS, CUL, DMS, DLTB, DMMC, ELV, JAC, JAM, JVH).
+- Bicol Magayon keeps the made-up `BMG`: that account has no operator profile row in
+  Supabase, so there is no real code to copy. It is the only one left unmatched.
+- Changed [prototype/src/lib/ts-week.ts](prototype/src/lib/ts-week.ts) and rebuilt
+  [demo/](demo/). The rebuild also picked up the shared files `sync-shared` copies:
+  the 43 new route gates from Trip Scheduling and the `duplicate` LTFRB badge style.
+- No migration. Nothing in Supabase changed; this reads from it.
+
+---
+
 ## 36 · Fuller sample sales today (18 Nov)
 
 Made-up ticketing data for today, so Overview, Reports, Manifest and Close Sales have a full day to show. Dummy data only (names, ids "demo-d2-", refs "DEMO-").
