@@ -5005,5 +5005,5 @@ receiving account already has one of those plates.
 - Notifications and the company profile are not copied; the new account fills
   in its own profile.
 
-**Migration not applied to the live database yet** - run `npm run migrate` or
+**Applied to the live database (PITX App project) on 19 Nov via the Supabase MCP.** If rebuilding, run `npm run migrate` or
 paste the file into the SQL editor before using the button.
