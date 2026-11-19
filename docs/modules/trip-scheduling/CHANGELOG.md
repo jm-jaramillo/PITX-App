@@ -5085,3 +5085,22 @@ CO., INC.; BOAC, MARINDUQUE splits its plates JAM LINER INC (4) / LLI BUS CO., I
 both staff and operator. Migration applied by hand with a `_schema_migrations` row.
 
 ---
+
+### 142. Daily schedule shows each operator's profile photo (migration 202611191300, 19 Nov)
+
+On the daily schedule (operator **My schedule**, My trips and All trips, and the staff
+**Schedule**) the round avatar left of each company name is now the operator's profile
+photo when they have one, instead of their initials (initials remain for operators with
+no photo). It is a little larger (36px) so the photo is readable.
+- `list_operator_logos(ids)` returns only operator id + photo path for the trips on
+  screen; a storage policy lets signed-in users read files named `logo*` in
+  `operator-docs` (the profile photo only - every other document in the bucket stays
+  private, and writing stays with the owner and staff). Needed because an operator
+  sees other operators' trips under All trips.
+- Signed URLs are cached for the page's life. The week view is unchanged.
+- Applied by hand with a `_schema_migrations` row. Verified as bicolisarog.ops (6 own
+  trips, all with the photo), on All trips (19 operators' photos, 34 initials) and as staff.
+- A bug found on the way: `app.js` again used a platform export (`supabase`) it hadn't
+  imported - same class as #115; fixed.
+
+---

@@ -104,6 +104,19 @@
         font-size: 12px;
         color: #fff;
       }
+      .pids-avatar.has-photo {
+        width: 36px;
+        height: 36px;
+        background: var(--surface, #fff);
+        border: 1px solid var(--border, #d7dbe3);
+        overflow: hidden;
+      }
+      .pids-avatar.has-photo img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
       .pids-company-name {
         font-weight: 700;
         color: var(--title, #14192b);
@@ -200,6 +213,7 @@
         showMessage,
         escapeHtml,
         downloadCsv,
+        loadOperatorLogos,
       } from "./assets/app.js";
 
       const profile = await guardPage("operator");
@@ -344,6 +358,15 @@
         "#2f5fd0", "#1c6b3f", "#9c1f22", "#a15c00",
         "#6b3fa0", "#0f7a8c", "#b0326b", "#4a5568",
       ];
+      // The operator's profile photo when they have one, else their initials.
+      let logoByOperator = new Map();
+      function avatarHtml(b, label) {
+        const url = logoByOperator.get(b.operator_id);
+        return url
+          ? `<span class="pids-avatar has-photo"><img src="${escapeHtml(url)}" alt="" loading="lazy" /></span>`
+          : `<span class="pids-avatar" style="background:${avatarColor(label)}">${escapeHtml(initials(label))}</span>`;
+      }
+
       function avatarColor(name) {
         let hash = 0;
         for (const ch of name || "") hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
@@ -410,6 +433,7 @@
 
         const bookings = data ?? [];
         lastDayBookings = bookings;
+        logoByOperator = await loadOperatorLogos(bookings.map((b) => b.operator_id));
 
         document.getElementById("capacity-note").textContent =
           viewMode === "mine"
@@ -507,9 +531,7 @@
                           }">
                           <td>
                             <div class="pids-company">
-                              <span class="pids-avatar" style="background:${avatarColor(label)}">${escapeHtml(
-                                initials(label)
-                              )}</span>
+                              ${avatarHtml(b, label)}
                               <span class="pids-company-name">${bookingOperatorHtml(b)}</span>
                             </div>
                           </td>

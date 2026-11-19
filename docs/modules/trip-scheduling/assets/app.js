@@ -3,7 +3,7 @@
 // not specific to trip scheduling lives in ../../../shared/platform.js and is
 // re-exported here so pages keep a single import.
 
-import { renderNav as renderShell, ICONS, escapeHtml } from "../../../shared/platform.js";
+import { renderNav as renderShell, ICONS, escapeHtml, supabase } from "../../../shared/platform.js";
 export * from "../../../shared/platform.js";
 
 /* ---------------------------------------------------------------- routes */
@@ -849,4 +849,30 @@ export function routesByTradeHtml(vehicles, selected) {
     })
     .join("");
   return `<option value="" disabled${selected ? "" : " selected"}>Select a route</option>` + html;
+}
+
+/* ------------------------------------------------------ operator photos */
+
+// Operator profile photos for the daily schedule: operator id -> signed URL.
+// list_operator_logos() returns only the photo path (nothing else of the
+// profile), and the signed URLs are cached for the page's lifetime (they last an
+// hour). Operators with no photo are simply absent from the map.
+const logoUrlCache = new Map();
+export async function loadOperatorLogos(operatorIds) {
+  const ids = [...new Set((operatorIds ?? []).filter(Boolean))];
+  const missing = ids.filter((id) => !logoUrlCache.has(id));
+  if (missing.length) {
+    const { data } = await supabase.rpc("list_operator_logos", { p_operator_ids: missing });
+    const rows = data ?? [];
+    const { data: signed } = rows.length
+      ? await supabase.storage.from("operator-docs").createSignedUrls(
+          rows.map((r) => r.logo_path),
+          3600
+        )
+      : { data: [] };
+    const urlByPath = new Map((signed ?? []).filter((s) => s.signedUrl).map((s) => [s.path, s.signedUrl]));
+    for (const id of missing) logoUrlCache.set(id, null);
+    for (const r of rows) logoUrlCache.set(r.operator_id, urlByPath.get(r.logo_path) ?? null);
+  }
+  return new Map(ids.filter((id) => logoUrlCache.get(id)).map((id) => [id, logoUrlCache.get(id)]));
 }
