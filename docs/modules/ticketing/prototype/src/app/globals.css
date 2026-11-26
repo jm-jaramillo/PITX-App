@@ -111,7 +111,7 @@
   }
 }
 
-/* Ticket Availability (entry 38): the board fills the screen width, and its PIDS table heads
+/* Ticket Availability (entries 38 and 40): the board fills the screen width, and its PIDS table heads
    keep their own size and colour instead of the small grey table heads. */
 @layer utilities {
   .wrap.wrap-full {

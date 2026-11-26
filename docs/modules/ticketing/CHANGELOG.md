@@ -37,6 +37,26 @@ sections 2 and 3).
 
 ---
 
+## 40 · Ticket Availability board: tighter header, smaller text (26 Nov)
+
+From the 26 Nov screenshot of the PITX Admin view.
+
+| Part | Before (entry 38) | Now |
+|---|---|---|
+| Legend | Big white box, 3 rows | Slim row on the red, small swatches |
+| Clock | Wrapped to 3 lines | One line |
+| PITX logo | Red letters, lost on the red board | White |
+| Title | Up to 88px | Up to 52px |
+| Destination band | 32 to 76px | 22 to 44px |
+| Trip rows | 26 to 60px | 18 to 36px |
+| Table heads | 15 to 30px | 13 to 20px |
+| "No more trips" box | Tall (64px padding) | Half the height |
+
+- Still full width, still grows with the screen, just less.
+- Not checked in the browser: the demo needs the portal sign-in.
+
+---
+
 ## 39 · Ticket fields from the operators' manual tickets, rules per operator (26 Nov)
 
 Based on Cagsawa's manual ticket (coupon 130233 C). No passenger address.
