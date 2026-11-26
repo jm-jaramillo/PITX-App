@@ -1,6 +1,6 @@
 import { boothServes } from "./booths";
 import { todayManila } from "./format";
-import { getLayout, parseBlockedSeats } from "./seat-layouts";
+import { getLayout, parseBlockedSeats, prioritySeats } from "./seat-layouts";
 import type { AuditEntry, Db, FareType, PaymentMethod, Ticket } from "./types";
 
 // Made-up sales, for the sample trips (seed.ts) and the real PITX trips the demo reads
@@ -24,7 +24,7 @@ const SEAT_FALLBACK = 45; // buses whose seat count isn't known yet
  * Prefix of this generation of sample tickets (entry 36: fuller sales today, mostly sold on
  * the day). Older sample tickets kept with real PITX data are made again with it (live.ts).
  */
-export const DEMO_TICKET_PREFIX = "demo-d2-";
+export const DEMO_TICKET_PREFIX = "demo-d3-"; // d3 (entry 43): seats spread, front rows senior / PWD
 
 /** A sample ticket from before entry 36, to be made again. */
 export const isOldDemoTicket = (id: string) => id.startsWith("demo-") && !id.startsWith(DEMO_TICKET_PREFIX);
@@ -99,16 +99,33 @@ export function addDemoSales(db: Db): Db {
     const onTheDay = isToday && saleEnd > dayOpens;
     const advanceEnd = onTheDay ? dayOpens : saleEnd;
 
-    let seat = 0;
+    // Seats spread over the bus, not filled from seat 1 (entry 43). Rows 1 and 2 are for
+    // seniors and PWDs, so they mostly fill last and only with seniors and PWDs.
+    const front = prioritySeats(layout);
+    const order = Array.from({ length: capacity }, (_, n) => n + 1)
+      .filter((n) => !blocked.has(n))
+      .map((n) => ({ n, key: rand() + (front.has(n) && rand() > 0.3 ? 1 : 0) }))
+      .sort((a, b) => a.key - b.key)
+      .map((x) => x.n);
+
     for (let i = 0; i < count; i++) {
-      do seat++;
-      while (blocked.has(seat));
-      if (seat > capacity) break;
+      const seat = order[i];
+      if (seat === undefined) break;
       sequence++;
       // No unit yet means no seat map at the counter, so only online bookings.
       const online = !layout || rand() < 0.2;
       const pick = rand();
-      const fareType: FareType = pick < 0.08 ? "Student" : pick < 0.16 ? "Senior" : pick < 0.2 ? "PWD" : "Adult";
+      const fareType: FareType = front.has(seat)
+        ? pick < 0.6
+          ? "Senior"
+          : "PWD"
+        : pick < 0.08
+          ? "Student"
+          : pick < 0.16
+            ? "Senior"
+            : pick < 0.2
+              ? "PWD"
+              : "Adult";
       const fare = fareType === "Adult" ? route.price : Math.round(route.price * 80) / 100;
       const payPick = rand();
       const paymentMethod: PaymentMethod = online ? "E-Wallet" : payPick < 0.7 ? "Cash" : payPick < 0.85 ? "Card" : "E-Wallet";

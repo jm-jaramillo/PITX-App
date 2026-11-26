@@ -13,6 +13,8 @@ const LEGEND = [
   { label: "Being booked", className: "border-sky-300 bg-sky-100" },
   { label: "Not for sale", className: "border-amber-300 bg-amber-100" },
 ];
+// Rows 1 and 2: senior citizens and PWDs only (entry 43).
+const PRIORITY_LEGEND = { label: "Senior / PWD only", className: "border-violet-400 bg-violet-50" };
 
 /** Window, aisle or middle seat, from where it sits across the bench (positions 0 and 5 are the windows). */
 export function seatSide(layout: SeatLayout | null | undefined, seatNo: number): "Window" | "Aisle" | "Middle" | "" {
@@ -33,6 +35,8 @@ export function BusSeatPlan({
   blocked,
   held,
   selected,
+  priority = new Set<number>(),
+  priorityOpen = true,
   onSelect,
 }: {
   layout: SeatLayout;
@@ -40,6 +44,10 @@ export function BusSeatPlan({
   blocked: Set<number>;
   held: Set<number>;
   selected: number[];
+  /** Seats for seniors and PWDs only. */
+  priority?: Set<number>;
+  /** false when the booking has no senior or PWD passenger left to seat. */
+  priorityOpen?: boolean;
   onSelect: (seatNo: number) => void;
 }) {
   const column = (position: number) => 5 - position; // driver side left
@@ -51,7 +59,7 @@ export function BusSeatPlan({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-slate-600">
-        {LEGEND.map((item) => (
+        {[...LEGEND, ...(priority.size ? [PRIORITY_LEGEND] : [])].map((item) => (
           <span key={item.label} className="flex items-center gap-1.5">
             <span className={`inline-block h-3.5 w-3.5 rounded-t-md rounded-b-sm border ${item.className}`} />
             {item.label}
@@ -84,13 +92,15 @@ export function BusSeatPlan({
               const isTaken = taken.has(cell.seatNo);
               const isHeld = !isTaken && held.has(cell.seatNo);
               const isSelected = selected.includes(cell.seatNo);
+              const isPriority = priority.has(cell.seatNo);
+              const closed = isPriority && !priorityOpen && !isSelected;
               const side = seatSide(layout, cell.seatNo);
-              const note = `${side ? `, ${side.toLowerCase()}` : ""}${isBlocked ? ", not for sale" : isTaken ? ", taken" : isHeld ? ", being booked by someone else" : ""}`;
+              const note = `${side ? `, ${side.toLowerCase()}` : ""}${isBlocked ? ", not for sale" : isTaken ? ", taken" : isHeld ? ", being booked by someone else" : ""}${isPriority ? ", for senior citizens and PWDs only" : ""}`;
               return (
                 <button
                   key={cell.seatNo}
                   type="button"
-                  disabled={isBlocked || isTaken || isHeld}
+                  disabled={isBlocked || isTaken || isHeld || closed}
                   aria-pressed={isSelected}
                   aria-label={`Seat ${cell.seatNo}${note}`}
                   title={`Seat ${cell.seatNo}${note}`}
@@ -105,7 +115,11 @@ export function BusSeatPlan({
                           ? "cursor-not-allowed border-sky-300 bg-sky-100 text-sky-700"
                           : isSelected
                             ? "scale-105 border-brand bg-brand text-white shadow"
-                            : "border-slate-300 bg-white text-slate-700 hover:-translate-y-0.5 hover:border-brand"
+                            : isPriority
+                              ? closed
+                                ? "cursor-not-allowed border-violet-300 bg-violet-50 text-violet-400"
+                                : "border-violet-400 bg-violet-50 text-violet-800 hover:-translate-y-0.5 hover:border-brand"
+                              : "border-slate-300 bg-white text-slate-700 hover:-translate-y-0.5 hover:border-brand"
                   }`}
                 >
                   {isTaken ? "✕" : cell.seatNo}

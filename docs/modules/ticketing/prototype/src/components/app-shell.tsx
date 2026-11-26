@@ -42,6 +42,23 @@ function initials(name: string): string {
 type LiveState = "idle" | "loading" | "loaded" | "empty";
 let liveState: LiveState = "idle";
 
+// Which data staff work with (entry 43): the sample month (default) or real PITX trips.
+const DATA_KEY = "pitx-tms-data";
+function dataChoice(): "sample" | "pitx" {
+  try {
+    return localStorage.getItem(DATA_KEY) === "pitx" ? "pitx" : "sample";
+  } catch {
+    return "sample";
+  }
+}
+function setDataChoice(choice: "sample" | "pitx") {
+  try {
+    localStorage.setItem(DATA_KEY, choice);
+  } catch {
+    // Storage blocked: the choice lasts this page only.
+  }
+}
+
 async function refreshLive(setState: (state: LiveState) => void) {
   liveState = "loading";
   setState(liveState);
@@ -270,12 +287,12 @@ function Shell({ children }: { children: ReactNode }) {
   const passengerView = session?.role === "Passenger";
   useEffect(() => {
     if (!onSite || !signedIn) return;
-    if (passengerView) {
-      // Passengers play through the sample week. The real feed is for staff: a passenger
-      // account only gets the few trips with a seat map, and their sample bookings drop off.
+    // Passengers always, and staff by default (entry 43), use the sample month, so there are
+    // trips and sales to work with today. "Refresh from PITX" switches staff to real trips.
+    if (passengerView || dataChoice() !== "pitx") {
       if (getDb().source === "pitx") {
         restoreSampleData();
-        liveState = "idle"; // switching back to a staff view reads PITX again
+        liveState = "idle"; // choosing PITX data again reads PITX
       }
       return;
     }
@@ -353,8 +370,29 @@ function Shell({ children }: { children: ReactNode }) {
                 </p>
                 {onSite && user && <ViewAs db={db} session={session} user={user} />}
                 {onSite && session.role === "PITX Admin" && (
-                  <button type="button" className="btn-link" disabled={live === "loading"} onClick={() => refreshLive(setLive)}>
+                  <button
+                    type="button"
+                    className="btn-link"
+                    disabled={live === "loading"}
+                    onClick={() => {
+                      setDataChoice("pitx");
+                      refreshLive(setLive);
+                    }}
+                  >
                     {live === "loading" ? "Reading PITX…" : "Refresh from PITX"}
+                  </button>
+                )}
+                {onSite && session.role === "PITX Admin" && db.source === "pitx" && (
+                  <button
+                    type="button"
+                    className="btn-link"
+                    onClick={() => {
+                      setDataChoice("sample");
+                      restoreSampleData();
+                      liveState = "idle";
+                    }}
+                  >
+                    Use sample data
                   </button>
                 )}
                 {session.role === "PITX Admin" && (
@@ -364,7 +402,7 @@ function Shell({ children }: { children: ReactNode }) {
                     onClick={() => {
                       if (window.confirm("Reset all demo data? Tickets and changes in this browser will be lost.")) {
                         resetDemoData();
-                        if (onSite) refreshLive(setLive);
+                        if (onSite && dataChoice() === "pitx") refreshLive(setLive);
                       }
                     }}
                   >

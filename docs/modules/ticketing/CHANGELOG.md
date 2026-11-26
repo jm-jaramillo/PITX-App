@@ -37,6 +37,39 @@ sections 2 and 3).
 
 ---
 
+## 43 · Passenger booking review, a month of sample data (26 Nov)
+
+**Sample data to work with today**
+
+| Change | Detail |
+|---|---|
+| Sample month | Trips and sales for today and the next 30 days (was 7). About 1,400 trips, 3.5 MB in the browser |
+| Staff default | Staff views open on the sample month, because Trip Scheduling has no trips left today. PITX Admin: "Refresh from PITX" switches to real trips (remembered), "Use sample data" switches back |
+| Seats | Sample sales are spread over the bus, not filled from seat 1. Rows 1 and 2 are only sold to seniors and PWDs |
+| Saved data | Older samples (one week, or old sample tickets) are made again on load |
+
+**Book a Trip (passenger)**
+
+| Point | Now |
+|---|---|
+| When are you leaving? | Month calendar, today up to a month ahead. Days with no open trips are greyed out |
+| Book again, Popular, provinces, destinations | No "from ₱900" amounts |
+| Capitals | Destinations and operators in proper case ("Naga City", "Cagsawa Travel & Tours"). Acronyms stay (PITX, DLTB, C.U.L.). Labels no longer all caps |
+| Sort | "Cheapest" removed (fares are the same). Earliest and Most seats stay |
+| Passenger types first | Regular, Student, Senior citizen and PWD are counted in step 1, before seats |
+| Rows 1 and 2 | Senior citizens and PWDs only. Shown in violet on the seat plan ("Senior / PWD only"), closed when no senior or PWD is left to seat. Checked again when paying |
+| Bus class | The operator's own class name on each trip and in the class filter |
+| Payment | Cash added: pay at 7-Eleven, Cebuana or M Lhuillier (demo: paid at once). Not counted in any teller's cash |
+| Yellow notes | Now a small "i" tag, note on hover (payment demo note, the rows 1 and 2 note, POS "no counter") |
+| My trips: cancel | "Cancel trip" on upcoming online bookings, up to 4 hours before departure (System Parameters refund cutoff). Refund at the operator's refund %, back the way they paid. Not for non-refundable operators (e.g. Cagsawa sample): go to the booth |
+| Live schedule | Passengers can open Ticket Availability (the PIDS board), view only |
+
+- Checked in the local demo (passenger view): calendar, types, no "from" prices, proper case, seat plan, Cancel trip, Ticket Availability.
+- Not on the site: the senior/PWD row rule applies to online booking only. Tellers at POS can still sell rows 1 and 2 to anyone.
+- Checks: new booking checks pass (31 days, rows 1 and 2, proper case, size). The 4 older seed-test failures (entry 39) are still there.
+
+---
+
 ## 42 · PITX ticket booths TB1 to TB4 and TB6 (26 Nov)
 
 The sample booths C01 to C08 are replaced by the real ones, from the floor plan.

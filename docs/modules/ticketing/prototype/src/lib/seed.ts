@@ -195,8 +195,8 @@ export function statusAt(date: string, time: string, now: number, cancelled = fa
   return "Scheduled";
 }
 
-/** Days of sample trips: today and the next six, the companies' advance selling window. */
-export const SAMPLE_DAYS = 7;
+/** Days of sample trips: today and the next 30, so passengers can book up to a month ahead (entry 43). */
+export const SAMPLE_DAYS = 31;
 
 export function seedDb(): Db {
   const today = todayManila();

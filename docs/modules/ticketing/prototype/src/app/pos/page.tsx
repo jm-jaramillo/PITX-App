@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState, type FormEvent } from "react";
+import { InfoTip } from "@/components/info-tip";
 import { OpenCounter } from "@/components/open-counter";
 import { SeatMap } from "@/components/seat-map";
 import { peso, todayManila } from "@/lib/format";
@@ -132,8 +133,8 @@ function Pos() {
     <div className="space-y-4">
       <PageTitle>POS Ticketing</PageTitle>
       {!canCharge && (
-        <p className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-          Sign in with a counter to sell tickets.
+        <p>
+          <InfoTip label="No counter" note="Sign in with a counter (ticket booth) to sell tickets." />
         </p>
       )}
       {canCharge && !counterOpenedToday(db, today) ? (

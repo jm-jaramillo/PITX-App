@@ -15,7 +15,8 @@ export const NAV: { href: string; label: string; roles: Role[] }[] = [
   { href: "/", label: "Overview", roles: [...OPS, "PITX Admin"] },
   { href: "/book", label: "Book a Trip", roles: ["Passenger"] },
   { href: "/pos", label: "POS Ticketing", roles: OPS },
-  { href: "/availability", label: "Ticket Availability", roles: [...OPS, "PITX Admin"] },
+  // Passengers see the same live board, view only (entry 43).
+  { href: "/availability", label: "Ticket Availability", roles: [...OPS, "PITX Admin", "Passenger"] },
   { href: "/close", label: "Close Sales", roles: OPS },
   { href: "/collection", label: "Daily Collection", roles: ["PITX Cashier"] },
   { href: "/manifest", label: "Manifest", roles: [...OPS, "PITX Admin"] },

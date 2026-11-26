@@ -7,8 +7,8 @@ import { todayManila } from "./format";
 import { routeGroupOf, type RouteGroup } from "./places";
 import { routeName, shiftRemittance } from "./reports";
 import { sells, setsUnits } from "./roles";
-import { getLayout, parseBlockedSeats } from "./seat-layouts";
-import { seedDb } from "./seed";
+import { getLayout, parseBlockedSeats, prioritySeats } from "./seat-layouts";
+import { addDays, SAMPLE_DAYS, seedDb } from "./seed";
 import { withUserSamples } from "./user-samples";
 import type {
   ApprovalMode,
@@ -67,7 +67,10 @@ function freshSample(stored: Db): Db {
   const today = todayManila();
   // Sample tickets from before entry 36 also mean a new sample week, with today's fuller sales.
   const oldSamples = stored.tickets?.some((t) => isOldDemoTicket(t.id));
-  if (stored.source === "pitx" || (stored.seededOn === today && !oldSamples)) return stored;
+  // A sample made before entry 43 covers one week, not a month.
+  const lastDay = addDays(today, SAMPLE_DAYS - 1);
+  const shortSample = !stored.trips?.some((t) => t.date >= lastDay);
+  if (stored.source === "pitx" || (stored.seededOn === today && !oldSamples && !shortSample)) return stored;
   const seeded = seedDb();
   const base = { ...seeded, settings: { ...seeded.settings, ...stored.settings } };
   const next = stored.session ? { ...withUserSamples(base, stored.session), session: stored.session } : base;
@@ -699,7 +702,8 @@ export function issueTickets(input: IssueInput, today: string): { tickets?: Tick
 export interface OnlineInput {
   tripId: string;
   passengers: PassengerInput[];
-  paymentMethod: Exclude<PaymentMethod, "Cash">;
+  /** Cash: paid at a payment center (7-Eleven, Cebuana, M Lhuillier) with a reference (entry 43). */
+  paymentMethod: PaymentMethod;
   paymentRef: string;
 }
 
@@ -717,9 +721,14 @@ export function bookOnline(input: OnlineInput, today: string): { tickets?: Ticke
   const company = current.companies.find((c) => c.id === route?.companyId);
   if (!route || !company) return { error: "This trip's route is missing from Trip Scheduling." };
   const taken = takenSeats(current, trip.id);
+  // Rows 1 and 2 are for senior citizens and PWDs (entry 43).
+  const priority = prioritySeats(tripSeating(current, trip).layout ?? undefined);
   for (const p of input.passengers) {
     if (!p.passengerName.trim()) return { error: `Enter the passenger name for seat ${p.seatNo}.` };
     if (taken.has(p.seatNo)) return { error: `Seat ${p.seatNo} was just sold. Pick another seat.` };
+    if (priority.has(p.seatNo) && p.fareType !== "Senior" && p.fareType !== "PWD") {
+      return { error: `Seat ${p.seatNo} is in rows 1 and 2, for senior citizens and PWDs only.` };
+    }
     if (p.fareType !== "Adult" && !p.idNo.trim()) return { error: `Enter the ${p.fareType} ID number for seat ${p.seatNo}.` };
   }
   if (!input.paymentRef.trim()) return { error: `Enter the ${input.paymentMethod} reference number.` };
@@ -877,6 +886,42 @@ function newRequest(data: Db, request: Pick<ApprovalRequest, "type" | "ticketId"
 
 export function pendingRequest(data: Db, ticketId: string, type: ApprovalRequest["type"]): ApprovalRequest | undefined {
   return data.requests.find((r) => r.ticketId === ticketId && r.type === type && r.status === "Pending");
+}
+
+/**
+ * A passenger cancels their own online booking from My trips (entry 43): up to the refund
+ * cutoff (System Parameters, hours before departure), refunded the way they paid, at the
+ * operator's refund %. Non-refundable operators' tickets can't be cancelled online.
+ */
+export function passengerCancelPlan(data: Db, ticket: Ticket, now: number): { block?: string; amount: number } {
+  const amount = refundAmountFor(data, ticket);
+  const session = data.session;
+  if (session?.role !== "Passenger" || ticket.source !== "Online" || ticket.bookedBy !== session.name) {
+    return { amount, block: "Only the passenger who booked online can cancel here." };
+  }
+  if (ticket.status !== "Ticketed") return { amount, block: `A ${ticket.status.toLowerCase()} ticket can't be cancelled.` };
+  const trip = data.trips.find((t) => t.id === ticket.tripId);
+  if (!trip || trip.status === "Departed" || trip.status === "Cancelled") return { amount, block: "This trip can't be cancelled any more." };
+  const company = ticketCompany(data, ticket);
+  if (company?.refundPercent === 0) {
+    return { amount, block: `${company.code} tickets are non-refundable. For help, go to the operator's ticket booth at PITX.` };
+  }
+  const hours = data.settings.refundCutoffHours;
+  if (departureTime(trip) - now < hours * 3_600_000) {
+    return { amount, block: `Online cancellation closes ${hours} hours before departure. Go to the operator's ticket booth at PITX.` };
+  }
+  return { amount };
+}
+
+export function cancelBooking(id: string): string | null {
+  const current = load();
+  const ticket = current.tickets.find((t) => t.id === id);
+  if (!ticket) return "Ticket not found.";
+  const plan = passengerCancelPlan(current, ticket, Date.now());
+  if (plan.block) return plan.block;
+  const ref = `DEMO-RFD-${String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, "0")}`;
+  commit(applyRefund(current, ticket, { category: "Cancelled by passenger", remark: "Online", method: ticket.paymentMethod, ref, by: current.session?.name }));
+  return null;
 }
 
 export interface RefundInput {

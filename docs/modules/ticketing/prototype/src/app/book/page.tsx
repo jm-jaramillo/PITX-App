@@ -6,15 +6,19 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { BusSeatPlan, seatSide } from "@/components/bus-seat-plan";
 import { CompanyLogo } from "@/components/company-logo";
 import { PageTitle } from "@/components/page-title";
-import { peso, todayManila } from "@/lib/format";
+import { InfoTip } from "@/components/info-tip";
+import { peso, properCase, todayManila } from "@/lib/format";
 import { groupHref, ticketHref } from "@/lib/paths";
 import { provinceOf, regionOf, REGIONS, type Region } from "@/lib/places";
+import { prioritySeats } from "@/lib/seat-layouts";
 import {
   bookOnline,
+  cancelBooking,
   computeFare,
   heldByOthers,
   holdSeat,
   myHolds,
+  passengerCancelPlan,
   releaseSeats,
   sellingBlock,
   sellingClosed,
@@ -30,22 +34,26 @@ import { FARE_TYPES, type Db, type FareType, type Trip } from "@/lib/types";
 // The passenger's own booking, laid out like buying a cinema ticket:
 //   1 Route: where to and when      2 Trip: the departure (like a screening time)
 //   3 Seats: on the bus seat plan   4 Passengers: names and discounts
-//   5 Payment: GCash, Maya or card, then the e-ticket.
+//   5 Payment: GCash, Maya, card or cash, then the e-ticket.
+// Entry 43: a month calendar for the date, passenger types picked first (rows 1 and 2 are
+// for senior citizens and PWDs only), no "from" prices or cheapest sort (fares are the same
+// across operators), names in proper case, and cash payment.
 // Seats picked in step 3 are held for the passenger until they pay (System Parameters,
 // seat hold minutes), so nobody else can take them meanwhile.
 
 const STEPS = ["Route", "Trip", "Seats", "Passengers", "Payment"] as const;
-const DAYS_AHEAD = 7;
+const DAYS_AHEAD = 31; // book up to a month ahead
 // How many seats one booking can take (demo cap, like the bus lines' online booking limits).
 const MAX_SEATS = 10;
-const SORTS = ["Earliest", "Cheapest", "Most seats"] as const;
+const SORTS = ["Earliest", "Most seats"] as const;
 type Sort = (typeof SORTS)[number];
 
-type Wallet = "GCash" | "Maya" | "Card";
+type Wallet = "GCash" | "Maya" | "Card" | "Cash";
 const WALLETS: { id: Wallet; label: string; note: string }[] = [
   { id: "GCash", label: "GCash", note: "E-wallet" },
   { id: "Maya", label: "Maya", note: "E-wallet" },
   { id: "Card", label: "Credit or debit card", note: "Visa, Mastercard" },
+  { id: "Cash", label: "Cash", note: "Pay at 7-Eleven, Cebuana or M Lhuillier" },
 ];
 
 const FARE_INFO: Record<FareType, { label: string; idLabel?: string; law?: string }> = {
@@ -62,7 +70,12 @@ const timeOfDay = (time: string): TimeOfDay => {
   return hour < 12 ? "Morning" : hour < 18 ? "Afternoon" : "Evening";
 };
 
-const placeOf = (description = "") => description.replace(/^PITX to /, "");
+const placeOf = (description = "") => properCase(description.replace(/^PITX to /, ""));
+
+/** Senior citizens and PWDs can sit in rows 1 and 2. */
+const PRIORITY_TYPES: FareType[] = ["Senior", "PWD"];
+/** Order seats are given out to passenger types: priority rows first to seniors, then PWDs. */
+const ORDER: FareType[] = ["Adult", "Student", "Senior", "PWD"];
 
 function addDays(date: string, days: number) {
   const d = new Date(`${date}T12:00:00+08:00`);
@@ -101,7 +114,9 @@ export default function BookPage() {
   const [operator, setOperator] = useState("");
   const [busClass, setBusClass] = useState("");
   const [sort, setSort] = useState<Sort>("Earliest");
-  const [count, setCount] = useState(1);
+  // Passenger types first (entry 43), so seats in rows 1 and 2 go to seniors and PWDs.
+  const [counts, setCounts] = useState<Record<FareType, number>>({ Adult: 1, Student: 0, Senior: 0, PWD: 0 });
+  const count = FARE_TYPES.reduce((sum, f) => sum + counts[f], 0);
   const [tripId, setTripId] = useState("");
   const [passengers, setPassengers] = useState<PassengerInput[]>([]);
   // Contact details from the passenger's last booking, like a saved profile.
@@ -133,11 +148,12 @@ export default function BookPage() {
   const companyOf = (t: Trip) => db.companies.find((c) => c.id === tripCompanyId(db, t));
   const busOf = (t: Trip) => db.buses.find((b) => b.id === t.busId);
   const busTypeOf = (t: Trip) => db.busTypes.find((b) => b.id === busOf(t)?.busTypeId);
+  // The operator's own class name (entry 39), else the bus type.
+  const classOf = (t: Trip) => busOf(t)?.busClass ?? busTypeOf(t)?.description ?? "";
 
-  const dates = Array.from({ length: DAYS_AHEAD }, (_, i) => addDays(today, i));
   const dayTrips = openTrips(db, date);
 
-  // Step 1: destinations open on the date, cheapest fare first shown on each card.
+  // Step 1: destinations open on the date. No "from" fare: fares are the same across operators.
   const places = [...new Set(dayTrips.map((t) => placeOf(routeOf(t.routeId)?.description)))]
     .filter(Boolean)
     .map((place) => {
@@ -145,7 +161,6 @@ export default function BookPage() {
       return {
         place,
         trips: trips.length,
-        from: Math.min(...trips.map((t) => routeOf(t.routeId)?.price ?? Infinity)),
         operators: new Set(trips.map((t) => tripCompanyId(db, t))).size,
         first: trips[0].time,
         province: provinceOf(place),
@@ -161,7 +176,6 @@ export default function BookPage() {
         region: regionOf(name),
         places: inside,
         trips: inside.reduce((sum, p) => sum + p.trips, 0),
-        from: Math.min(...inside.map((p) => p.from)),
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -191,22 +205,16 @@ export default function BookPage() {
   // Step 2: departures to the destination.
   const toPlace = dayTrips.filter((t) => placeOf(routeOf(t.routeId)?.description) === destination);
   const operators = [...new Set(toPlace.map((t) => tripCompanyId(db, t) ?? ""))];
-  const classes = [...new Set(toPlace.map((t) => busTypeOf(t)?.description ?? ""))].filter(Boolean).sort();
-  const fareFrom = (t: Trip) => {
-    const r = routeOf(t.routeId);
-    return r ? computeFare(r, "Adult") : Infinity;
-  };
+  const classes = [...new Set(toPlace.map(classOf))].filter(Boolean).sort();
   const departures = toPlace
     .filter(
       (t) =>
         (when === "Any time" || timeOfDay(t.time) === when) &&
         (!operator || tripCompanyId(db, t) === operator) &&
-        (!busClass || busTypeOf(t)?.description === busClass),
+        (!busClass || classOf(t) === busClass),
     )
     .sort((a, b) =>
-      sort === "Cheapest"
-        ? fareFrom(a) - fareFrom(b) || a.time.localeCompare(b.time)
-        : sort === "Most seats"
+      sort === "Most seats"
           ? ticketAvailability(db, b).left - ticketAvailability(db, a).left || a.time.localeCompare(b.time)
           : a.time.localeCompare(b.time),
     );
@@ -226,6 +234,10 @@ export default function BookPage() {
   const savings = passengers.length * regular - fares;
   const total = fares + passengers.length * insurance;
   const seatList = passengers.map((p) => p.seatNo).sort((a, b) => a - b);
+  // Rows 1 and 2 are for seniors and PWDs (entry 43). Types still without a seat:
+  const priority = prioritySeats(seating?.layout ?? undefined);
+  const leftOf = (f: FareType) => counts[f] - passengers.filter((p) => p.fareType === f).length;
+  const priorityLeft = PRIORITY_TYPES.reduce((n, f) => n + Math.max(0, leftOf(f)), 0);
 
   function go(next: number) {
     setError(null);
@@ -267,10 +279,22 @@ export default function BookPage() {
         `You're booking for ${count} passenger${count === 1 ? "" : "s"}. Tap a picked seat to let it go, or go back to Route to add a passenger.`,
       );
     }
+    // A front-row seat goes to a senior or PWD; others to the next type still without a seat.
+    const fareType = priority.has(seatNo) ? PRIORITY_TYPES.find((f) => leftOf(f) > 0) : ORDER.find((f) => leftOf(f) > 0);
+    if (!fareType) {
+      return setError("Rows 1 and 2 are for senior citizens and PWDs only. Pick a seat further back, or add a senior or PWD passenger in step 1.");
+    }
     const problem = holdSeat(tripId, seatNo);
     if (problem) return setError(problem);
     const first = passengers.length === 0 ? (db.session?.name ?? "") : "";
-    setPassengers((current) => [...current, { seatNo, passengerName: first, contactNo: "", email: "", fareType: "Adult", idNo: "" }]);
+    setPassengers((current) => [...current, { seatNo, passengerName: first, contactNo: "", email: "", fareType, idNo: "" }]);
+  }
+
+  /** Changes a passenger's type, keeping the counts in step 1 in line. Front rows stay senior or PWD. */
+  function changeType(p: PassengerInput, f: FareType) {
+    if (priority.has(p.seatNo) && !PRIORITY_TYPES.includes(f)) return;
+    setCounts((c) => ({ ...c, [p.fareType]: Math.max(0, c[p.fareType] - 1), [f]: c[f] + 1 }));
+    edit(p.seatNo, { fareType: f, idNo: f === "Adult" ? "" : p.idNo });
   }
 
   function edit(seatNo: number, changes: Partial<PassengerInput>) {
@@ -302,7 +326,7 @@ export default function BookPage() {
             .slice()
             .sort((a, b) => a.seatNo - b.seatNo)
             .map((p) => ({ ...p, contactNo: contact.mobile, email: contact.email })),
-          paymentMethod: wallet === "Card" ? "Card" : "E-Wallet",
+          paymentMethod: wallet === "Card" ? "Card" : wallet === "Cash" ? "Cash" : "E-Wallet",
           paymentRef: ref,
         },
         today,
@@ -348,7 +372,7 @@ export default function BookPage() {
       </div>
 
       {tab === "mine" ? (
-        <MyTrips db={db} upcoming={upcoming} past={past} onBook={() => setTab("book")} />
+        <MyTrips db={db} upcoming={upcoming} past={past} now={now} onBook={() => setTab("book")} />
       ) : (
         <>
           <Stepper
@@ -363,66 +387,56 @@ export default function BookPage() {
           {step === 0 && (
             <section className="space-y-4">
               <div className="rounded-xl border border-slate-200 bg-white p-4">
-                <p className="section-head mb-2">When are you leaving?</p>
-                <div className="flex gap-2 overflow-x-auto pb-1">
-                  {dates.map((d) => {
-                    const count = openTrips(db, d).length;
-                    return (
-                      <button
-                        key={d}
-                        type="button"
-                        aria-pressed={d === date}
-                        disabled={count === 0}
-                        onClick={() => pickDate(d)}
-                        className={`min-w-[4.5rem] shrink-0 rounded-lg border px-3 py-2 text-center disabled:opacity-40 ${
-                          d === date ? "border-brand bg-brand text-white" : "border-slate-200 bg-white hover:border-brand"
-                        }`}
-                      >
-                        <span className="block text-[11px] font-semibold uppercase">
-                          {d === today ? "Today" : d === addDays(today, 1) ? "Tmrw" : dayLabel(d, { weekday: "short" })}
+                <p className="section-head normal-case mb-2">When are you leaving?</p>
+                <MonthCalendar today={today} last={addDays(today, DAYS_AHEAD - 1)} value={date} tripsOn={(d) => openTrips(db, d).length} onPick={pickDate} />
+                <div className="mt-4 space-y-2 border-t border-slate-100 pt-3">
+                  <p className="section-head normal-case">
+                    Who&apos;s travelling?{" "}
+                    <InfoTip
+                      label="Rows 1 and 2"
+                      note="The first two rows are for senior citizens and PWDs only. Bring the ID for every student, senior or PWD passenger: it is checked at boarding."
+                    />
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {FARE_TYPES.map((f) => (
+                      <div key={f} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2">
+                        <span className="text-sm font-semibold">{FARE_INFO[f].label}</span>
+                        <span className="flex items-center rounded-lg border border-slate-300">
+                          <button
+                            type="button"
+                            aria-label={`One ${FARE_INFO[f].label} passenger less`}
+                            disabled={counts[f] <= 0 || count <= 1}
+                            onClick={() => setCounts((c) => ({ ...c, [f]: c[f] - 1 }))}
+                            className="px-2 py-0.5 text-lg font-bold text-brand disabled:text-slate-300"
+                          >
+                            −
+                          </button>
+                          <span className="w-6 text-center font-bold" aria-live="polite">
+                            {counts[f]}
+                          </span>
+                          <button
+                            type="button"
+                            aria-label={`One ${FARE_INFO[f].label} passenger more`}
+                            disabled={count >= MAX_SEATS}
+                            onClick={() => setCounts((c) => ({ ...c, [f]: c[f] + 1 }))}
+                            className="px-2 py-0.5 text-lg font-bold text-brand disabled:text-slate-300"
+                          >
+                            +
+                          </button>
                         </span>
-                        <span className="block text-lg font-bold leading-tight">{dayLabel(d, { day: "numeric" })}</span>
-                        <span className="block text-[11px]">{dayLabel(d, { month: "short" })}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="mt-2 text-xs text-slate-500">Days without trips open for booking are greyed out.</p>
-                <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-slate-100 pt-3">
-                  <span className="section-head">Passengers</span>
-                  <div className="flex items-center rounded-lg border border-slate-300">
-                    <button
-                      type="button"
-                      aria-label="One passenger less"
-                      disabled={count <= 1}
-                      onClick={() => setCount((c) => c - 1)}
-                      className="px-3 py-1 text-lg font-bold text-brand disabled:text-slate-300"
-                    >
-                      −
-                    </button>
-                    <span className="w-8 text-center font-bold" aria-live="polite">
-                      {count}
-                    </span>
-                    <button
-                      type="button"
-                      aria-label="One passenger more"
-                      disabled={count >= MAX_SEATS}
-                      onClick={() => setCount((c) => c + 1)}
-                      className="px-3 py-1 text-lg font-bold text-brand disabled:text-slate-300"
-                    >
-                      +
-                    </button>
+                      </div>
+                    ))}
                   </div>
-                  <span className="text-xs text-slate-500">
-                    Up to {MAX_SEATS} per booking. Student, senior and PWD fares are picked per passenger later.
-                  </span>
+                  <p className="text-xs text-slate-500">
+                    {count} passenger{count === 1 ? "" : "s"}, up to {MAX_SEATS} per booking.
+                  </p>
                 </div>
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-white p-4">
                 <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
                   <div>
-                    <p className="section-head">Where to?</p>
+                    <p className="section-head normal-case">Where to?</p>
                     <p className="text-sm text-slate-600">From PITX, Parañaque · {dayLabel(date, { weekday: "long", month: "long", day: "numeric" })}</p>
                   </div>
                   <label className="w-full sm:w-64">
@@ -479,7 +493,7 @@ export default function BookPage() {
                       .filter((r) => region === "All" || region === r)
                       .map((r) => (
                         <div key={r} className="space-y-2">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{r}</p>
+                          <p className="text-xs font-semibold tracking-wide text-slate-500">{r}</p>
                           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
                             {provinces
                               .filter((p) => p.region === r)
@@ -496,10 +510,6 @@ export default function BookPage() {
                                       ? p.places[0].place
                                       : `${p.places.length} destinations`}{" "}
                                     · {p.trips} trip{p.trips === 1 ? "" : "s"}
-                                  </span>
-                                  <span className="mt-1 text-sm">
-                                    <span className="text-[11px] text-slate-500">from </span>
-                                    <span className="font-bold text-brand">{peso(p.from)}</span>
                                   </span>
                                 </button>
                               ))}
@@ -518,7 +528,7 @@ export default function BookPage() {
             <section className="space-y-3">
               <TripHeader destination={destination} date={date} count={count} onChange={() => go(0)} />
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sort</span>
+                <span className="text-xs font-semibold tracking-wide text-slate-500">Sort</span>
                 {SORTS.map((s) => (
                   <Chip key={s} on={sort === s} onClick={() => setSort(s)}>
                     {s}
@@ -541,7 +551,7 @@ export default function BookPage() {
                     <option value="">All operators</option>
                     {operators.map((id) => (
                       <option key={id} value={id}>
-                        {db.companies.find((c) => c.id === id)?.name}
+                        {properCase(db.companies.find((c) => c.id === id)?.name)}
                       </option>
                     ))}
                   </select>
@@ -591,10 +601,10 @@ export default function BookPage() {
                       <span className="min-w-0 flex-1 space-y-1">
                         <span className="flex items-center gap-2">
                           <CompanyLogo company={c} className="h-6 max-w-[3rem] text-xs font-bold text-slate-500" />
-                          <span className="truncate text-sm font-semibold">{c?.name}</span>
+                          <span className="truncate text-sm font-semibold">{properCase(c?.name)}</span>
                         </span>
                         <span className="block text-xs text-slate-600">
-                          {busOf(t)?.aircon ? "Aircon" : "Ordinary"} · {busTypeOf(t)?.description}
+                          {classOf(t)}
                           {arrangement ? ` (${arrangement} seats)` : ""} · {t.bay || "Bay to follow"}
                         </span>
                         <span className="flex items-center gap-2 text-xs">
@@ -629,14 +639,14 @@ export default function BookPage() {
             <section className="space-y-3">
               <TripSummary db={db} trip={trip} onChange={() => { changeTrip(""); go(1); }} />
               <div className="rounded-xl border border-slate-200 bg-white p-4">
-                <p className="section-head mb-1 text-center">
+                <p className="section-head normal-case mb-1 text-center">
                   Pick {count} seat{count === 1 ? "" : "s"}
                   <span className={`ml-2 rounded-full px-2 py-0.5 text-xs ${passengers.length === count ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-600"}`}>
                     {passengers.length} of {count} picked
                   </span>
                 </p>
                 <p className="mb-3 text-center text-xs text-slate-500">
-                  Tap a seat to pick it, tap again to let it go. Seat selection is free. Seats along the left and right edges are by the window.
+                  Tap a seat to pick it, tap again to let it go. Rows 1 and 2 are for senior citizens and PWDs.
                 </p>
                 {block && <p className="mb-3 text-center text-sm text-red-700">{block}</p>}
                 {seating?.layout ? (
@@ -646,6 +656,8 @@ export default function BookPage() {
                     blocked={seating.blocked}
                     held={heldByOthers(db, trip)}
                     selected={passengers.map((p) => p.seatNo)}
+                    priority={priority}
+                    priorityOpen={priorityLeft > 0}
                     onSelect={toggleSeat}
                   />
                 ) : (
@@ -687,8 +699,10 @@ export default function BookPage() {
                               key={f}
                               type="button"
                               aria-pressed={p.fareType === f}
-                              onClick={() => edit(p.seatNo, { fareType: f, idNo: f === "Adult" ? "" : p.idNo })}
-                              className={`rounded-lg border p-2 text-left ${p.fareType === f ? "border-brand bg-brand-tint ring-1 ring-brand" : "border-slate-200 hover:border-brand"}`}
+                              disabled={priority.has(p.seatNo) && !PRIORITY_TYPES.includes(f)}
+                              title={priority.has(p.seatNo) && !PRIORITY_TYPES.includes(f) ? "Rows 1 and 2 are for senior citizens and PWDs only" : undefined}
+                              onClick={() => changeType(p, f)}
+                              className={`rounded-lg border p-2 text-left disabled:cursor-not-allowed disabled:opacity-40 ${p.fareType === f ? "border-brand bg-brand-tint ring-1 ring-brand" : "border-slate-200 hover:border-brand"}`}
                             >
                               <span className="block text-sm font-semibold">{FARE_INFO[f].label}</span>
                               <span className="block text-sm">{peso(amount)}</span>
@@ -739,8 +753,8 @@ export default function BookPage() {
             <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
               <div className="space-y-3">
                 <div className="rounded-xl border border-slate-200 bg-white p-4">
-                  <p className="section-head mb-3">Pay with</p>
-                  <div className="grid gap-2 sm:grid-cols-3">
+                  <p className="section-head normal-case mb-3">Pay with</p>
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                     {WALLETS.map((w) => (
                       <button
                         key={w.id}
@@ -754,13 +768,19 @@ export default function BookPage() {
                       </button>
                     ))}
                   </div>
-                  <p className="mt-3 rounded bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                    Demo: no real payment. In the live system you&apos;d be sent to {wallet === "Card" ? "your bank's secure page" : wallet} to
-                    approve {peso(total)}, then come back here for your e-ticket.
+                  <p className="mt-3">
+                    <InfoTip
+                      label="Demo payment"
+                      note={
+                        wallet === "Cash"
+                          ? `Demo: no real payment. In the live system you get a reference number to pay ${peso(total)} in cash at 7-Eleven, Cebuana or M Lhuillier, and your e-ticket comes once it is paid.`
+                          : `Demo: no real payment. In the live system you are sent to ${wallet === "Card" ? "your bank's secure page" : wallet} to approve ${peso(total)}, then come back here for your e-ticket.`
+                      }
+                    />
                   </p>
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-white p-4">
-                  <p className="section-head mb-2">Before you travel</p>
+                  <p className="section-head normal-case mb-2">Before you travel</p>
                   <ul className="list-disc space-y-1 pl-5 text-sm text-slate-700">
                     <li>Your e-ticket&apos;s QR code is your boarding pass. No need to swap it at a ticket counter.</li>
                     <li>Check your bay on the e-ticket or the PITX departure screens. We text you if the bay or time changes.</li>
@@ -864,7 +884,7 @@ export default function BookPage() {
                     onClick={pay}
                     className="flex-1 rounded-lg bg-brand px-5 py-2.5 sm:flex-none text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-40"
                   >
-                    {paying ? `Paying with ${wallet}…` : `Pay ${peso(total)}`}
+                    {paying ? `Paying with ${wallet}…` : wallet === "Cash" ? `Pay ${peso(total)} in cash` : `Pay ${peso(total)}`}
                   </button>
                 )}
               </div>
@@ -906,7 +926,7 @@ function Stepper({ step, onGo }: { step: number; onGo: (i: number) => void }) {
   );
 }
 
-type PlaceCard = { place: string; province: string; trips: number; operators: number; first: string; from: number };
+type PlaceCard = { place: string; province: string; trips: number; operators: number; first: string };
 
 function PlaceGrid({ places, showProvince = false, onPick }: { places: PlaceCard[]; showProvince?: boolean; onPick: (place: string) => void }) {
   return (
@@ -925,10 +945,6 @@ function PlaceGrid({ places, showProvince = false, onPick }: { places: PlaceCard
               {p.trips} trip{p.trips === 1 ? "" : "s"} · {p.operators} operator{p.operators === 1 ? "" : "s"} · first {time12(p.first)}
             </span>
           </span>
-          <span className="shrink-0 text-right">
-            <span className="block text-[11px] text-slate-500">from</span>
-            <span className="block font-bold text-brand">{peso(p.from)}</span>
-          </span>
         </button>
       ))}
     </div>
@@ -938,7 +954,7 @@ function PlaceGrid({ places, showProvince = false, onPick }: { places: PlaceCard
 function QuickRow({ label, places, onPick }: { label: string; places: PlaceCard[]; onPick: (place: string) => void }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="w-full text-xs font-semibold uppercase tracking-wide text-slate-500 sm:w-32">{label}</span>
+      <span className="w-full text-xs font-semibold tracking-wide text-slate-500 sm:w-32">{label}</span>
       {places.map((p) => (
         <button
           key={p.place}
@@ -947,7 +963,6 @@ function QuickRow({ label, places, onPick }: { label: string; places: PlaceCard[
           className="rounded-full border border-slate-300 bg-white px-3 py-1 text-sm hover:border-brand hover:bg-brand-tint"
         >
           <span className="font-semibold">{p.place}</span>
-          <span className="ml-1.5 text-xs text-slate-500">from {peso(p.from)}</span>
         </button>
       ))}
     </div>
@@ -998,8 +1013,8 @@ function TripSummary({ db, trip, onChange }: { db: Db; trip: Trip; onChange?: ()
           PITX <span aria-hidden>→</span> {placeOf(route?.description)} · {time12(trip.time)}
         </p>
         <p className="text-xs opacity-80">
-          {dayLabel(trip.date, { weekday: "short", month: "short", day: "numeric" })} · {company?.name} · {trip.tripNo} ·{" "}
-          {bus?.aircon ? "Aircon" : "Ordinary"} {busType?.description ? `· ${busType.description}` : ""} · {trip.bay || "Bay to follow"}
+          {dayLabel(trip.date, { weekday: "short", month: "short", day: "numeric" })} · {properCase(company?.name)} · {trip.tripNo} ·{" "}
+          {bus?.busClass ?? busType?.description ?? ""} · {trip.bay || "Bay to follow"}
         </p>
       </div>
       {onChange && (
@@ -1032,7 +1047,7 @@ function OrderSummary({
 }) {
   return (
     <aside className="h-fit space-y-3 rounded-xl border border-slate-200 bg-white p-4">
-      <p className="section-head">Your booking</p>
+      <p className="section-head normal-case">Your booking</p>
       <TripSummary db={db} trip={trip} />
       <ul className="divide-y divide-slate-100 text-sm">
         {passengers
@@ -1081,7 +1096,7 @@ function OrderSummary({
 
 type Booked = { ticket: Db["tickets"][number]; trip?: Trip };
 
-function MyTrips({ db, upcoming, past, onBook }: { db: Db; upcoming: Booked[]; past: Booked[]; onBook: () => void }) {
+function MyTrips({ db, upcoming, past, onBook, now }: { db: Db; upcoming: Booked[]; past: Booked[]; onBook: () => void; now: number }) {
   if (upcoming.length + past.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center">
@@ -1101,7 +1116,7 @@ function MyTrips({ db, upcoming, past, onBook }: { db: Db; upcoming: Booked[]; p
       ].map(([label, list]) =>
         (list as Booked[]).length === 0 ? null : (
           <section key={label as string} className="space-y-2">
-            <p className="section-head">{label as string}</p>
+            <p className="section-head normal-case">{label as string}</p>
             <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
               {(list as Booked[]).map(({ ticket, trip }) => {
                 const route = db.routes.find((r) => r.id === trip?.routeId);
@@ -1112,14 +1127,13 @@ function MyTrips({ db, upcoming, past, onBook }: { db: Db; upcoming: Booked[]; p
                     : ticket.status === "Boarded"
                       ? "bg-slate-200 text-slate-700"
                       : "bg-red-100 text-red-800";
+                // Cancel from My trips (entry 43), before the refund cutoff.
+                const cancel = label === "Upcoming" ? passengerCancelPlan(db, ticket, now) : null;
                 return (
-                  <Link
-                    key={ticket.id}
-                    href={ticketHref(ticket.id)}
-                    className="flex gap-3 rounded-xl border border-slate-200 bg-white p-3 hover:border-brand"
-                  >
+                  <div key={ticket.id} className="rounded-xl border border-slate-200 bg-white hover:border-brand">
+                  <Link href={ticketHref(ticket.id)} className="flex gap-3 p-3">
                     <span className="w-16 shrink-0 border-r border-dashed border-slate-300 pr-3 text-center">
-                      <span className="block text-[11px] font-semibold uppercase text-slate-500">{trip ? dayLabel(trip.date, { month: "short" }) : ""}</span>
+                      <span className="block text-[11px] font-semibold text-slate-500">{trip ? dayLabel(trip.date, { month: "short" }) : ""}</span>
                       <span className="block text-2xl font-bold leading-none">{trip ? dayLabel(trip.date, { day: "numeric" }) : ""}</span>
                       <span className="block text-[11px] text-slate-500">{trip ? time12(trip.time) : ""}</span>
                     </span>
@@ -1129,7 +1143,7 @@ function MyTrips({ db, upcoming, past, onBook }: { db: Db; upcoming: Booked[]; p
                         <span className={`shrink-0 rounded px-1.5 text-[11px] font-semibold ${tone}`}>{ticket.status === "Voided" ? "Refunded" : ticket.status}</span>
                       </span>
                       <span className="block truncate text-xs text-slate-600">
-                        {company?.name} · Seat {ticket.seatNo} · {ticket.passengerName}
+                        {properCase(company?.name)} · Seat {ticket.seatNo} · {ticket.passengerName}
                       </span>
                       <span className="block text-xs text-slate-500">
                         {ticket.bookingRef ?? ticket.ticketNo} · {trip?.bay || "Bay to follow"} · {peso(ticket.fare)}{" "}
@@ -1144,12 +1158,125 @@ function MyTrips({ db, upcoming, past, onBook }: { db: Db; upcoming: Booked[]; p
                       <span className="mt-1 block text-xs font-semibold text-brand">View e-ticket</span>
                     </span>
                   </Link>
+                  {cancel && (
+                    <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-3 py-2 text-xs">
+                      {cancel.block ? (
+                        <span className="text-slate-500">{cancel.block}</span>
+                      ) : (
+                        <>
+                          <span className="text-slate-600">
+                            Refund {peso(cancel.amount)} to your {ticket.paymentMethod === "Cash" ? "cash payment center" : ticket.paymentMethod}
+                          </span>
+                          <button
+                            type="button"
+                            className="rounded border border-red-300 px-2.5 py-1 font-semibold text-red-700 hover:bg-red-50"
+                            onClick={() => {
+                              if (!window.confirm(`Cancel seat ${ticket.seatNo} for ${ticket.passengerName}? You get ${peso(cancel.amount)} back and the seat is released.`)) return;
+                              const problem = cancelBooking(ticket.id);
+                              if (problem) window.alert(problem);
+                            }}
+                          >
+                            Cancel trip
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  </div>
                 );
               })}
             </div>
           </section>
         ),
       )}
+    </div>
+  );
+}
+
+/**
+ * "When are you leaving?": a month calendar from today up to a month ahead (entry 43). Days
+ * before today, past the last day or with no trips open for booking can't be picked.
+ */
+function MonthCalendar({
+  today,
+  last,
+  value,
+  tripsOn,
+  onPick,
+}: {
+  today: string;
+  last: string;
+  value: string;
+  tripsOn: (date: string) => number;
+  onPick: (date: string) => void;
+}) {
+  // Every month from today's to the last day's (31 days can touch three months).
+  const months: string[] = [];
+  for (let d = today; d <= last; d = addDays(d, 1)) if (!months.includes(d.slice(0, 7))) months.push(d.slice(0, 7));
+  const [shown, setShown] = useState(() => (months.includes(value.slice(0, 7)) ? value.slice(0, 7) : months[0]));
+  const [year, month] = shown.split("-").map(Number);
+  const first = new Date(Date.UTC(year, month - 1, 1));
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const lead = first.getUTCDay(); // Sunday first
+  const cells = [
+    ...Array.from({ length: lead }, () => ""),
+    ...Array.from({ length: daysInMonth }, (_, i) => `${shown}-${String(i + 1).padStart(2, "0")}`),
+  ];
+  const index = months.indexOf(shown);
+  const title = new Intl.DateTimeFormat("en-PH", { month: "long", year: "numeric", timeZone: "UTC" }).format(first);
+  return (
+    <div className="max-w-md">
+      <div className="mb-2 flex items-center justify-between">
+        <button
+          type="button"
+          aria-label="Previous month"
+          disabled={index <= 0}
+          onClick={() => setShown(months[index - 1])}
+          className="rounded px-2 py-1 text-lg font-bold text-brand disabled:text-slate-300"
+        >
+          ‹
+        </button>
+        <p className="font-semibold">{title}</p>
+        <button
+          type="button"
+          aria-label="Next month"
+          disabled={index >= months.length - 1}
+          onClick={() => setShown(months[index + 1])}
+          className="rounded px-2 py-1 text-lg font-bold text-brand disabled:text-slate-300"
+        >
+          ›
+        </button>
+      </div>
+      <div className="grid grid-cols-7 gap-1 text-center text-xs text-slate-500">
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+          <span key={d} className="py-1 font-semibold">
+            {d}
+          </span>
+        ))}
+        {cells.map((d, i) => {
+          if (!d) return <span key={`blank-${i}`} />;
+          const inRange = d >= today && d <= last;
+          const trips = inRange ? tripsOn(d) : 0;
+          const on = d === value;
+          return (
+            <button
+              key={d}
+              type="button"
+              aria-pressed={on}
+              aria-label={`${dayLabel(d, { weekday: "long", month: "long", day: "numeric" })}${inRange ? `, ${trips} trips` : ""}`}
+              disabled={!inRange || trips === 0}
+              onClick={() => onPick(d)}
+              className={`flex h-10 flex-col items-center justify-center rounded-lg border text-sm disabled:border-transparent disabled:text-slate-300 ${
+                on ? "border-brand bg-brand font-bold text-white" : "border-slate-200 bg-white hover:border-brand"
+              }`}
+            >
+              <span className="leading-none">{Number(d.slice(8))}</span>
+              {d === today && <span className={`text-[9px] leading-none ${on ? "text-white" : "text-brand"}`}>Today</span>}
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-2 text-xs text-slate-500">Up to a month ahead. Days with no trips open for booking are greyed out.</p>
     </div>
   );
 }

@@ -60,3 +60,8 @@ export function parseBlockedSeats(value: string | undefined, layout: SeatLayout 
     .filter((n) => Number.isInteger(n) && n >= 1 && n <= (layout?.seats ?? 0));
   return new Set(seats);
 }
+
+/** Rows 1 and 2 (the two front benches): for senior citizens and PWDs only (entry 43). */
+export function prioritySeats(layout: SeatLayout | undefined): Set<number> {
+  return new Set((layout?.cells ?? []).filter((c) => c.bench < 2).map((c) => c.seatNo));
+}
