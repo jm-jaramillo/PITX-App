@@ -132,7 +132,6 @@ function addOperatorCompany(user: PortalUser) {
     ptuNo: "Not set",
     tin: "Not set",
     ticketCode: code,
-    advanceDays: 7,
     address: "Not set",
     contactPerson: "Not set",
     mobileNo: "Not set",

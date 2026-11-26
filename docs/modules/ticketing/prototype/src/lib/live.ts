@@ -164,7 +164,6 @@ export async function loadLive(base: Db): Promise<LiveResult | null> {
         ptuNo: "Not set",
         tin: "Not set",
         ticketCode: code,
-        advanceDays: 7,
         address: "Not set",
         contactPerson: "Not set",
         mobileNo: "Not set",
@@ -197,7 +196,14 @@ export async function loadLive(base: Db): Promise<LiveResult | null> {
   };
 
   const buses = new Map<string, Bus>();
-  const busFor = (company: Company, plate: string, capacity: number | null | undefined, body?: string | null): Bus => {
+  // The vehicle's bus type in Trip Scheduling is the operator's own class name (entry 39).
+  const busFor = (
+    company: Company,
+    plate: string,
+    capacity: number | null | undefined,
+    body?: string | null,
+    busClass?: string | null,
+  ): Bus => {
     const key = plateKey(plate);
     const existing = buses.get(key);
     const type = busTypeFor(company, capacity);
@@ -209,6 +215,8 @@ export async function loadLive(base: Db): Promise<LiveResult | null> {
       id: `bus-${key}`,
       companyId: company.id,
       plateNo: plate,
+      bodyNo: body?.trim() || undefined,
+      busClass: busClass?.trim() || undefined,
       description: body ? `Body no. ${body}` : "",
       busTypeId: type.id,
       aircon: true,
@@ -220,7 +228,7 @@ export async function loadLive(base: Db): Promise<LiveResult | null> {
   };
 
   for (const v of vehicles ?? []) {
-    if (v.plate_no) busFor(companyFor(v.operator_id, v.operator_name, v.trade_name), v.plate_no, null, v.body_number);
+    if (v.plate_no) busFor(companyFor(v.operator_id, v.operator_name, v.trade_name), v.plate_no, null, v.body_number, v.bus_type);
   }
 
   // One route per company and Trip Scheduling destination. The booking's route is the

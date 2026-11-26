@@ -37,6 +37,39 @@ sections 2 and 3).
 
 ---
 
+## 39 · Ticket fields from the operators' manual tickets, rules per operator (26 Nov)
+
+Based on Cagsawa's manual ticket (coupon 130233 C). No passenger address.
+
+**Printed ticket**
+
+| Added | From |
+|---|---|
+| From / To (was one route line) | Route, "PITX to" dropped |
+| Class | The operator's own class name (e.g. Cagsawa: Royale, Royale Elite). Not one PITX list |
+| Bus no. (body number), plus plate no. | Trip Scheduling vehicle list (`body_number`) |
+| Boarding time | Departure minus the operator's check-in minutes (default 30) |
+| Place of issue, Date of issue, Issued by | Booth name and code, sale time, teller (or "Online booking") |
+| Restrictions | Non-refundable / refund %, Non-transferable, check-in note |
+| BIR part | Placeholders: TIN, VAT status, ATP no., approved series, MIN, serial, PTU, VAT breakdown and invoice wording "to follow" |
+
+**Rules per operator** (not set = PITX default)
+
+| Rule | Effect |
+|---|---|
+| Refund % (0 = non-refundable) | Teller can't refund a non-refundable ticket. PITX Admin still can (e.g. cancelled trip), at the PITX default |
+| Non-transferable | The passenger name can't be changed on a reprint |
+| Check-in minutes | Boarding time on the ticket |
+| Advance days | No fixed 7 days any more. Selling runs as far ahead as Trip Scheduling has the trip, unless the operator sets a limit |
+
+- Selling until the last minute stays (cutoff 0).
+- Bus class comes from the vehicle's bus type in Trip Scheduling (`bus_type`). Also shown in the POS trip list.
+- Sample week: Cagsawa is set non-refundable, non-transferable, 30-minute check-in, VAT-registered, like its manual ticket.
+- Where the rules are set for real data is open: Trip Scheduling's operator profile is the likely home, since Master Data was removed (entry 35).
+- Checks: 10 new checks pass. 4 older sample-data checks in seed-test fail on main before this change too (company with no trips, reprint approvals, company sample trips), likely from entry 37.
+
+---
+
 ## 38 · Ticket Availability board: full width, larger (26 Nov)
 
 PITX Admin view of the PIDS board, made to fill the screen.

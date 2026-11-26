@@ -13,6 +13,7 @@ import type {
   ApprovalMode,
   ApprovalRequest,
   AuditEntry,
+  Company,
   CounterFare,
   Db,
   FareType,
@@ -587,7 +588,8 @@ export function sellingBlock(data: Db, trip: Trip, today: string): string | null
   }
   const company = data.companies.find((c) => c.id === route?.companyId);
   const days = Math.round((Date.parse(trip.date) - Date.parse(today)) / 86_400_000);
-  if (company && days > company.advanceDays) {
+  // No fixed limit: selling as far ahead as the trip is approved, unless the operator sets one.
+  if (company?.advanceDays !== undefined && days > company.advanceDays) {
     return `${company.code} only allows selling ${company.advanceDays} days in advance.`;
   }
   return null;
@@ -792,14 +794,39 @@ export function refundPlan(data: Db, ticket: Ticket, now: number): { block?: str
   if (!sells(session?.role)) return { step, block: "Only a Teller of this company or the PITX Admin can refund this ticket." };
   const trip = data.trips.find((t) => t.id === ticket.tripId);
   if (!trip || !canReachTrip(data, trip)) return { step, block: "This ticket belongs to another company." };
+  const company = ticketCompany(data, ticket);
+  if (company?.refundPercent === 0) {
+    return { step, block: `${company.code} tickets are non-refundable. Only the PITX Admin can refund one, e.g. for a cancelled trip.` };
+  }
   if (trip.status === "Departed" || departureTime(trip) <= now) {
     return { step, block: "The trip has left, so only the PITX Admin can refund this ticket." };
   }
   return { step };
 }
 
+/** The bus company a ticket is for. */
+export function ticketCompany(data: Db, ticket: Ticket): Company | undefined {
+  const trip = data.trips.find((t) => t.id === ticket.tripId);
+  const companyId = trip ? tripCompanyId(data, trip) : undefined;
+  return data.companies.find((c) => c.id === companyId);
+}
+
+/** Default check-in before departure, when the operator hasn't set one. */
+export const DEFAULT_CHECK_IN_MINUTES = 30;
+
+/**
+ * Refund % of the fare: the operator's own rule, else the PITX default (entry 39). A
+ * non-refundable operator's ticket can still be refunded by the PITX Admin (a cancelled
+ * trip, for example), at the PITX default.
+ */
+export function refundPercentFor(data: Db, ticket: Ticket): number {
+  const own = ticketCompany(data, ticket)?.refundPercent;
+  if (own === undefined || (own === 0 && data.session?.role === "PITX Admin")) return data.settings.refundPercent;
+  return own;
+}
+
 export function refundAmountFor(data: Db, ticket: Ticket): number {
-  return Math.round(ticket.fare * data.settings.refundPercent) / 100;
+  return Math.round(ticket.fare * refundPercentFor(data, ticket)) / 100;
 }
 
 function applyRefund(
@@ -951,6 +978,10 @@ export function reprintTicket(id: string, input: ReprintInput): { error?: string
   if (!input.category) return { error: "Choose a reprint reason." };
   if (input.category === "Other" && !input.remark.trim()) return { error: "Enter a remark for this reason." };
   if (!input.passengerName.trim()) return { error: "Enter the passenger name." };
+  const company = ticketCompany(current, ticket);
+  if (company?.transferable === false && input.passengerName.trim() !== ticket.passengerName) {
+    return { error: `${company.code} tickets are non-transferable, so the passenger name can't be changed.` };
+  }
   const badPassword = checkPassword(current, plan.step, input.password);
   if (badPassword) return { error: badPassword };
   if (plan.step === "request") {

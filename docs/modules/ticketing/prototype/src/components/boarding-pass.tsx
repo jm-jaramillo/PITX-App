@@ -5,7 +5,8 @@ import { useEffect, useState } from "react";
 import { CompanyLogo } from "@/components/company-logo";
 import { dateTimeManila, peso } from "@/lib/format";
 import { asset } from "@/lib/paths";
-import { computeFare } from "@/lib/store";
+import { routeName } from "@/lib/reports";
+import { computeFare, DEFAULT_CHECK_IN_MINUTES } from "@/lib/store";
 import type { Db, Ticket } from "@/lib/types";
 
 export function BoardingPass({ db, ticket, className = "" }: { db: Db; ticket: Ticket; className?: string }) {
@@ -23,23 +24,43 @@ export function BoardingPass({ db, ticket, className = "" }: { db: Db; ticket: T
   const bus = db.buses.find((b) => b.id === trip?.busId);
   const counter = db.counters.find((c) => c.id === ticket.counterId);
 
+  // Fields as on the operators' manual tickets (Cagsawa sample, entry 39). No passenger address.
+  const departs = trip ? Date.parse(`${trip.date}T${trip.time}:00+08:00`) : NaN;
+  const checkIn = company?.checkInMinutes ?? DEFAULT_CHECK_IN_MINUTES;
+  const boarding = Number.isNaN(departs)
+    ? "-"
+    : new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Manila", hour: "2-digit", minute: "2-digit", hour12: false }).format(
+        departs - checkIn * 60_000,
+      );
   const rows: [string, string | number | undefined][] = [
     ["Operator", company?.name],
-    ["Route", route?.description],
-    ["Departure", `${trip?.date} ${trip?.time}`],
+    ["From", "PITX"],
+    ["To", routeName(route?.description ?? "") || "-"],
+    ["Class", bus?.busClass ?? "-"],
+    ["Bus no.", bus?.bodyNo ?? "-"],
+    ["Plate no.", bus?.plateNo ?? "-"],
+    ["Date", trip?.date],
+    ["Departure", trip?.time],
+    ["Boarding", boarding],
     ["Bay", trip?.bay || "-"],
-    ["Bus", bus?.plateNo ?? "-"],
     ["Seat", ticket.seatNo],
     ["Fare", `${peso(ticket.fare)} (${ticket.fareType})`],
     ["Payment", ticket.paymentMethod],
     ...(ticket.bookingRef ? ([["Booking ref", ticket.bookingRef]] as [string, string][]) : []),
-    ["Counter", counter?.code ?? "Online"],
-    ["Issued", dateTimeManila(ticket.issuedAt)],
+    ["Place of issue", counter ? `${counter.description} (${counter.code})` : "Online"],
+    ["Date of issue", dateTimeManila(ticket.issuedAt)],
+    ["Issued by", ticket.soldBy ?? "Online booking"],
   ];
+  const refundPercent = company?.refundPercent;
+  const restrictions = [
+    refundPercent === 0 ? "Non-refundable" : refundPercent !== undefined ? `Refundable at ${refundPercent}% before departure` : "",
+    company?.transferable === false ? "Non-transferable" : "",
+    `Check in not later than ${checkIn} minutes before departure`,
+  ].filter(Boolean);
 
-  // BIR invoice part (RR 7-2024: the invoice replaces the official receipt). Land
-  // transport of passengers pays percentage tax, not VAT, so the sale is VAT-exempt.
-  // Finance to confirm the wording and the accreditation numbers.
+  // BIR invoice part: placeholders until Finance confirms (entry 39). VAT status, ATP and
+  // approved series differ per operator (Cagsawa's ticket is VAT-registered and says it is
+  // not valid for claiming input taxes), so nothing here is final.
   const regular = route ? computeFare(route, "Adult", ticket.counterId) : ticket.fare;
   const discount = Math.max(0, regular - ticket.fare);
   const total = ticket.fare + (ticket.insurance ?? 0);
@@ -48,9 +69,9 @@ export function BoardingPass({ db, ticket, className = "" }: { db: Db; ticket: T
     ...(discount > 0 ? ([[`Less ${ticket.fareType} discount`, `-${peso(discount)}`]] as [string, string][]) : []),
     ...(ticket.insurance ? ([["Insurance", peso(ticket.insurance)]] as [string, string][]) : []),
     ["Total amount due", peso(total)],
-    ["VAT-exempt sale", peso(ticket.fare)],
-    ["VAT", peso(0)],
+    ["VAT breakdown", "To follow"],
   ];
+  const vatStatus = company?.vatRegistered === undefined ? "Not set" : company.vatRegistered ? "VAT-registered" : "Non-VAT";
   const reprints = ticket.reprints ?? [];
   const lastReprint = reprints.at(-1);
 
@@ -85,18 +106,29 @@ export function BoardingPass({ db, ticket, className = "" }: { db: Db; ticket: T
           </div>
         ))}
       </dl>
+      <div className="mt-3 border-t border-dashed border-slate-300 pt-3 text-center text-xs">
+        <div className="font-bold tracking-widest">RESTRICTIONS</div>
+        {restrictions.map((r) => (
+          <div key={r} className="font-semibold">
+            {r}
+          </div>
+        ))}
+      </div>
       <div className="mt-3 border-t border-dashed border-slate-300 pt-3 text-xs">
         <div className="text-center font-bold tracking-widest">INVOICE</div>
+        <div className="text-center text-[10px] text-slate-500">BIR details are placeholders, to be confirmed by Finance</div>
         <div className="mt-1 text-center">
           {company?.name}
           <br />
           {company?.address}
           <br />
-          VAT-exempt TIN {company?.tin || "-"}
+          TIN {company?.tin || "Not set"} · {vatStatus}
         </div>
         <dl className="mt-2 space-y-0.5">
           {[
             ["Invoice no.", ticket.ticketNo],
+            ["ATP no.", company?.atpNo || "Not set"],
+            ["Approved series", company?.approvedSeries || "Not set"],
             ["MIN", company?.minNo || "Not set"],
             ["Serial no.", company?.serialNo || "Not set"],
             ["PTU no.", company?.ptuNo || "Not set"],
@@ -113,7 +145,7 @@ export function BoardingPass({ db, ticket, className = "" }: { db: Db; ticket: T
             {ticket.fareType} ID {ticket.idNo ? "on file" : "-"} · Name and signature: ____________
           </p>
         )}
-        <p className="mt-2 text-center font-semibold">THIS DOCUMENT SERVES AS YOUR INVOICE</p>
+        <p className="mt-2 text-center font-semibold">Invoice wording to follow (BIR)</p>
       </div>
       {route?.message && (
         <p className="mt-3 border-t border-dashed border-slate-300 pt-3 text-center text-xs">{route.message}</p>

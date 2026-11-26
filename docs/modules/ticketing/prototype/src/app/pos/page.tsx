@@ -164,6 +164,7 @@ function Pos() {
                 {trips.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.time} · {db.routes.find((r) => r.id === t.routeId)?.description} · {t.tripNo} ·{" "}
+                    {db.buses.find((b) => b.id === t.busId)?.busClass ? `${db.buses.find((b) => b.id === t.busId)?.busClass} · ` : ""}
                     {t.busId
                       ? `${ticketAvailability(db, t).left} left · ${ticketAvailability(db, t).status}`
                       : "unit not set"}

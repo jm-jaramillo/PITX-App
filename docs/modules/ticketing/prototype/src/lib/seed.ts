@@ -74,6 +74,17 @@ const REGULAR = ["45", "49", "53"];
 const SECOND = ["61", "36", "63", "26", "66"];
 const SECOND_NAME: Record<string, string> = { "61": "High capacity", "63": "High capacity", "66": "High capacity", "36": "Deluxe", "26": "Super deluxe" };
 
+/** Bus classes are the operator's own names, not one PITX list (entry 39). Others: Regular and the second type's name. */
+const SAMPLE_CLASSES: Record<string, [string, string]> = {
+  CAGSA: ["Royale", "Royale Elite"],
+  DLTB: ["Regular Aircon", "Deluxe"],
+};
+
+/** Ticket rules a sample operator sets (entry 39), like Cagsawa's manual ticket. Others use the PITX defaults. */
+const SAMPLE_RULES: Record<string, Partial<Company>> = {
+  CAGSA: { refundPercent: 0, transferable: false, checkInMinutes: 30, vatRegistered: true },
+};
+
 const codeOf = (destination: string) => tripCode(destination) ?? destination.replace(/[^A-Z]/g, "").slice(0, 3);
 export const routeIdOf = (companyCode: string, destination: string) => `rt-${companyCode}-${destination}`;
 
@@ -95,11 +106,11 @@ export function sampleCompany(code: string, name: string, n: number, logo?: stri
     ptuNo: `DEMO-PTU-${1001 + n}`,
     tin: "000-000-000-000",
     ticketCode: code,
-    advanceDays: 7,
     address: "Demo address, Parañaque City",
     contactPerson: `${code} Demo Contact`,
     mobileNo: "0900 000 0000",
     status: "Active",
+    ...SAMPLE_RULES[code],
   };
 }
 
@@ -148,6 +159,8 @@ export function sampleFleet(company: Company, n: number): { busTypes: BusType[];
         id: `bus-${company.code}-${typeCode}-${u}`,
         companyId: company.id,
         plateNo: `DEMO ${1000 + n * 10 + k * 2 + u}`,
+        bodyNo: String(100 + n * 4 + k * 2 + u),
+        busClass: (SAMPLE_CLASSES[company.code] ?? ["Regular", SECOND_NAME[layoutId]])[k],
         description: `Unit ${n * 4 + k * 2 + u}`,
         busTypeId,
         aircon: true,

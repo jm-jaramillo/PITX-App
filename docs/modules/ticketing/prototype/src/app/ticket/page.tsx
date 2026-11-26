@@ -12,12 +12,14 @@ import {
   moveTicket,
   pendingRequest,
   refundAmountFor,
+  refundPercentFor,
   refundPlan,
   refundTicket,
   reprintPlan,
   reprintTicket,
   scopedTickets,
   takenSeats,
+  ticketCompany,
   transferOptions,
   tripSeating,
   useDb,
@@ -225,7 +227,7 @@ function TicketDetail() {
         <form onSubmit={submitRefund} className="no-print space-y-3 rounded-lg border border-red-200 bg-white p-4">
           <h2 className="text-sm font-semibold">Refund this ticket and release the seat</h2>
           <p className="text-sm">
-            Refund: <span className="font-semibold">{peso(refundAmountFor(db, ticket))}</span> ({db.settings.refundPercent}% of{" "}
+            Refund: <span className="font-semibold">{peso(refundAmountFor(db, ticket))}</span> ({refundPercentFor(db, ticket)}% of{" "}
             {peso(ticket.fare)})
           </p>
           {refund.note && <p className="text-sm text-amber-800">{refund.note}</p>}
@@ -297,7 +299,12 @@ function TicketDetail() {
             </label>
             <label>
               Passenger name
-              <input value={passengerName} onChange={(e) => setPassengerName(e.target.value)} />
+              {/* Non-transferable operators: the name stays as sold (entry 39). */}
+              <input
+                value={passengerName}
+                readOnly={ticketCompany(db, ticket)?.transferable === false}
+                onChange={(e) => setPassengerName(e.target.value)}
+              />
             </label>
             <label>
               Contact no.

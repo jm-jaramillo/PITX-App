@@ -29,7 +29,19 @@ export interface Company {
   serialNo?: string;
   minNo?: string;
   ticketCode: string;
-  advanceDays: number;
+  /** Days ahead the company sells. Not set: no limit (entry 39). */
+  advanceDays?: number;
+  // Ticket rules per operator (entry 39). Not set: the PITX defaults.
+  /** Refund % of the fare. 0 = non-refundable. */
+  refundPercent?: number;
+  /** false = non-transferable: the passenger name can't be changed. */
+  transferable?: boolean;
+  /** Check-in this many minutes before departure (boarding time on the ticket). */
+  checkInMinutes?: number;
+  // BIR details: placeholders until Finance confirms (entry 39).
+  vatRegistered?: boolean;
+  atpNo?: string;
+  approvedSeries?: string;
   address: string;
   contactPerson: string;
   mobileNo: string;
@@ -71,6 +83,10 @@ export interface Bus {
   id: string;
   companyId: string;
   plateNo: string;
+  /** The operator's body number ("Bus No." on the ticket). */
+  bodyNo?: string;
+  /** The operator's own class name (e.g. "Royale Elite"). Each operator has its own. */
+  busClass?: string;
   description: string;
   busTypeId: string;
   aircon: boolean;
