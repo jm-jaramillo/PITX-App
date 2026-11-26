@@ -37,6 +37,14 @@ sections 2 and 3).
 
 ---
 
+## 41 · Demo-data banner is now a small tag (26 Nov)
+
+- The yellow banner under every page title ("Real PITX trips, operators and plates from Trip Scheduling... Sales are saved in this browser only.") is gone.
+- In its place: a small "Demo data" tag next to the page title. Hover (or tab to it) to read the same note.
+- Temporary: it goes when the demo data does.
+
+---
+
 ## 40 · Ticket Availability board: tighter header, smaller text (26 Nov)
 
 From the 26 Nov screenshot of the PITX Admin view.

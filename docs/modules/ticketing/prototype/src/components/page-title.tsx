@@ -10,8 +10,8 @@ export const DemoNotice = createContext<string>("");
 /**
  * A page's title block, built like Trip Scheduling and TOS pages after
  * tidyPageHead() (docs/shared/platform.js): .page-head with the (hidden) eyebrow,
- * the h1 with a "?" that shows or hides the one-line description, then the
- * demo-data notice.
+ * the h1 with a "?" that shows or hides the one-line description, and a small
+ * "Demo data" tag whose details show on hover.
  */
 export function PageTitle({ children, sub, className = "" }: { children: ReactNode; sub?: ReactNode; className?: string }) {
   const pathname = usePathname();
@@ -34,11 +34,25 @@ export function PageTitle({ children, sub, className = "" }: { children: ReactNo
                 </button>
               </>
             )}
+            {/* Demo-data note (entry 41): a small tag with the details on hover, not a banner.
+                To go when the demo data does. */}
+            {notice && (
+              <>
+                {" "}
+                <span
+                  className="no-print cursor-help rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 align-middle text-xs font-semibold text-amber-800"
+                  title={notice}
+                  tabIndex={0}
+                  aria-label={`Demo data: ${notice}`}
+                >
+                  Demo data
+                </span>
+              </>
+            )}
           </h1>
           {sub && <p className={`subtle page-help${help ? "" : " hidden"}`}>{sub}</p>}
         </div>
       </div>
-      {notice && <p className="hint no-print">{notice}</p>}
     </div>
   );
 }
