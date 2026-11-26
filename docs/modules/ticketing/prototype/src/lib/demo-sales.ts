@@ -1,3 +1,4 @@
+import { boothServes } from "./booths";
 import { todayManila } from "./format";
 import { getLayout, parseBlockedSeats } from "./seat-layouts";
 import type { AuditEntry, Db, FareType, PaymentMethod, Ticket } from "./types";
@@ -64,6 +65,11 @@ export function addDemoSales(db: Db): Db {
     for (const mark of trip.seatMarks ?? []) blocked.add(mark.seatNo); // seats passengers requested
     const capacity = layout?.seats ?? SEAT_FALLBACK;
 
+    // Counter sales at a booth that sells this route (entry 42), else any booth.
+    const destination = route.description.replace(/^PITX to /, "");
+    const serving = booths.filter((b) => boothServes(b, destination, bus));
+    const pool = serving.length ? serving : booths;
+
     const rand = seeded(trip.id);
     const departs = Date.parse(`${trip.date}T${trip.time}:00+08:00`);
     const departed = trip.status === "Departed";
@@ -109,7 +115,7 @@ export function addDemoSales(db: Db): Db {
       const voided = cancelled || (!online && !departed && rand() < 0.05);
       const boarded = !voided && (departed || (trip.status === "Boarding" && i < count / 2));
       const teller = rand() < 0.5 ? 1 : 0;
-      const counter = online ? undefined : booths[(Math.max(companyIndex, 0) * 2 + teller) % booths.length];
+      const counter = online ? undefined : pool[(Math.max(companyIndex, 0) * 2 + teller) % pool.length];
       const [from, to] = onTheDay && rand() < 0.75 ? [dayOpens, saleEnd] : [saleStart, advanceEnd];
       const issuedAt = new Date(from + ((to - from) * (i + 1)) / (count + 1)).toISOString();
       const soldBy = online ? undefined : `${company.code} Teller ${teller + 1}`;

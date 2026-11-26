@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { CompanyLogo } from "@/components/company-logo";
 import { todayManila } from "@/lib/format";
 import { asset } from "@/lib/paths";
-import { routeGroupOf, ROUTE_GROUPS, type RouteGroup } from "@/lib/places";
+import { boothServes } from "@/lib/booths";
+import { routeGroupOf, routeGroupOfProvince, ROUTE_GROUPS, type RouteGroup } from "@/lib/places";
 import { departurePassed, scopedTrips, ticketAvailability, tripCompanyId, type AvailabilityStatus } from "@/lib/store";
 import type { Db, Trip } from "@/lib/types";
 
@@ -71,14 +72,24 @@ export function AvailabilityBoard({ db }: { db: Db }) {
   const boothCompanies = counter?.companyIds?.length ? new Set(counter.companyIds) : null;
   const routeOf = (t: Trip) => db.routes.find((r) => r.id === t.routeId);
   const destinationOf = (t: Trip) => (routeOf(t)?.description ?? "").replace(/^PITX to /, "");
+  const busOf = (t: Trip) => db.buses.find((b) => b.id === t.busId);
 
+  // A booth shows the routes it sells now (entry 42), e.g. TB1 Bicol aircon only.
   const upcoming = scopedTrips(db)
     .filter((t) => t.date === today && stillToLeave(t))
+    .filter((t) => boothServes(counter, destinationOf(t), busOf(t)))
     .filter((t) => !boothCompanies || boothCompanies.has(tripCompanyId(db, t) ?? ""));
   const inGroup = (g: RouteGroup) => upcoming.filter((t) => routeGroupOf(destinationOf(t)) === g);
-  const groups = ROUTE_GROUPS.filter((g) => g !== "Other" || inGroup(g).length > 0);
+  // With a booth picked, only the groups it sells.
+  const boothGroups = new Set(
+    (counter?.serves ?? []).flatMap((s) => (s.group ? [s.group] : (s.provinces ?? []).map((p) => routeGroupOfProvince(p)))),
+  );
+  const groups = ROUTE_GROUPS.filter((g) =>
+    boothGroups.size ? boothGroups.has(g) || inGroup(g).length > 0 : g !== "Other" || inGroup(g).length > 0,
+  );
+  const shown = groups.includes(group) ? group : (groups[0] ?? group);
 
-  const trips = inGroup(group);
+  const trips = inGroup(shown);
   const destinations = [...new Set(trips.map(destinationOf))].sort();
 
   return (
@@ -90,10 +101,10 @@ export function AvailabilityBoard({ db }: { db: Db }) {
               key={g}
               type="button"
               role="tab"
-              aria-selected={group === g}
+              aria-selected={shown === g}
               onClick={() => setGroup(g)}
               className={`rounded-full border px-3 py-1.5 text-sm ${
-                group === g ? "border-brand bg-brand font-semibold text-white" : "border-slate-300 bg-white"
+                shown === g ? "border-brand bg-brand font-semibold text-white" : "border-slate-300 bg-white"
               }`}
             >
               {g} · {inGroup(g).length}
@@ -105,10 +116,12 @@ export function AvailabilityBoard({ db }: { db: Db }) {
           <select value={booth} onChange={(e) => setBooth(e.target.value)}>
             <option value="">All booths</option>
             {db.counters
-              .filter((c) => c.status === "Active")
+              .filter((c) => c.status === "Active" && !c.kiosk)
               .map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.code} · {c.description}
+                  {c.code}
+                  {c.floor ? ` · ${c.floor}` : ""}
+                  {c.windows ? ` · ${c.windows} counters` : ""}
                 </option>
               ))}
           </select>
@@ -121,9 +134,10 @@ export function AvailabilityBoard({ db }: { db: Db }) {
           Full screen
         </button>
       </div>
-      {counter && !boothCompanies && (
+      {counter && (
         <p className="text-xs text-slate-600">
-          {counter.description} is open to all bus companies, so it shows every trip.
+          {counter.code} sells: {counter.serves?.length ? counter.serves.map((s) => s.label).join(", ") : "every route"}.
+          {counter.proposed?.length ? ` Proposed: ${counter.proposed.map((s) => s.label).join(", ")}.` : ""}
         </p>
       )}
 
@@ -142,7 +156,10 @@ export function AvailabilityBoard({ db }: { db: Db }) {
             </div>
             <div className="text-center">
               <div className="text-[clamp(1.6rem,2.4vw,3.25rem)] font-black uppercase leading-none tracking-tight">Tickets Availability</div>
-              <div className="mt-1 text-[clamp(0.85rem,1vw,1.4rem)] font-semibold uppercase tracking-wider">{group}</div>
+              <div className="mt-1 text-[clamp(0.85rem,1vw,1.4rem)] font-semibold uppercase tracking-wider">
+                {shown}
+                {counter ? ` · ${counter.code}` : ""}
+              </div>
             </div>
             <div className="flex flex-col items-end gap-1.5 text-[clamp(0.75rem,0.85vw,1.15rem)]">
               {/* Slim legend on the red, not a white box. */}
@@ -162,7 +179,7 @@ export function AvailabilityBoard({ db }: { db: Db }) {
 
           {destinations.length === 0 && (
             <p className="border-2 border-black px-3 py-8 text-center text-[clamp(1.1rem,1.6vw,2.25rem)] font-semibold" style={{ background: NAVY }}>
-              No more {group} trips today{counter ? ` at ${counter.description}` : ""}.
+              No more {shown} trips today{counter ? ` at ${counter.description}` : ""}.
             </p>
           )}
 

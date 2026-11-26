@@ -187,6 +187,11 @@ const REGION_GROUP: Record<Region, RouteGroup | null> = {
 
 /** The board group of a destination: null when not provincial ticketed. Unlisted ones go to Other. */
 const NOT_TICKETED = new Set(["Cavite", "Metro Manila"]);
+/** The board group of a province (booth assignments by province, entry 42). */
+export function routeGroupOfProvince(province: string): RouteGroup | null {
+  return NOT_TICKETED.has(province) ? null : REGION_GROUP[regionOf(province)];
+}
+
 export function routeGroupOf(destination: string): RouteGroup | null {
   const province = provinceOf(destination);
   if (NOT_TICKETED.has(province)) return null;

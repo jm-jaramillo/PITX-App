@@ -37,6 +37,28 @@ sections 2 and 3).
 
 ---
 
+## 42 · PITX ticket booths TB1 to TB4 and TB6 (26 Nov)
+
+The sample booths C01 to C08 are replaced by the real ones, from the floor plan.
+
+| Booth | Floor | Counters | Sells now (filters the board) | Proposed (kept for reference) |
+|---|---|---|---|---|
+| TB1 | Second | 20 | Bicol: Aircon, Deluxe, Luxury | - |
+| TB2 | Second | 10 | Bicol: non-AC / Ordinary | Laguna, Batangas, Quezon, Mindoro |
+| TB3 | Second | 12 | Mindoro, Visayas, Mindanao | Visayas, Mindanao |
+| TB4 | Second | 13 | Bicol, Batangas, Olongapo, Nueva Ecija | Bicol |
+| TB6 | Ground | 10 | Laguna, Quezon, Baguio City | Northern Routes |
+
+- Ticket Availability: picking a booth shows only its routes and groups, with "TB1 sells: ..." under the filter and the booth code on the board. The kiosk is not in the booth list.
+- Aircon or ordinary: from the bus class ("Ordinary", "Non-AC" = non-aircon), else the aircon flag. Trip Scheduling has no aircon field yet, so real trips count as aircon unless the class says otherwise.
+- Olongapo is matched by its province (Zambales), Baguio City by Benguet.
+- Sample week: counter sales are made at a booth that sells the route. Two Bicol operators (Bicol Isarog, Bicol Magayon) get Ordinary buses, so TB2 has trips.
+- Saved data with the old booths switches to TB1 to TB6 on load. A teller signed in at an old booth moves to TB1.
+- Ticket numbers now carry the booth code (e.g. CAGSATB1-000123).
+- Checks: 9 new booth checks pass. The 4 older seed-test failures (entry 39) are still there.
+
+---
+
 ## 41 · Demo-data banner is now a small tag (26 Nov)
 
 - The yellow banner under every page title ("Real PITX trips, operators and plates from Trip Scheduling... Sales are saved in this browser only.") is gone.

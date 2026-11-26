@@ -1,3 +1,4 @@
+import { pitxCounters } from "./booths";
 import { addDemoSales } from "./demo-sales";
 import { todayManila } from "./format";
 import { SAMPLE_OPERATORS } from "./operator-routes";
@@ -78,6 +79,9 @@ const SECOND_NAME: Record<string, string> = { "61": "High capacity", "63": "High
 const SAMPLE_CLASSES: Record<string, [string, string]> = {
   CAGSA: ["Royale", "Royale Elite"],
   DLTB: ["Regular Aircon", "Deluxe"],
+  // Bicol ordinary (non-aircon) buses, sold at TB2 (entry 42).
+  ISARG: ["Ordinary", "Deluxe"],
+  BMG: ["Ordinary", "Aircon"],
 };
 
 /** Ticket rules a sample operator sets (entry 39), like Cagsawa's manual ticket. Others use the PITX defaults. */
@@ -163,7 +167,7 @@ export function sampleFleet(company: Company, n: number): { busTypes: BusType[];
         busClass: (SAMPLE_CLASSES[company.code] ?? ["Regular", SECOND_NAME[layoutId]])[k],
         description: `Unit ${n * 4 + k * 2 + u}`,
         busTypeId,
-        aircon: true,
+        aircon: (SAMPLE_CLASSES[company.code] ?? [])[k] !== "Ordinary",
         charter: u === 2 && n % 3 === 0 ? "Monthly Chartered" : u === 2 && n % 3 === 1 ? "Special Chartered" : "Not Chartered",
         status: "Active",
       });
@@ -249,21 +253,8 @@ export function seedDb(): Db {
     stop.remark = "Selling stopped by the PITX Admin (demo).";
   }
 
-  const counters: Db["counters"] = [
-    ...["A", "B", "C", "D", "E", "F", "G", "H"].map((letter, i) => ({
-      id: `ctr-${i + 1}`,
-      code: `C0${i + 1}`,
-      description: `Booth ${i + 1}`,
-      ticketCode: letter,
-      kiosk: false,
-      townId: "town-pque",
-      allowInternet: false,
-      counterDisplay: true,
-      kioskDisplay: false,
-      status: "Active" as const,
-    })),
-    { id: "ctr-k", code: "K01", description: "Kiosk 1", ticketCode: "K", kiosk: true, townId: "town-pque", allowInternet: true, counterDisplay: false, kioskDisplay: true, status: "Active" },
-  ];
+  // PITX ticket booths TB1 to TB4 and TB6 (entry 42), plus the kiosk.
+  const counters: Db["counters"] = pitxCounters();
 
   const settings: Db["settings"] = {
     defaultCounterId: "ctr-1",
@@ -404,10 +395,10 @@ function counterDay(db: Db, today: string, now: number): Pick<Db, "openings" | "
   // Lines counted every two hours from 6 AM, at four booths and the three gates.
   const queueCounts: QueueCount[] = [];
   const spots: [QueueCount["place"], string][] = [
-    ["Ticket booth", "C01"],
-    ["Ticket booth", "C02"],
-    ["Ticket booth", "C03"],
-    ["Ticket booth", "C04"],
+    ["Ticket booth", "TB1"],
+    ["Ticket booth", "TB2"],
+    ["Ticket booth", "TB3"],
+    ["Ticket booth", "TB4"],
     ["Boarding gate", "Gate 2"],
     ["Boarding gate", "Gate 4"],
     ["Boarding gate", "Gate 5"],

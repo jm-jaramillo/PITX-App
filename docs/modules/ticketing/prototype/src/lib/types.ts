@@ -62,7 +62,26 @@ export interface Counter {
   // Operators designated to sell at this booth (process map: booth and counter assignment).
   // Empty or missing means any operator.
   companyIds?: string[];
+  /** PITX ticket booths (entry 42): "Second floor" or "Ground floor". */
+  floor?: string;
+  /** Number of counter windows in the booth. */
+  windows?: number;
+  /** Routes the booth sells now. Missing means every route. */
+  serves?: BoothServe[];
+  /** Routes proposed for the booth (not used for filtering yet). */
+  proposed?: BoothServe[];
   status: Status;
+}
+
+/**
+ * One line of a booth's assignment, e.g. "Bicol (Aircon, Deluxe, Luxury)": a route group or
+ * provinces, optionally aircon or non-aircon buses only.
+ */
+export interface BoothServe {
+  label: string;
+  group?: string;
+  provinces?: string[];
+  aircon?: boolean;
 }
 
 export interface BusType {

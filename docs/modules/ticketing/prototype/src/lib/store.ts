@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { withPitxBooths } from "./booths";
 import { isOldDemoTicket } from "./demo-sales";
 import { todayManila } from "./format";
 import { routeGroupOf, type RouteGroup } from "./places";
@@ -42,7 +43,7 @@ function load(): Db {
   if (db) return db;
   try {
     const raw = localStorage.getItem(KEY);
-    db = raw ? freshSample(renamedStatus(JSON.parse(raw) as Db)) : seedDb();
+    db = raw ? freshSample(withPitxBooths(renamedStatus(JSON.parse(raw) as Db))) : seedDb();
   } catch {
     db = seedDb();
   }
