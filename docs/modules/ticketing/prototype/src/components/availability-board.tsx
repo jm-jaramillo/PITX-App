@@ -127,56 +127,61 @@ export function AvailabilityBoard({ db }: { db: Db }) {
         </p>
       )}
 
-      <div ref={screen} className="overflow-x-auto bg-white" style={{ background: RED }}>
-        <div className="min-w-[720px] p-2 text-white">
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-1 pb-2">
+      {/* Sizes grow with the screen width (vw), so a wall screen shows it large. */}
+      <div ref={screen} className="pids overflow-x-auto" style={{ background: RED }}>
+        <div className="min-w-[900px] p-[clamp(0.5rem,0.8vw,1.25rem)] text-white">
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 px-1 pb-3">
             <div>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={asset("/brand/pitx-horizontal-on-dark.png")} alt="PITX, Parañaque Integrated Terminal Exchange" className="h-12 w-auto" />
+              <img
+                src={asset("/brand/pitx-horizontal-on-dark.png")}
+                alt="PITX, Parañaque Integrated Terminal Exchange"
+                className="h-[clamp(3.5rem,5vw,7rem)] w-auto"
+              />
             </div>
             <div className="text-center">
-              <div className="text-3xl font-black uppercase tracking-tight sm:text-4xl">Tickets Availability</div>
-              <div className="text-sm font-semibold uppercase tracking-wider">{group}</div>
+              <div className="text-[clamp(2.25rem,4vw,5.5rem)] font-black uppercase leading-none tracking-tight">Tickets Availability</div>
+              <div className="mt-1 text-[clamp(1rem,1.6vw,2.25rem)] font-semibold uppercase tracking-wider">{group}</div>
             </div>
             <div className="flex flex-col items-end gap-1">
-              <ul className="border border-white bg-white text-xs font-bold">
+              <ul className="border border-white bg-white text-[clamp(0.8rem,1vw,1.4rem)] font-bold">
                 {LEGEND.map((l) => (
                   <li key={l.label} className="flex items-center border-b border-slate-300 last:border-0">
-                    <span className="h-4 w-6" style={{ background: l.swatch }} />
+                    <span className="h-[1.4em] w-[2em]" style={{ background: l.swatch }} />
                     <span className="px-2" style={{ color: l.swatch }}>
                       {l.label}
                     </span>
                   </li>
                 ))}
               </ul>
-              <div className="text-base">
+              <div className="text-[clamp(1rem,1.5vw,2.25rem)] font-semibold">
                 <Clock />
               </div>
             </div>
           </div>
 
           {destinations.length === 0 && (
-            <p className="border-2 border-black px-3 py-10 text-center text-xl font-semibold" style={{ background: NAVY }}>
+            <p className="border-2 border-black px-3 py-16 text-center text-[clamp(1.5rem,2.5vw,3.5rem)] font-semibold" style={{ background: NAVY }}>
               No more {group} trips today{counter ? ` at ${counter.description}` : ""}.
             </p>
           )}
 
           {destinations.map((d) => (
             <section key={d} className="border-2 border-black">
-              <h3 className="py-1 text-center text-3xl font-bold uppercase" style={{ background: NAVY }}>
+              <h3 className="py-1 text-center text-[clamp(2rem,3.4vw,4.75rem)] font-bold uppercase leading-tight" style={{ background: NAVY }}>
                 {d}
               </h3>
               <table className="w-full table-fixed text-left">
-                <thead className="text-sm font-bold" style={{ background: MAROON }}>
+                <thead className="text-[clamp(0.95rem,1.3vw,1.9rem)] font-bold" style={{ background: MAROON }}>
                   <tr>
-                    <th className="w-[28%] px-1 py-0.5">Company</th>
-                    <th className="w-[10%] px-1">Aircon</th>
-                    <th className="w-[18%] px-1">Time</th>
-                    <th className="w-[22%] px-1">Available Tickets</th>
-                    <th className="px-1">Status</th>
+                    <th className="w-[30%] px-2 py-1">Company</th>
+                    <th className="w-[10%] px-2">Aircon</th>
+                    <th className="w-[18%] px-2">Time</th>
+                    <th className="w-[20%] px-2">Available Tickets</th>
+                    <th className="px-2">Status</th>
                   </tr>
                 </thead>
-                <tbody className="text-2xl font-bold sm:text-3xl">
+                <tbody className="text-[clamp(1.6rem,2.6vw,3.75rem)] font-bold">
                   {trips
                     .filter((t) => destinationOf(t) === d)
                     .sort((a, b) => a.time.localeCompare(b.time))
@@ -190,8 +195,8 @@ export function AvailabilityBoard({ db }: { db: Db }) {
                         <tr key={t.id} className="text-slate-900" style={{ background: i % 2 ? "#b4b4b4" : "#c8c8c8" }}>
                           <td className="px-0 py-0">
                             <div className="flex items-center gap-3">
-                              <span className="flex h-14 w-32 shrink-0 items-center justify-center bg-white p-1 text-sm">
-                                <CompanyLogo company={company} className="h-12 w-full" />
+                              <span className="flex h-[1.9em] w-[4.4em] shrink-0 items-center justify-center bg-white p-1 text-sm">
+                                <CompanyLogo company={company} className="h-full w-full object-contain" />
                               </span>
                               <span className="truncate">{company?.code}</span>
                             </div>

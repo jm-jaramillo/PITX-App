@@ -110,3 +110,26 @@
     background: #fff;
   }
 }
+
+/* Ticket Availability (entry 38): the board fills the screen width, and its PIDS table heads
+   keep their own size and colour instead of the small grey table heads. */
+@layer utilities {
+  .wrap.wrap-full {
+    max-width: none;
+    padding: 16px 20px 32px;
+  }
+  .wrap .pids thead th {
+    font-size: inherit;
+    letter-spacing: 0;
+    text-transform: none;
+    color: #fff;
+  }
+  .wrap .pids tbody tr:hover {
+    background: inherit;
+  }
+  .pids:fullscreen {
+    width: 100vw;
+    height: 100vh;
+    overflow-y: auto;
+  }
+}

@@ -387,7 +387,8 @@ function Shell({ children }: { children: ReactNode }) {
             </details>
           </div>
         </div>
-        <main className="wrap">
+        {/* Ticket Availability is a wall board: it uses the full width of the screen. */}
+        <main className={pathname.startsWith("/availability") ? "wrap wrap-full" : "wrap"}>
           {canAccess(session.role, pathname) ? (
             <DemoNotice.Provider value={notice}>{children}</DemoNotice.Provider>
           ) : (

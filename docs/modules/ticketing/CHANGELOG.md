@@ -37,6 +37,25 @@ sections 2 and 3).
 
 ---
 
+## 38 · Ticket Availability board: full width, larger (26 Nov)
+
+PITX Admin view of the PIDS board, made to fill the screen.
+
+| Part | Before | Now |
+|---|---|---|
+| Page width | Capped at 1,300px like other pages | Full screen width (Ticket Availability only) |
+| Text sizes | Fixed | Grow with the screen width, so a wall screen or TV shows it large |
+| Destination band | 30px | 32 to 76px |
+| Trip rows (company, time, tickets, status) | 24 to 30px | 26 to 60px |
+| Table heads | Small grey caps (the shared table style was overriding them) | White, 15 to 30px, as on the PIDS |
+| Title, PITX logo, legend, clock | Small | Scaled up the same way |
+| Operator logos | Fixed box | Scale with the row |
+| Full screen | Board could stop short of the screen | Fills the whole screen, scrolls if there are many trips |
+
+- Not checked in the browser: the demo needs the portal sign-in.
+
+---
+
 ## 37 · Company codes match Supabase (19 Nov)
 
 - The demo's company codes were invented before the real codes existed. They now come
