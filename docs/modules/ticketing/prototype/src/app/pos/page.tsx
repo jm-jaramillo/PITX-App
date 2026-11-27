@@ -5,6 +5,7 @@ import { Suspense, useState, type FormEvent } from "react";
 import { InfoTip } from "@/components/info-tip";
 import { OpenCounter } from "@/components/open-counter";
 import { SeatMap } from "@/components/seat-map";
+import { prioritySeats } from "@/lib/seat-layouts";
 import { peso, todayManila } from "@/lib/format";
 import { groupHref } from "@/lib/paths";
 import {
@@ -89,6 +90,8 @@ function Pos() {
   const received = Number(tendered);
   const change = tendered && received >= total ? received - total : null;
   const canCharge = Boolean(db.session?.counterId);
+  // Rows 1 and 2 are for senior citizens and PWDs (entry 44), same as online.
+  const priority = prioritySeats(seating?.layout ?? undefined);
 
   // Picking a seat holds it for everyone else (other tellers, online buyers) until paid.
   function toggleSeat(seatNo: number) {
@@ -104,7 +107,8 @@ function Pos() {
       return;
     }
     if (passengers.length === 0) setStartedAt(new Date().toISOString());
-    setPassengers((current) => [...current, { seatNo, passengerName: "", contactNo: "", email: "", fareType: "Adult", idNo: "" }]);
+    const fareType: FareType = priority.has(seatNo) ? "Senior" : "Adult";
+    setPassengers((current) => [...current, { seatNo, passengerName: "", contactNo: "", email: "", fareType, idNo: "" }]);
   }
 
   function changeTrip(next: string) {
@@ -257,6 +261,7 @@ function Pos() {
                 taken={taken}
                 blocked={seating.blocked}
                 held={held}
+                priority={priority}
                 selected={passengers.map((p) => p.seatNo)}
                 onSelect={toggleSeat}
               />
@@ -281,6 +286,7 @@ function Pos() {
               <legend className="px-1 text-xs font-semibold text-slate-600">
                 Seat {p.seatNo}
                 {route ? ` · ${peso(computeFare(route, p.fareType, counterId))}` : ""}
+                {priority.has(p.seatNo) ? " · Senior / PWD only" : ""}
               </legend>
               <label>
                 Passenger name
@@ -313,7 +319,7 @@ function Pos() {
                   value={p.fareType}
                   onChange={(e) => editPassenger(p.seatNo, { fareType: e.target.value as FareType })}
                 >
-                  {FARE_TYPES.map((f) => (
+                  {FARE_TYPES.filter((f) => !priority.has(p.seatNo) || f === "Senior" || f === "PWD").map((f) => (
                     <option key={f}>{f}</option>
                   ))}
                 </select>

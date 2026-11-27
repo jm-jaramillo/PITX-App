@@ -9,12 +9,14 @@ const LEGEND = [
   { label: "Sold", className: "border-slate-200 bg-slate-300" },
   { label: "Blocked (CR)", className: "border-amber-300 bg-amber-100" },
 ];
+const PRIORITY_LEGEND = { label: "Senior / PWD only", className: "border-violet-400 bg-violet-50" };
 
 export function SeatMap({
   layout,
   taken,
   blocked,
   held = new Set<number>(),
+  priority = new Set<number>(),
   selected,
   onSelect,
 }: {
@@ -22,6 +24,7 @@ export function SeatMap({
   taken: Set<number>;
   blocked: Set<number>;
   held?: Set<number>; // Picked by another teller or an online buyer, not yet paid
+  priority?: Set<number>; // Rows 1 and 2, for senior citizens and PWDs (entry 44)
 
   selected: number[];
   onSelect: (seatNo: number) => void;
@@ -45,7 +48,16 @@ export function SeatMap({
               const isTaken = taken.has(cell.seatNo);
               const isHeld = !isTaken && held.has(cell.seatNo);
               const isSelected = selected.includes(cell.seatNo);
-              const note = isBlocked ? ", blocked" : isTaken ? ", sold" : isHeld ? ", held by someone else" : "";
+              const isPriority = priority.has(cell.seatNo);
+              const note = isBlocked
+                ? ", blocked"
+                : isTaken
+                  ? ", sold"
+                  : isHeld
+                    ? ", held by someone else"
+                    : isPriority
+                      ? ", senior or PWD only"
+                      : "";
               return (
                 <button
                   key={cell.seatNo}
@@ -64,7 +76,9 @@ export function SeatMap({
                           ? "cursor-not-allowed border-sky-300 bg-sky-100 text-sky-800"
                           : isSelected
                           ? "border-accent bg-accent font-semibold text-white"
-                          : "border-slate-300 bg-white hover:border-brand"
+                          : isPriority
+                            ? "border-violet-400 bg-violet-50 text-violet-800 hover:border-brand"
+                            : "border-slate-300 bg-white hover:border-brand"
                   }`}
                 >
                   {cell.seatNo}
@@ -75,7 +89,7 @@ export function SeatMap({
         </div>
       </div>
       <div className="flex flex-wrap gap-3 text-xs text-slate-600">
-        {LEGEND.map((item) => (
+        {[...LEGEND, ...(priority.size ? [PRIORITY_LEGEND] : [])].map((item) => (
           <span key={item.label} className="flex items-center gap-1">
             <span className={`inline-block h-3 w-3 rounded-sm border ${item.className}`} />
             {item.label}

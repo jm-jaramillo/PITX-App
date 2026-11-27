@@ -37,6 +37,23 @@ sections 2 and 3).
 
 ---
 
+## 44 · Senior / PWD rows at POS, cash paid to the teller (27 Nov)
+
+| Change | Detail |
+|---|---|
+| POS seat map | Rows 1 and 2 shown in violet, "Senior / PWD only" in the legend, same as online |
+| POS fare type | A seat in rows 1 and 2 starts as Senior and only offers Senior or PWD. The seat box says "Senior / PWD only" |
+| POS sale check | Selling rows 1 and 2 to a Regular or Student is refused, even if the screen is bypassed |
+| Online cash | No more 7-Eleven, Cebuana or M Lhuillier. Cash now means paying the teller at the booth. The payment step names the booth that sells the route (e.g. TB1 or TB4, second floor) and says seats are not held until paid |
+| Online cash button | "OK, I'll pay at the booth" lets go of the held seats and goes back to the start. No ticket is made online for cash |
+| Cancel refund text | Cash bookings (older ones) say "Refund in cash at the booth" |
+
+- Checked in the local demo: POS as a teller at TB1 (violet rows, Senior/PWD only), Book a Trip cash step as a passenger (booth shown, seats released).
+- Not yet: no "reserve now, pay cash at the booth" booking. Cash buyers pick seats at the booth.
+- Checks: all ticketing checks pass. The 4 older seed-test failures are still there.
+
+---
+
 ## 43 · Passenger booking review, a month of sample data (26 Nov)
 
 **Sample data to work with today**

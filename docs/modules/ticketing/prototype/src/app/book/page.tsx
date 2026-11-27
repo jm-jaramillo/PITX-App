@@ -10,6 +10,7 @@ import { InfoTip } from "@/components/info-tip";
 import { peso, properCase, todayManila } from "@/lib/format";
 import { groupHref, ticketHref } from "@/lib/paths";
 import { provinceOf, regionOf, REGIONS, type Region } from "@/lib/places";
+import { boothServes } from "@/lib/booths";
 import { prioritySeats } from "@/lib/seat-layouts";
 import {
   bookOnline,
@@ -34,7 +35,7 @@ import { FARE_TYPES, type Db, type FareType, type Trip } from "@/lib/types";
 // The passenger's own booking, laid out like buying a cinema ticket:
 //   1 Route: where to and when      2 Trip: the departure (like a screening time)
 //   3 Seats: on the bus seat plan   4 Passengers: names and discounts
-//   5 Payment: GCash, Maya, card or cash, then the e-ticket.
+//   5 Payment: GCash, Maya or card, then the e-ticket. Cash is paid to the teller at the booth.
 // Entry 43: a month calendar for the date, passenger types picked first (rows 1 and 2 are
 // for senior citizens and PWDs only), no "from" prices or cheapest sort (fares are the same
 // across operators), names in proper case, and cash payment.
@@ -53,7 +54,7 @@ const WALLETS: { id: Wallet; label: string; note: string }[] = [
   { id: "GCash", label: "GCash", note: "E-wallet" },
   { id: "Maya", label: "Maya", note: "E-wallet" },
   { id: "Card", label: "Credit or debit card", note: "Visa, Mastercard" },
-  { id: "Cash", label: "Cash", note: "Pay at 7-Eleven, Cebuana or M Lhuillier" },
+  { id: "Cash", label: "Cash", note: "Pay the teller at the PITX booth" },
 ];
 
 const FARE_INFO: Record<FareType, { label: string; idLabel?: string; law?: string }> = {
@@ -224,6 +225,19 @@ export default function BookPage() {
   const seating = trip ? tripSeating(db, trip) : null;
   const block = trip ? sellingBlock(db, trip, today) : null;
   const holdUntil = trip ? myHolds(db, trip).at(0)?.until : undefined;
+  // Cash is paid to the teller (entry 44): the booths at PITX that sell this route.
+  const cashBooths =
+    trip && route
+      ? db.counters.filter(
+          (c) =>
+            !c.kiosk &&
+            c.status === "Active" &&
+            boothServes(c, route.description.replace(/^PITX to /, ""), db.buses.find((b) => b.id === trip.busId)),
+        )
+      : [];
+  const boothText = cashBooths.length
+    ? cashBooths.map((c) => `${c.code}${c.floor ? ` (${c.floor.toLowerCase()})` : ""}`).join(" or ")
+    : "the ticket booths";
   const secondsLeft = holdUntil ? Math.max(0, Math.floor((Date.parse(holdUntil) - now) / 1000)) : 0;
   const holdExpired = passengers.length > 0 && step >= 2 && !holdUntil;
 
@@ -768,16 +782,21 @@ export default function BookPage() {
                       </button>
                     ))}
                   </div>
+                  {wallet === "Cash" ? (
+                    <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                      Pay {peso(total)} in cash to the teller at <b>{boothText}</b> at PITX. Seats are not held until you pay, so
+                      come early.
+                    </p>
+                  ) : (
                   <p className="mt-3">
                     <InfoTip
                       label="Demo payment"
                       note={
-                        wallet === "Cash"
-                          ? `Demo: no real payment. In the live system you get a reference number to pay ${peso(total)} in cash at 7-Eleven, Cebuana or M Lhuillier, and your e-ticket comes once it is paid.`
-                          : `Demo: no real payment. In the live system you are sent to ${wallet === "Card" ? "your bank's secure page" : wallet} to approve ${peso(total)}, then come back here for your e-ticket.`
+                        `Demo: no real payment. In the live system you are sent to ${wallet === "Card" ? "your bank's secure page" : wallet} to approve ${peso(total)}, then come back here for your e-ticket.`
                       }
                     />
                   </p>
+                  )}
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-white p-4">
                   <p className="section-head normal-case mb-2">Before you travel</p>
@@ -878,14 +897,27 @@ export default function BookPage() {
                       : "Go to payment"}
                   </button>
                 ) : (
+                  wallet === "Cash" ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      changeTrip("");
+                      go(0);
+                    }}
+                    className="flex-1 rounded-lg bg-brand px-5 py-2.5 sm:flex-none text-sm font-semibold text-white hover:bg-brand-dark"
+                  >
+                    OK, I&apos;ll pay at the booth
+                  </button>
+                  ) : (
                   <button
                     type="button"
                     disabled={paying || passengers.length === 0 || Boolean(block) || holdExpired}
                     onClick={pay}
                     className="flex-1 rounded-lg bg-brand px-5 py-2.5 sm:flex-none text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-40"
                   >
-                    {paying ? `Paying with ${wallet}…` : wallet === "Cash" ? `Pay ${peso(total)} in cash` : `Pay ${peso(total)}`}
+                    {paying ? `Paying with ${wallet}…` : `Pay ${peso(total)}`}
                   </button>
+                  )
                 )}
               </div>
             </div>
@@ -1165,7 +1197,7 @@ function MyTrips({ db, upcoming, past, onBook, now }: { db: Db; upcoming: Booked
                       ) : (
                         <>
                           <span className="text-slate-600">
-                            Refund {peso(cancel.amount)} to your {ticket.paymentMethod === "Cash" ? "cash payment center" : ticket.paymentMethod}
+                            {ticket.paymentMethod === "Cash" ? `Refund ${peso(cancel.amount)} in cash at the booth` : `Refund ${peso(cancel.amount)} to your ${ticket.paymentMethod}`}
                           </span>
                           <button
                             type="button"

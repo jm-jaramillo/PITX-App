@@ -627,6 +627,8 @@ export function issueTickets(input: IssueInput, today: string): { tickets?: Tick
   if (input.passengers.length === 0) return { error: "Select at least one seat." };
   const { layout, blocked } = tripSeating(current, trip);
   const taken = takenSeats(current, trip.id);
+  // Rows 1 and 2 are for senior citizens and PWDs, at the counter too (entry 44).
+  const priority = prioritySeats(layout ?? undefined);
   const route = current.routes.find((r) => r.id === trip.routeId);
   const company = current.companies.find((c) => c.id === route?.companyId);
   const counter = current.counters.find((c) => c.id === current.session?.counterId);
@@ -639,6 +641,9 @@ export function issueTickets(input: IssueInput, today: string): { tickets?: Tick
     if (!layout || p.seatNo < 1 || p.seatNo > layout.seats) return { error: `Seat ${p.seatNo} isn't on this bus.` };
     if (blocked.has(p.seatNo)) return { error: `Seat ${p.seatNo} is blocked. Pick another seat.` };
     if (taken.has(p.seatNo)) return { error: `Seat ${p.seatNo} was just taken. Pick another seat.` };
+    if (priority.has(p.seatNo) && p.fareType !== "Senior" && p.fareType !== "PWD") {
+      return { error: `Seat ${p.seatNo} is in rows 1 and 2, for senior citizens and PWDs only.` };
+    }
     if (p.fareType !== "Adult" && !p.idNo.trim()) {
       return { error: `Enter the ${p.fareType} ID number for seat ${p.seatNo}.` };
     }
@@ -702,7 +707,7 @@ export function issueTickets(input: IssueInput, today: string): { tickets?: Tick
 export interface OnlineInput {
   tripId: string;
   passengers: PassengerInput[];
-  /** Cash: paid at a payment center (7-Eleven, Cebuana, M Lhuillier) with a reference (entry 43). */
+  /** Online is GCash, Maya or card. Cash is paid to the teller at the booth (entry 44). */
   paymentMethod: PaymentMethod;
   paymentRef: string;
 }
@@ -717,6 +722,7 @@ export function bookOnline(input: OnlineInput, today: string): { tickets?: Ticke
   const blockedReason = sellingBlock(current, trip, today);
   if (blockedReason) return { error: blockedReason };
   if (input.passengers.length === 0) return { error: "Pick at least one seat." };
+  if (input.paymentMethod === "Cash") return { error: "Cash is paid to the teller at the booth, not online." };
   const route = current.routes.find((r) => r.id === trip.routeId);
   const company = current.companies.find((c) => c.id === route?.companyId);
   if (!route || !company) return { error: "This trip's route is missing from Trip Scheduling." };
