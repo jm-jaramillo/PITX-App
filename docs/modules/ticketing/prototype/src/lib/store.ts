@@ -20,6 +20,7 @@ import type {
   FareType,
   PaymentMethod,
   QueueCount,
+  Reservation,
   Route,
   SalesClosing,
   SeatMark,
@@ -204,7 +205,9 @@ const LAST_FEW_SHARE = 0.2;
 /** Ticket availability as named in the OBTS and PIDS specs. */
 export function ticketAvailability(data: Db, trip: Trip): { status: AvailabilityStatus; left: number } {
   const capacity = seatCapacity(data, trip);
-  const left = trip.busId ? Math.max(0, capacity - takenSeats(data, trip.id).size) : 0;
+  // Seats under an unpaid cash reservation (entry 45) aren't open either.
+  const reserved = activeHolds(trip).filter((h) => h.holder.startsWith("reservation|")).length;
+  const left = trip.busId ? Math.max(0, capacity - takenSeats(data, trip.id).size - reserved) : 0;
   if (!trip.busId || trip.stopSelling) return { status: "On-Hold", left };
   if (left === 0) return { status: "Sold Out", left };
   return { status: left <= capacity * LAST_FEW_SHARE ? "Last Few Seats" : "Available", left };
@@ -426,19 +429,29 @@ export function releaseSeats(tripId: string, seatNos?: number[]) {
 }
 
 /** A sale only goes through for seats the seller still holds. */
-function holdProblem(data: Db, trip: Trip, seatNos: number[]): string | null {
+function holdProblem(data: Db, trip: Trip, seatNos: number[], reservationId?: string): string | null {
+  // Seats of the cash reservation being paid count as the teller's own (entry 45).
+  const resKey = reservationId ? reservationHolder(reservationId) : "";
+  const reserved = new Set(activeHolds(trip).filter((h) => resKey && h.holder === resKey).map((h) => h.seatNo));
   const others = heldByOthers(data, trip);
-  const lost = seatNos.filter((n) => others.has(n));
+  const lost = seatNos.filter((n) => others.has(n) && !reserved.has(n));
   if (lost.length) return `Seat ${lost.join(", ")} is being held by someone else. Pick another seat.`;
-  const mine = new Set(myHolds(data, trip).map((h) => h.seatNo));
+  const mine = new Set([...myHolds(data, trip).map((h) => h.seatNo), ...reserved]);
   const expired = seatNos.filter((n) => !mine.has(n));
   if (expired.length) return `The hold on seat ${expired.join(", ")} ran out. Pick the seat again.`;
   return null;
 }
 
-function withoutMyHolds(data: Db, tripId: string): Trip[] {
+function withoutMyHolds(data: Db, tripId: string, alsoHolder = ""): Trip[] {
   const me = holderKey(data.session);
-  return data.trips.map((t) => (t.id === tripId ? { ...t, holds: activeHolds(t).filter((h) => h.holder !== me) } : t));
+  return data.trips.map((t) =>
+    t.id === tripId ? { ...t, holds: activeHolds(t).filter((h) => h.holder !== me && h.holder !== alsoHolder) } : t,
+  );
+}
+
+/** Hold key of a cash reservation's seats. */
+function reservationHolder(id: string): string {
+  return `reservation|${id}`;
 }
 
 export function updateTrip(id: string, changes: { status?: TripStatus; stopSelling?: boolean; remark?: string }) {
@@ -615,6 +628,7 @@ export interface IssueInput {
   tendered: number;
   paymentRef: string;
   startedAt?: string; // When the Teller picked the first seat, for KPI 11
+  reservationId?: string; // Paying a cash reservation made online (entry 45)
 }
 
 /** Sells every seat in one payment, or none of them if anything is wrong. */
@@ -634,6 +648,12 @@ export function issueTickets(input: IssueInput, today: string): { tickets?: Tick
   const counter = current.counters.find((c) => c.id === current.session?.counterId);
   if (!route || !company) return { error: "This trip's route is missing from Trip Scheduling." };
   if (!counter) return { error: "Sign in with a counter to sell tickets." };
+  const reservation = input.reservationId ? current.reservations?.find((r) => r.id === input.reservationId) : undefined;
+  if (input.reservationId) {
+    if (!reservation || reservation.tripId !== trip.id) return { error: "Reservation not found for this trip." };
+    const state = reservationState(reservation);
+    if (state !== "Open") return { error: `Reservation ${reservation.ref} is ${state.toLowerCase()}.` };
+  }
 
   let total = 0;
   for (const p of input.passengers) {
@@ -658,7 +678,7 @@ export function issueTickets(input: IssueInput, today: string): { tickets?: Tick
   if (input.paymentMethod !== "Cash" && !input.paymentRef.trim()) {
     return { error: `Enter the ${input.paymentMethod} reference number.` };
   }
-  const holdError = holdProblem(current, trip, input.passengers.map((p) => p.seatNo));
+  const holdError = holdProblem(current, trip, input.passengers.map((p) => p.seatNo), reservation?.id);
   if (holdError) return { error: holdError };
 
   const groupId = crypto.randomUUID();
@@ -672,6 +692,8 @@ export function issueTickets(input: IssueInput, today: string): { tickets?: Tick
     ticketNo: `${company.ticketCode}${counter.ticketCode}-${String(current.tickets.length + index + 1).padStart(6, "0")}`,
     groupId,
     source: "Counter",
+    bookingRef: reservation?.ref,
+    bookedBy: reservation?.bookedBy,
     tripId: trip.id,
     counterId: counter.id,
     soldBy: current.session?.name,
@@ -692,12 +714,22 @@ export function issueTickets(input: IssueInput, today: string): { tickets?: Tick
   }));
   commit({
     ...current,
-    trips: withoutMyHolds(current, trip.id),
+    trips: withoutMyHolds(current, trip.id, reservation ? reservationHolder(reservation.id) : ""),
     tickets: [...current.tickets, ...tickets],
+    reservations: reservation
+      ? (current.reservations ?? []).map((r) =>
+          r.id === reservation.id ? { ...r, status: "Paid" as const, groupId, paidAt: issuedAt, paidBy: current.session?.name } : r,
+        )
+      : current.reservations,
     audit: [
       ...current.audit,
       ...tickets.map((t) =>
-        entry(current, "Ticket sold", `${t.ticketNo}, ${trip.tripNo} seat ${t.seatNo}`, { ticketId: t.id, tripId: trip.id }),
+        entry(
+          current,
+          "Ticket sold",
+          `${t.ticketNo}, ${trip.tripNo} seat ${t.seatNo}${reservation ? `, reservation ${reservation.ref} paid` : ""}`,
+          { ticketId: t.id, tripId: trip.id },
+        ),
       ),
     ],
   });
@@ -793,6 +825,128 @@ export function bookOnline(input: OnlineInput, today: string): { tickets?: Ticke
 
 /** How the signed-in user may complete a refund or reprint. */
 export type ApprovalStep = "direct" | "password" | "request";
+
+// Cash reservations (entry 45): a passenger picks seats online and pays the teller at the
+// booth. The seats stay held under the reservation until paid, cancelled or the pay-by time.
+const DEFAULT_RESERVE_HOURS = 24;
+const DEFAULT_PAY_BY_MINUTES = 60;
+const MIN_RESERVE_MINUTES = 30; // Less time than this left to pay: no reservation
+const MAX_OPEN_RESERVATIONS = 2; // Per passenger account
+
+export type ReservationState = "Open" | "Expired" | "Paid" | "Cancelled";
+
+export function reservationState(r: Reservation, now = Date.now()): ReservationState {
+  if (r.status === "Open" && Date.parse(r.payBy) <= now) return "Expired";
+  return r.status;
+}
+
+/** When a reservation made now must be paid: within the hold time, and before the booth cutoff. */
+export function reservePayBy(data: Db, trip: Trip, now = Date.now()): number {
+  const hours = data.settings.reserveHours ?? DEFAULT_RESERVE_HOURS;
+  const before = data.settings.reservePayByMinutes ?? DEFAULT_PAY_BY_MINUTES;
+  return Math.min(now + hours * 3_600_000, departureTime(trip) - before * 60_000);
+}
+
+/** Why a passenger can't reserve this trip with cash now, or null. */
+export function reserveBlock(data: Db, trip: Trip, now = Date.now()): string | null {
+  const before = data.settings.reservePayByMinutes ?? DEFAULT_PAY_BY_MINUTES;
+  if (reservePayBy(data, trip, now) - now < MIN_RESERVE_MINUTES * 60_000) {
+    return `Too close to departure to reserve. Cash reservations are paid at least ${before} minutes before the trip. Pay online now or buy at the booth.`;
+  }
+  const open = (data.reservations ?? []).filter((r) => r.bookedBy === data.session?.name && reservationState(r, now) === "Open");
+  if (open.length >= MAX_OPEN_RESERVATIONS) {
+    return `You already have ${open.length} unpaid reservations. Pay or cancel one first.`;
+  }
+  return null;
+}
+
+/** A passenger reserves the seats they hold, to pay in cash at the booth. */
+export function reserveOnline(
+  input: { tripId: string; passengers: PassengerInput[] },
+  today: string,
+): { reservation?: Reservation; error?: string } {
+  const current = load();
+  const session = current.session;
+  if (session?.role !== "Passenger") return { error: "Sign in as a passenger to reserve." };
+  const trip = current.trips.find((t) => t.id === input.tripId);
+  if (!trip) return { error: "Trip not found." };
+  const blockedReason = sellingBlock(current, trip, today) ?? reserveBlock(current, trip);
+  if (blockedReason) return { error: blockedReason };
+  if (input.passengers.length === 0) return { error: "Pick at least one seat." };
+  const taken = takenSeats(current, trip.id);
+  const priority = prioritySeats(tripSeating(current, trip).layout ?? undefined);
+  for (const p of input.passengers) {
+    if (!p.passengerName.trim()) return { error: `Enter the passenger name for seat ${p.seatNo}.` };
+    if (taken.has(p.seatNo)) return { error: `Seat ${p.seatNo} was just sold. Pick another seat.` };
+    if (priority.has(p.seatNo) && p.fareType !== "Senior" && p.fareType !== "PWD") {
+      return { error: `Seat ${p.seatNo} is in rows 1 and 2, for senior citizens and PWDs only.` };
+    }
+    if (p.fareType !== "Adult" && !p.idNo.trim()) return { error: `Enter the ${p.fareType} ID number for seat ${p.seatNo}.` };
+  }
+  const holdError = holdProblem(current, trip, input.passengers.map((p) => p.seatNo));
+  if (holdError) return { error: holdError };
+
+  const id = crypto.randomUUID();
+  const ref = `PX-R${String(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000))}`;
+  const now = Date.now();
+  const payBy = new Date(reservePayBy(current, trip, now)).toISOString();
+  const reservation: Reservation = {
+    id,
+    ref,
+    tripId: trip.id,
+    passengers: input.passengers.map((p) => ({ ...p, passengerName: p.passengerName.trim(), idNo: p.idNo.trim() })),
+    bookedBy: session.name,
+    createdAt: new Date(now).toISOString(),
+    payBy,
+    status: "Open",
+  };
+  const holds = input.passengers.map((p) => ({
+    seatNo: p.seatNo,
+    holder: reservationHolder(id),
+    holderName: `cash reservation ${ref}`,
+    until: payBy,
+  }));
+  const trips = withoutMyHolds(current, trip.id).map((t) => (t.id === trip.id ? { ...t, holds: [...(t.holds ?? []), ...holds] } : t));
+  const seats = reservation.passengers.map((p) => p.seatNo).join(", ");
+  commit({
+    ...current,
+    trips,
+    reservations: [...(current.reservations ?? []), reservation],
+    audit: [...current.audit, entry(current, "Reserved online (cash)", `${ref}, ${trip.tripNo} seat ${seats}, pay by ${payBy}`, { tripId: trip.id })],
+  });
+  return { reservation };
+}
+
+/** The passenger cancels their unpaid reservation. The seats go back on sale at once. */
+export function cancelReservation(id: string): string | null {
+  const current = load();
+  const r = current.reservations?.find((x) => x.id === id);
+  if (!r) return "Reservation not found.";
+  if (current.session?.role !== "Passenger" || r.bookedBy !== current.session.name) return "Only the passenger who reserved can cancel.";
+  const state = reservationState(r);
+  if (state !== "Open") return `This reservation is ${state.toLowerCase()}.`;
+  const key = reservationHolder(id);
+  commit({
+    ...current,
+    trips: current.trips.map((t) => (t.id === r.tripId ? { ...t, holds: (t.holds ?? []).filter((h) => h.holder !== key) } : t)),
+    reservations: (current.reservations ?? []).map((x) => (x.id === id ? { ...x, status: "Cancelled" as const } : x)),
+    audit: [...current.audit, entry(current, "Reservation cancelled", `${r.ref} (by passenger)`, { tripId: r.tripId })],
+  });
+  return null;
+}
+
+/** POS: an open cash reservation by its number, for the teller to collect. */
+export function findReservation(data: Db, ref: string): { reservation?: Reservation; error?: string } {
+  const text = ref.trim().toUpperCase();
+  if (!text) return { error: "Enter the reservation number." };
+  const reservation = (data.reservations ?? []).find((r) => r.ref === text);
+  if (!reservation) return { error: `No reservation ${text}.` };
+  const state = reservationState(reservation);
+  if (state !== "Open") return { error: `Reservation ${text} is ${state.toLowerCase()}.` };
+  const trip = data.trips.find((t) => t.id === reservation.tripId);
+  if (!trip || !canReachTrip(data, trip)) return { error: `Reservation ${text} is for another company's trip.` };
+  return { reservation };
+}
 
 function stepForMode(mode: ApprovalMode): ApprovalStep {
   return mode === "None" ? "direct" : mode === "Password" ? "password" : "request";
@@ -902,6 +1056,9 @@ export function pendingRequest(data: Db, ticketId: string, type: ApprovalRequest
 export function passengerCancelPlan(data: Db, ticket: Ticket, now: number): { block?: string; amount: number } {
   const amount = refundAmountFor(data, ticket);
   const session = data.session;
+  if (session?.role === "Passenger" && ticket.bookedBy === session.name && ticket.source === "Counter") {
+    return { amount, block: "Paid at the booth. For a refund, go to the operator's ticket booth at PITX." };
+  }
   if (session?.role !== "Passenger" || ticket.source !== "Online" || ticket.bookedBy !== session.name) {
     return { amount, block: "Only the passenger who booked online can cancel here." };
   }

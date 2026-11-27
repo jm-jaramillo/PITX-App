@@ -15,6 +15,11 @@ import { prioritySeats } from "@/lib/seat-layouts";
 import {
   bookOnline,
   cancelBooking,
+  cancelReservation,
+  reservationState,
+  reserveBlock,
+  reserveOnline,
+  reservePayBy,
   computeFare,
   heldByOthers,
   holdSeat,
@@ -30,7 +35,7 @@ import {
   useDb,
   type PassengerInput,
 } from "@/lib/store";
-import { FARE_TYPES, type Db, type FareType, type Trip } from "@/lib/types";
+import { FARE_TYPES, type Db, type FareType, type Reservation, type Trip } from "@/lib/types";
 
 // The passenger's own booking, laid out like buying a cinema ticket:
 //   1 Route: where to and when      2 Trip: the departure (like a screening time)
@@ -54,7 +59,7 @@ const WALLETS: { id: Wallet; label: string; note: string }[] = [
   { id: "GCash", label: "GCash", note: "E-wallet" },
   { id: "Maya", label: "Maya", note: "E-wallet" },
   { id: "Card", label: "Credit or debit card", note: "Visa, Mastercard" },
-  { id: "Cash", label: "Cash", note: "Pay the teller at the PITX booth" },
+  { id: "Cash", label: "Cash", note: "Reserve now, pay the teller at PITX" },
 ];
 
 const FARE_INFO: Record<FareType, { label: string; idLabel?: string; law?: string }> = {
@@ -225,19 +230,10 @@ export default function BookPage() {
   const seating = trip ? tripSeating(db, trip) : null;
   const block = trip ? sellingBlock(db, trip, today) : null;
   const holdUntil = trip ? myHolds(db, trip).at(0)?.until : undefined;
-  // Cash is paid to the teller (entry 44): the booths at PITX that sell this route.
-  const cashBooths =
-    trip && route
-      ? db.counters.filter(
-          (c) =>
-            !c.kiosk &&
-            c.status === "Active" &&
-            boothServes(c, route.description.replace(/^PITX to /, ""), db.buses.find((b) => b.id === trip.busId)),
-        )
-      : [];
-  const boothText = cashBooths.length
-    ? cashBooths.map((c) => `${c.code}${c.floor ? ` (${c.floor.toLowerCase()})` : ""}`).join(" or ")
-    : "the ticket booths";
+  // Cash is a reservation paid to the teller at the booth (entries 44 and 45).
+  const boothText = trip ? boothsFor(db, trip) : "the ticket booths";
+  const reserveProblem = trip ? reserveBlock(db, trip, now) : null;
+  const payByText = trip ? clockText(reservePayBy(db, trip, now)) : "";
   const secondsLeft = holdUntil ? Math.max(0, Math.floor((Date.parse(holdUntil) - now) / 1000)) : 0;
   const holdExpired = passengers.length > 0 && step >= 2 && !holdUntil;
 
@@ -352,12 +348,40 @@ export default function BookPage() {
     }, 1200);
   }
 
+  /** Cash: reserve the held seats, pay the teller at the booth (entry 45). */
+  function reserve() {
+    const problem = checkPassengers();
+    if (problem) return setError(problem);
+    const result = reserveOnline(
+      {
+        tripId,
+        passengers: passengers
+          .slice()
+          .sort((a, b) => a.seatNo - b.seatNo)
+          .map((p) => ({ ...p, contactNo: contact.mobile, email: contact.email })),
+      },
+      today,
+    );
+    if (result.error) return setError(result.error);
+    heldTrip.current = "";
+    setTripId("");
+    setPassengers([]);
+    setStep(0);
+    setTab("mine");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  // Own bookings: online, and reservations paid at the booth (entry 45).
   const mine = db.tickets
-    .filter((t) => t.bookedBy === db.session?.name && t.source === "Online")
+    .filter((t) => t.bookedBy === db.session?.name)
     .map((t) => ({ ticket: t, trip: db.trips.find((x) => x.id === t.tripId) }))
     .sort((a, b) => `${a.trip?.date}${a.trip?.time}`.localeCompare(`${b.trip?.date}${b.trip?.time}`));
   const upcoming = mine.filter((m) => m.ticket.status === "Ticketed" && m.trip && m.trip.status !== "Departed" && m.trip.status !== "Cancelled");
   const past = mine.filter((m) => !upcoming.includes(m)).reverse();
+  const myReservations = (db.reservations ?? [])
+    .filter((r) => r.bookedBy === db.session?.name && reservationState(r, now) !== "Paid")
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const openReservations = myReservations.filter((r) => reservationState(r, now) === "Open");
 
   return (
     <div className="min-w-0 space-y-4">
@@ -369,7 +393,7 @@ export default function BookPage() {
         {(
           [
             ["book", "Book a trip"],
-            ["mine", `My trips (${upcoming.length})`],
+            ["mine", `My trips (${upcoming.length + openReservations.length})`],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -386,7 +410,7 @@ export default function BookPage() {
       </div>
 
       {tab === "mine" ? (
-        <MyTrips db={db} upcoming={upcoming} past={past} now={now} onBook={() => setTab("book")} />
+        <MyTrips db={db} upcoming={upcoming} past={past} reservations={myReservations} now={now} onBook={() => setTab("book")} />
       ) : (
         <>
           <Stepper
@@ -783,10 +807,21 @@ export default function BookPage() {
                     ))}
                   </div>
                   {wallet === "Cash" ? (
-                    <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-                      Pay {peso(total)} in cash to the teller at <b>{boothText}</b> at PITX. Seats are not held until you pay, so
-                      come early.
-                    </p>
+                    <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                      {reserveProblem ? (
+                        <p className="text-red-700">{reserveProblem}</p>
+                      ) : (
+                        <>
+                          <p>
+                            Reserve now, then pay {peso(total)} in cash to the teller at <b>{boothText}</b> at PITX by{" "}
+                            <b>{payByText}</b>.
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Give the teller your reservation number. Not paid by then, the seats go back on sale.
+                          </p>
+                        </>
+                      )}
+                    </div>
                   ) : (
                   <p className="mt-3">
                     <InfoTip
@@ -900,13 +935,11 @@ export default function BookPage() {
                   wallet === "Cash" ? (
                   <button
                     type="button"
-                    onClick={() => {
-                      changeTrip("");
-                      go(0);
-                    }}
-                    className="flex-1 rounded-lg bg-brand px-5 py-2.5 sm:flex-none text-sm font-semibold text-white hover:bg-brand-dark"
+                    disabled={paying || passengers.length === 0 || Boolean(block) || Boolean(reserveProblem) || holdExpired}
+                    onClick={reserve}
+                    className="flex-1 rounded-lg bg-brand px-5 py-2.5 sm:flex-none text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-40"
                   >
-                    OK, I&apos;ll pay at the booth
+                    Reserve, pay at the booth
                   </button>
                   ) : (
                   <button
@@ -1128,8 +1161,105 @@ function OrderSummary({
 
 type Booked = { ticket: Db["tickets"][number]; trip?: Trip };
 
-function MyTrips({ db, upcoming, past, onBook, now }: { db: Db; upcoming: Booked[]; past: Booked[]; onBook: () => void; now: number }) {
-  if (upcoming.length + past.length === 0) {
+/** The PITX booths that sell a trip's route, e.g. "TB1 (second floor) or TB4 (second floor)". */
+function boothsFor(db: Db, trip: Trip): string {
+  const route = db.routes.find((r) => r.id === trip.routeId);
+  const bus = db.buses.find((b) => b.id === trip.busId);
+  const booths = route
+    ? db.counters.filter((c) => !c.kiosk && c.status === "Active" && boothServes(c, route.description.replace(/^PITX to /, ""), bus))
+    : [];
+  return booths.length ? booths.map((c) => `${c.code}${c.floor ? ` (${c.floor.toLowerCase()})` : ""}`).join(" or ") : "the ticket booths";
+}
+
+/** "Fri, Nov 27, 2:30 PM" in Manila time. */
+function clockText(ms: number): string {
+  return new Date(ms).toLocaleString("en-PH", {
+    timeZone: "Asia/Manila",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+/** Cash reservations in My trips (entry 45): open ones to pay at the booth, then expired or cancelled. */
+function ReservationCard({ db, r, now }: { db: Db; r: Reservation; now: number }) {
+  const trip = db.trips.find((t) => t.id === r.tripId);
+  const route = db.routes.find((x) => x.id === trip?.routeId);
+  const company = db.companies.find((c) => c.id === route?.companyId);
+  const state = reservationState(r, now);
+  const total = route
+    ? r.passengers.reduce((sum, p) => sum + computeFare(route, p.fareType) + db.settings.insurancePrice, 0)
+    : 0;
+  const tone = state === "Open" ? "bg-amber-100 text-amber-900" : "bg-slate-200 text-slate-700";
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white">
+      <div className="flex gap-3 p-3">
+        <span className="w-16 shrink-0 border-r border-dashed border-slate-300 pr-3 text-center">
+          <span className="block text-[11px] font-semibold text-slate-500">{trip ? dayLabel(trip.date, { month: "short" }) : ""}</span>
+          <span className="block text-2xl font-bold leading-none">{trip ? dayLabel(trip.date, { day: "numeric" }) : ""}</span>
+          <span className="block text-[11px] text-slate-500">{trip ? time12(trip.time) : ""}</span>
+        </span>
+        <span className="min-w-0 flex-1 text-sm">
+          <span className="flex items-center justify-between gap-2">
+            <span className="truncate font-semibold">PITX → {placeOf(route?.description)}</span>
+            <span className={`shrink-0 rounded px-1.5 text-[11px] font-semibold ${tone}`}>
+              {state === "Open" ? "Pay at the booth" : state}
+            </span>
+          </span>
+          <span className="block truncate text-xs text-slate-600">
+            {properCase(company?.name)} · Seat {r.passengers.map((p) => p.seatNo).join(", ")} ·{" "}
+            {r.passengers.map((p) => p.passengerName).join(", ")}
+          </span>
+          <span className="block text-xs text-slate-500">
+            Reservation <b className="text-slate-800">{r.ref}</b> · {peso(total)} cash
+          </span>
+          {state === "Open" && trip && (
+            <span className="mt-1 block text-xs text-slate-700">
+              Pay at <b>{boothsFor(db, trip)}</b> by <b>{clockText(Date.parse(r.payBy))}</b>. Not paid by then, the seats go back on sale.
+            </span>
+          )}
+        </span>
+      </div>
+      {state === "Open" && (
+        <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-3 py-2 text-xs">
+          <span className="text-slate-500">Nothing paid yet, so nothing to refund.</span>
+          <button
+            type="button"
+            className="rounded border border-red-300 px-2.5 py-1 font-semibold text-red-700 hover:bg-red-50"
+            onClick={() => {
+              if (!window.confirm(`Cancel reservation ${r.ref}? The seats go back on sale.`)) return;
+              const problem = cancelReservation(r.id);
+              if (problem) window.alert(problem);
+            }}
+          >
+            Cancel reservation
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MyTrips({
+  db,
+  upcoming,
+  past,
+  reservations,
+  onBook,
+  now,
+}: {
+  db: Db;
+  upcoming: Booked[];
+  past: Booked[];
+  reservations: Reservation[];
+  onBook: () => void;
+  now: number;
+}) {
+  const open = reservations.filter((r) => reservationState(r, now) === "Open");
+  const closed = reservations.filter((r) => reservationState(r, now) !== "Open");
+  if (upcoming.length + past.length + reservations.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center">
         <p className="font-semibold">No trips yet</p>
@@ -1142,6 +1272,16 @@ function MyTrips({ db, upcoming, past, onBook, now }: { db: Db; upcoming: Booked
   }
   return (
     <div className="space-y-4">
+      {open.length > 0 && (
+        <section className="space-y-2">
+          <p className="section-head normal-case">Reserved, pay in cash at the booth</p>
+          <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+            {open.map((r) => (
+              <ReservationCard key={r.id} db={db} r={r} now={now} />
+            ))}
+          </div>
+        </section>
+      )}
       {[
         ["Upcoming", upcoming],
         ["Past and cancelled", past],
@@ -1220,6 +1360,16 @@ function MyTrips({ db, upcoming, past, onBook, now }: { db: Db; upcoming: Booked
             </div>
           </section>
         ),
+      )}
+      {closed.length > 0 && (
+        <section className="space-y-2">
+          <p className="section-head normal-case">Expired and cancelled reservations</p>
+          <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+            {closed.map((r) => (
+              <ReservationCard key={r.id} db={db} r={r} now={now} />
+            ))}
+          </div>
+        </section>
       )}
     </div>
   );

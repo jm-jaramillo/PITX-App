@@ -248,6 +248,8 @@ export interface SystemParams {
   reprintApproval: ApprovalMode;
   reprintReasons: string[];
   seatHoldMinutes: number; // How long a picked, unpaid seat stays held
+  reserveHours?: number; // Cash reservations (entry 45): held this long at most (default 24)
+  reservePayByMinutes?: number; // and paid at the booth at least this long before departure (default 60)
   issueTargetSeconds: number; // KPI 11: one counter sale should take at most this long
   openingChecks: string[]; // Booth activation checks a Teller ticks before the first sale of the day
   approvalPassword: string; // Demo only: real accounts must replace this
@@ -346,6 +348,28 @@ export interface AuditEntry {
   detail: string;
 }
 
+/** A seat reserved online, paid in cash to the teller at the booth (entry 45). */
+export interface Reservation {
+  id: string;
+  ref: string; // Shown to the passenger and typed in at POS, e.g. PX-R123456
+  tripId: string;
+  passengers: {
+    seatNo: number;
+    passengerName: string;
+    contactNo: string;
+    email: string;
+    fareType: FareType;
+    idNo: string;
+  }[];
+  bookedBy: string; // Passenger account name
+  createdAt: string;
+  payBy: string; // After this the seats go back on sale
+  status: "Open" | "Paid" | "Cancelled"; // Open past payBy reads as Expired
+  groupId?: string; // The tickets once paid
+  paidAt?: string;
+  paidBy?: string;
+}
+
 export interface Db {
   provinces: Province[];
   towns: Town[];
@@ -364,6 +388,7 @@ export interface Db {
   closings: SalesClosing[];
   openings: CounterOpening[];
   queueCounts: QueueCount[];
+  reservations?: Reservation[]; // Missing in data saved before entry 45
   source?: "sample" | "pitx"; // pitx: masterfiles and trips read from the other modules (live.ts)
   loadedAt?: string; // ISO timestamp of the last read from PITX
   seededOn?: string; // Manila date the sample week was made: a new day makes a new week

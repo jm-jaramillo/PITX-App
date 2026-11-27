@@ -37,6 +37,39 @@ sections 2 and 3).
 
 ---
 
+## 45 · Cash reservations: reserve online, pay the teller (27 Nov)
+
+**Passenger (Book a Trip)**
+
+| Point | Now |
+|---|---|
+| Cash option | "Reserve now, pay the teller at PITX". Shows the booth that sells the route (e.g. TB4, second floor) and the pay-by time |
+| Pay-by | 24 hours after reserving, or 60 minutes before departure, whichever comes first |
+| Too close | No reservation when less than 30 minutes would be left to pay. Pay online or buy at the booth |
+| Limit | 2 unpaid reservations per passenger account |
+| My trips | New "Reserved, pay in cash at the booth" section: reservation no. (PX-R######), seats, cash amount, booth, pay-by. **Cancel reservation** button (nothing to refund) |
+| Expired | Not paid by the pay-by time: the seats go back on sale and it shows under "Expired and cancelled reservations" |
+
+**Teller (POS)**
+
+| Point | Now |
+|---|---|
+| Find | "Cash reservation no." box at the top of POS. Loads the trip, seats and passengers |
+| Collect | Check the IDs, take the cash, record payment as usual. The sale counts in the teller's cash and Close Sales like any counter sale |
+| Seats | Locked to the reservation while collecting. "Clear" to sell something else |
+| After | Reservation marked Paid. The ticket keeps the reservation no. and shows in the passenger's My trips. Refunds for these are at the booth |
+
+**Seats**
+- Reserved seats are held for everyone else (POS, online) until paid, cancelled or expired.
+- Ticket Availability counts reserved seats as not open.
+- No ticket exists until the teller is paid, so manifest, reports and boarding only see paid tickets.
+
+- Checked in the local demo: passenger reserved seat 12 on a Baliwag trip (TB4 shown), teller at TB4 found it, took ₱600 cash, ticket issued, reservation Paid, hold gone.
+- Checks: new reservation test (19 checks) passes. All other ticketing checks pass. The 4 older seed-test failures are still there.
+- Open: the counter fare applies at the booth, which can differ from the online fare shown when reserving. Pay-by rules (24 h, 60 min) are fixed in code for now, not in System Parameters.
+
+---
+
 ## 44 · Senior / PWD rows at POS, cash paid to the teller (27 Nov)
 
 | Change | Detail |
@@ -49,7 +82,7 @@ sections 2 and 3).
 | Cancel refund text | Cash bookings (older ones) say "Refund in cash at the booth" |
 
 - Checked in the local demo: POS as a teller at TB1 (violet rows, Senior/PWD only), Book a Trip cash step as a passenger (booth shown, seats released).
-- Not yet: no "reserve now, pay cash at the booth" booking. Cash buyers pick seats at the booth.
+- Not yet: no "reserve now, pay cash at the booth" booking. Cash buyers pick seats at the booth (done in entry 45).
 - Checks: all ticketing checks pass. The 4 older seed-test failures are still there.
 
 ---

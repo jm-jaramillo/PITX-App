@@ -11,6 +11,7 @@ import { groupHref } from "@/lib/paths";
 import {
   computeFare,
   counterOpenedToday,
+  findReservation,
   heldByOthers,
   holdSeat,
   issueTickets,
@@ -26,7 +27,7 @@ import {
   useDb,
   type PassengerInput,
 } from "@/lib/store";
-import { FARE_TYPES, PAYMENT_METHODS, type FareType, type PaymentMethod } from "@/lib/types";
+import { FARE_TYPES, PAYMENT_METHODS, type FareType, type PaymentMethod, type Reservation } from "@/lib/types";
 import { PageTitle } from "@/components/page-title";
 
 const TIME_RANGES = {
@@ -58,6 +59,9 @@ function Pos() {
   const [townId, setTownId] = useState("");
   const [letter, setLetter] = useState("");
   const [timeRange, setTimeRange] = useState<keyof typeof TIME_RANGES>("All");
+  // Collecting a cash reservation made online (entry 45).
+  const [resRef, setResRef] = useState("");
+  const [reservation, setReservation] = useState<Reservation | null>(null);
 
   const openTrips = reachable
     .filter((t) => t.date === date && !sellingClosed(db, t) && (t.status === "Scheduled" || t.status === "Boarding"))
@@ -82,7 +86,8 @@ function Pos() {
   const capacity = trip ? seatCapacity(db, trip) : 0;
   const taken = trip ? takenSeats(db, trip.id) : new Set<number>();
   const block = trip ? sellingBlock(db, trip, today) : null;
-  const held = trip ? heldByOthers(db, trip) : new Set<number>();
+  const reservedSeats = new Set(reservation?.passengers.map((p) => p.seatNo) ?? []);
+  const held = trip ? new Set([...heldByOthers(db, trip)].filter((n) => !reservedSeats.has(n))) : new Set<number>();
   const holdUntil = trip ? myHolds(db, trip).at(0)?.until : undefined;
   const counterId = db.session?.counterId;
   const insurance = db.settings.insurancePrice;
@@ -96,6 +101,10 @@ function Pos() {
   // Picking a seat holds it for everyone else (other tellers, online buyers) until paid.
   function toggleSeat(seatNo: number) {
     setError(null);
+    if (reservation) {
+      setError(`These seats are from reservation ${reservation.ref}. Clear the reservation to pick other seats.`);
+      return;
+    }
     if (passengers.some((p) => p.seatNo === seatNo)) {
       releaseSeats(tripId, [seatNo]);
       setPassengers((current) => current.filter((p) => p.seatNo !== seatNo));
@@ -111,7 +120,28 @@ function Pos() {
     setPassengers((current) => [...current, { seatNo, passengerName: "", contactNo: "", email: "", fareType, idNo: "" }]);
   }
 
+  /** Loads a cash reservation: its trip, seats and passengers, ready to collect. */
+  function loadReservation() {
+    const found = findReservation(db, resRef);
+    if (!found.reservation) return setError(found.error ?? "Reservation not found.");
+    const r = found.reservation;
+    const resTrip = db.trips.find((t) => t.id === r.tripId);
+    if (tripId) releaseSeats(tripId);
+    setProvinceId("");
+    setTownId("");
+    setLetter("");
+    setTimeRange("All");
+    if (resTrip) setDate(resTrip.date);
+    setTripId(r.tripId);
+    setPassengers(r.passengers.map((p) => ({ ...p })));
+    setReservation(r);
+    setPaymentMethod("Cash");
+    setStartedAt(new Date().toISOString());
+    setError(null);
+  }
+
   function changeTrip(next: string) {
+    setReservation(null);
     if (tripId) releaseSeats(tripId);
     setTripId(next);
     setPassengers([]);
@@ -125,7 +155,10 @@ function Pos() {
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    const result = issueTickets({ tripId, passengers, paymentMethod, tendered: received, paymentRef, startedAt }, today);
+    const result = issueTickets(
+      { tripId, passengers, paymentMethod, tendered: received, paymentRef, startedAt, reservationId: reservation?.id },
+      today,
+    );
     if (result.error) {
       setError(result.error);
       return;
@@ -146,6 +179,40 @@ function Pos() {
       ) : (
       <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_24rem]">
         <div className="min-w-0 space-y-4">
+          <form
+            noValidate
+            onSubmit={(e) => {
+              e.preventDefault();
+              loadReservation();
+            }}
+            className="flex flex-wrap items-end gap-2 rounded-lg border border-slate-200 bg-white p-4"
+          >
+            {reservation ? (
+              <div className="flex w-full flex-wrap items-center justify-between gap-2 text-sm">
+                <span>
+                  Collecting cash reservation <b>{reservation.ref}</b> for {reservation.bookedBy}, seat{" "}
+                  {reservation.passengers.map((p) => p.seatNo).join(", ")}. Check the IDs, then take the cash.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => changeTrip("")}
+                  className="rounded border border-slate-300 px-2.5 py-1 text-xs font-semibold"
+                >
+                  Clear
+                </button>
+              </div>
+            ) : (
+              <>
+                <label className="min-w-48 flex-1">
+                  Cash reservation no. (paid at the booth)
+                  <input value={resRef} placeholder="PX-R123456" onChange={(e) => setResRef(e.target.value)} />
+                </label>
+                <button type="submit" className="rounded border border-brand px-3 py-2 text-sm font-semibold text-brand">
+                  Find
+                </button>
+              </>
+            )}
+          </form>
           <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-3">
             <label>
               Date
